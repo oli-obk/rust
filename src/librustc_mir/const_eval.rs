@@ -147,6 +147,10 @@ fn eval_body_using_ecx<'mir, 'tcx>(
     body: &'mir mir::Body<'tcx>,
     param_env: ty::ParamEnv<'tcx>,
 ) -> InterpResult<'tcx, MPlaceTy<'tcx>> {
+    use crate::rustc::ty::TypeFoldable;
+    if cid.instance.substs.is_empty() && body.needs_subst() {
+        throw_inval!(TooGeneric);
+    }
     debug!("eval_body_using_ecx: {:?}, {:?}", cid, param_env);
     let tcx = ecx.tcx.tcx;
     let layout = ecx.layout_of(body.return_ty().subst(tcx, cid.instance.substs))?;

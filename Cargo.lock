@@ -3263,6 +3263,8 @@ dependencies = [
  "rustc_traits",
  "rustc_typeck",
  "serialize",
+ "sire",
+ "sire-smt",
  "smallvec",
  "syntax",
  "syntax_ext",
@@ -3782,6 +3784,21 @@ name = "siphasher"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0df90a788073e8d0235a67e50441d47db7c8ad9debd91cbf43736a2a92d36537"
+
+[[package]]
+name = "sire"
+version = "0.1.0"
+dependencies = [
+ "rustc",
+]
+
+[[package]]
+name = "sire-smt"
+version = "0.1.0"
+dependencies = [
+ "rustc",
+ "sire",
+]
 
 [[package]]
 name = "sized-chunks"
