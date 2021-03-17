@@ -24,6 +24,7 @@ use rustc_middle::ty::{self, AdtDef, DefIdTree, Region, Ty, TyCtxt, UserType};
 use rustc_middle::ty::{
     CanonicalUserType, CanonicalUserTypeAnnotation, CanonicalUserTypeAnnotations,
 };
+use rustc_middle::ty::{ConstInt, ScalarInt};
 use rustc_span::{Span, Symbol, DUMMY_SP};
 use rustc_target::abi::VariantIdx;
 
@@ -196,8 +197,9 @@ pub enum PatKind<'tcx> {
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct PatRange<'tcx> {
-    pub lo: &'tcx ty::Const<'tcx>,
-    pub hi: &'tcx ty::Const<'tcx>,
+    pub lo: ScalarInt,
+    pub hi: ScalarInt,
+    pub ty: Ty<'tcx>,
     pub end: RangeEnd,
 }
 
@@ -316,10 +318,12 @@ impl<'tcx> fmt::Display for Pat<'tcx> {
                 write!(f, "{}", subpattern)
             }
             PatKind::Constant { value } => write!(f, "{}", value),
-            PatKind::Range(PatRange { lo, hi, end }) => {
-                write!(f, "{}", lo)?;
+            PatKind::Range(PatRange { lo, hi, end, ty }) => {
+                let lo = ConstInt::new(lo, ty.is_signed(), ty.is_ptr_sized_integral());
+                let hi = ConstInt::new(hi, ty.is_signed(), ty.is_ptr_sized_integral());
+                write!(f, "{:?}", lo)?;
                 write!(f, "{}", end)?;
-                write!(f, "{}", hi)
+                write!(f, "{:?}", hi)
             }
             PatKind::Slice { ref prefix, ref slice, ref suffix }
             | PatKind::Array { ref prefix, ref slice, ref suffix } => {
@@ -447,10 +451,23 @@ impl<'a, 'tcx> PatCtxt<'a, 'tcx> {
         assert_eq!(lo.ty, ty);
         assert_eq!(hi.ty, ty);
         let cmp = compare_const_vals(self.tcx, lo, hi, self.param_env, ty);
+        let lo_const = lo;
+        let lo = lo
+            .val
+            .eval(self.tcx, self.param_env)
+            .try_to_scalar_int()
+            .expect("range patterns must be integral");
+        let hi = hi
+            .val
+            .eval(self.tcx, self.param_env)
+            .try_to_scalar_int()
+            .expect("range patterns must be integral");
         match (end, cmp) {
             // `x..y` where `x < y`.
             // Non-empty because the range includes at least `x`.
-            (RangeEnd::Excluded, Some(Ordering::Less)) => PatKind::Range(PatRange { lo, hi, end }),
+            (RangeEnd::Excluded, Some(Ordering::Less)) => {
+                PatKind::Range(PatRange { lo, hi, end, ty })
+            }
             // `x..y` where `x >= y`. The range is empty => error.
             (RangeEnd::Excluded, _) => {
                 struct_span_err!(
@@ -463,9 +480,11 @@ impl<'a, 'tcx> PatCtxt<'a, 'tcx> {
                 PatKind::Wild
             }
             // `x..=y` where `x == y`.
-            (RangeEnd::Included, Some(Ordering::Equal)) => PatKind::Constant { value: lo },
+            (RangeEnd::Included, Some(Ordering::Equal)) => PatKind::Constant { value: lo_const },
             // `x..=y` where `x < y`.
-            (RangeEnd::Included, Some(Ordering::Less)) => PatKind::Range(PatRange { lo, hi, end }),
+            (RangeEnd::Included, Some(Ordering::Less)) => {
+                PatKind::Range(PatRange { lo, hi, end, ty })
+            }
             // `x..=y` where `x > y` hence the range is empty => error.
             (RangeEnd::Included, _) => {
                 let mut err = struct_span_err!(
