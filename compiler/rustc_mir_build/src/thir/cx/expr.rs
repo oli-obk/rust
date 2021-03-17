@@ -8,7 +8,6 @@ use rustc_index::vec::Idx;
 use rustc_middle::hir::place::Place as HirPlace;
 use rustc_middle::hir::place::PlaceBase as HirPlaceBase;
 use rustc_middle::hir::place::ProjectionKind as HirProjectionKind;
-use rustc_middle::mir::interpret::Scalar;
 use rustc_middle::mir::BorrowKind;
 use rustc_middle::ty::adjustment::{
     Adjust, Adjustment, AutoBorrow, AutoBorrowMutability, PointerCast,
@@ -945,11 +944,8 @@ impl<'thir, 'tcx> Cx<'thir, 'tcx> {
                 let kind = if self.tcx.is_thread_local_static(id) {
                     ExprKind::ThreadLocalRef(id)
                 } else {
-                    let ptr = self.tcx.create_static_alloc(id);
-                    ExprKind::StaticRef {
-                        literal: ty::Const::from_scalar(self.tcx, Scalar::Ptr(ptr.into()), ty),
-                        def_id: id,
-                    }
+                    let address = self.tcx.create_static_alloc(id);
+                    ExprKind::StaticRef { address, ty, def_id: id }
                 };
                 ExprKind::Deref {
                     arg: self.arena.alloc(Expr { ty, temp_lifetime, span: expr.span, kind }),

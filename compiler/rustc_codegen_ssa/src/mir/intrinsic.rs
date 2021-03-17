@@ -113,7 +113,7 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                     .tcx()
                     .const_eval_instance(ty::ParamEnv::reveal_all(), instance, None)
                     .unwrap();
-                OperandRef::from_const(bx, value, ret_ty).immediate_or_packed_pair(bx)
+                OperandRef::from_const(bx, Ok(value), ret_ty, span).immediate_or_packed_pair(bx)
             }
             sym::offset => {
                 let ptr = args[0].immediate();

@@ -1,7 +1,15 @@
+<<<<<<< HEAD
 error[E0391]: cycle detected when normalizing `<() as Tr>::A`
    |
 note: ...which requires simplifying constant for the type system `Tr::A`...
   --> $DIR/defaults-cyclic-fail.rs:6:5
+||||||| parent of ab70bbeec72... Use ValTree in all type level constants
+error[E0391]: cycle detected when simplifying constant for the type system `Tr::A`
+  --> $DIR/defaults-cyclic-fail.rs:5:5
+=======
+error[E0391]: cycle detected when evaluating constant for MIR opt/codegen `Tr::A`
+  --> $DIR/defaults-cyclic-fail.rs:5:5
+>>>>>>> ab70bbeec72... Use ValTree in all type level constants
    |
 LL |     const A: u8 = Self::B;
    |     ^^^^^^^^^^^^^^^^^^^^^^
@@ -15,6 +23,7 @@ note: ...which requires const-evaluating + checking `Tr::A`...
    |
 LL |     const A: u8 = Self::B;
    |     ^^^^^^^^^^^^^^^^^^^^^^
+<<<<<<< HEAD
    = note: ...which requires normalizing `<() as Tr>::B`...
 note: ...which requires simplifying constant for the type system `Tr::B`...
   --> $DIR/defaults-cyclic-fail.rs:8:5
@@ -23,6 +32,13 @@ LL |     const B: u8 = Self::A;
    |     ^^^^^^^^^^^^^^^^^^^^^^
 note: ...which requires simplifying constant for the type system `Tr::B`...
   --> $DIR/defaults-cyclic-fail.rs:8:5
+||||||| parent of ab70bbeec72... Use ValTree in all type level constants
+note: ...which requires simplifying constant for the type system `Tr::B`...
+  --> $DIR/defaults-cyclic-fail.rs:7:5
+=======
+note: ...which requires evaluating constant for MIR opt/codegen `Tr::B`...
+  --> $DIR/defaults-cyclic-fail.rs:7:5
+>>>>>>> ab70bbeec72... Use ValTree in all type level constants
    |
 LL |     const B: u8 = Self::A;
    |     ^^^^^^^^^^^^^^^^^^^^^^
@@ -31,7 +47,13 @@ note: ...which requires const-evaluating + checking `Tr::B`...
    |
 LL |     const B: u8 = Self::A;
    |     ^^^^^^^^^^^^^^^^^^^^^^
+<<<<<<< HEAD
    = note: ...which again requires normalizing `<() as Tr>::A`, completing the cycle
+||||||| parent of ab70bbeec72... Use ValTree in all type level constants
+   = note: ...which again requires simplifying constant for the type system `Tr::A`, completing the cycle
+=======
+   = note: ...which again requires evaluating constant for MIR opt/codegen `Tr::A`, completing the cycle
+>>>>>>> ab70bbeec72... Use ValTree in all type level constants
 note: cycle used when const-evaluating + checking `main::promoted[1]`
   --> $DIR/defaults-cyclic-fail.rs:14:1
    |

@@ -13,7 +13,6 @@ use crate::thir::*;
 use rustc_data_structures::fx::FxIndexMap;
 use rustc_hir::{LangItem, RangeEnd};
 use rustc_index::bit_set::BitSet;
-use rustc_middle::mir::interpret::ConstValue;
 use rustc_middle::mir::*;
 use rustc_middle::ty::subst::{GenericArg, Subst};
 use rustc_middle::ty::util::IntTypeExt;
@@ -276,8 +275,8 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                 let target_blocks = make_target_blocks(self);
 
                 // Test `val` by computing `lo <= val && val <= hi`, using primitive comparisons.
-                let lo = ty::Const::from_value(self.tcx, ConstValue::Scalar(lo.into()), ty);
-                let hi = ty::Const::from_value(self.tcx, ConstValue::Scalar(hi.into()), ty);
+                let lo = ty::Const::from_value(self.tcx, ty::ValTree::Leaf(lo), ty);
+                let hi = ty::Const::from_value(self.tcx, ty::ValTree::Leaf(hi), ty);
                 let lo = self.literal_operand(test.span, lo);
                 let hi = self.literal_operand(test.span, hi);
                 let val = Operand::Copy(place);
@@ -643,14 +642,10 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                     let tcx = self.tcx;
 
                     let test_ty = match_pair.pattern.ty;
-                    let test_lo =
-                        ty::Const::from_value(tcx, ConstValue::Scalar(test.lo.into()), test_ty);
-                    let test_hi =
-                        ty::Const::from_value(tcx, ConstValue::Scalar(test.hi.into()), test_ty);
-                    let pat_lo =
-                        ty::Const::from_value(tcx, ConstValue::Scalar(test.lo.into()), test_ty);
-                    let pat_hi =
-                        ty::Const::from_value(tcx, ConstValue::Scalar(test.hi.into()), test_ty);
+                    let test_lo = ty::Const::from_value(tcx, ty::ValTree::Leaf(test.lo), test_ty);
+                    let test_hi = ty::Const::from_value(tcx, ty::ValTree::Leaf(test.hi), test_ty);
+                    let pat_lo = ty::Const::from_value(tcx, ty::ValTree::Leaf(test.lo), test_ty);
+                    let pat_hi = ty::Const::from_value(tcx, ty::ValTree::Leaf(test.hi), test_ty);
                     let lo = compare_const_vals(tcx, test_lo, pat_hi, self.param_env, test_ty)?;
                     let hi = compare_const_vals(tcx, test_hi, pat_lo, self.param_env, test_ty)?;
 
@@ -779,8 +774,8 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
 
         let tcx = self.tcx;
 
-        let lo = ConstantKind::Val(ConstValue::Scalar(range.lo.into()), value.ty());
-        let hi = ConstantKind::Val(ConstValue::Scalar(range.hi.into()), value.ty());
+        let lo = ty::Const::from_value(self.tcx, ty::ValTree::Leaf(range.lo), value.ty());
+        let hi = ty::Const::from_value(self.tcx, ty::ValTree::Leaf(range.hi), value.ty());
         let a = compare_const_vals(tcx, lo, value, self.param_env, value.ty())?;
         let b = compare_const_vals(tcx, value, hi, self.param_env, value.ty())?;
 

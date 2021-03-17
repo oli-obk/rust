@@ -1,14 +1,16 @@
 // Not in interpret to make sure we do not use private implementation details
 
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 
 use rustc_hir::Mutability;
-use rustc_middle::ty::{self, Ty, TyCtxt};
+use rustc_middle::mir;
+use rustc_middle::ty::ScalarInt;
 use rustc_middle::{
-    mir::{self, interpret::ConstAlloc},
-    ty::ScalarInt,
+    mir::interpret::{EvalToValTreeResult, GlobalId},
+    ty::{self, Ty, TyCtxt},
 };
 use rustc_span::{source_map::DUMMY_SP, symbol::Symbol};
+use rustc_target::abi::{LayoutOf, VariantIdx};
 
 use crate::interpret::{
     intern_const_alloc_recursive, ConstValue, InternKind, InterpCx, MPlaceTy, MemPlaceMeta, Scalar,
@@ -38,12 +40,12 @@ pub(crate) fn const_caller_location(
     ConstValue::Scalar(loc_place.ptr)
 }
 
-/// Convert an evaluated constant to a type level constant
-pub(crate) fn const_to_valtree<'tcx>(
+pub(crate) fn eval_to_valtree<'tcx>(
     tcx: TyCtxt<'tcx>,
     param_env: ty::ParamEnv<'tcx>,
-    raw: ConstAlloc<'tcx>,
-) -> Option<ty::ValTree<'tcx>> {
+    gid: GlobalId<'tcx>,
+) -> EvalToValTreeResult<'tcx> {
+    let raw = tcx.eval_to_allocation_raw(param_env.and(gid))?;
     let ecx = mk_eval_cx(
         tcx, DUMMY_SP, param_env,
         // It is absolutely crucial for soundness that
@@ -51,84 +53,132 @@ pub(crate) fn const_to_valtree<'tcx>(
         false,
     );
     let place = ecx.raw_const_to_mplace(raw).unwrap();
-    const_to_valtree_inner(&ecx, &place)
+
+    const_to_valtree(&ecx, &place)
 }
 
-fn const_to_valtree_inner<'tcx>(
+fn branches<'tcx>(
+    ecx: &CompileTimeEvalContext<'tcx, 'tcx>,
+    n: usize,
+    variant: Option<VariantIdx>,
+    place: &MPlaceTy<'tcx>,
+) -> EvalToValTreeResult<'tcx> {
+    let place = match variant {
+        Some(variant) => ecx.mplace_downcast(place, variant).unwrap(),
+        None => *place,
+    };
+    let variant =
+        variant.map(|variant| Ok(Some(ty::ValTree::Leaf(ScalarInt::from(variant.as_u32())))));
+    let fields = (0..n).map(|i| {
+        let field = ecx.mplace_field(&place, i).unwrap();
+        const_to_valtree(ecx, &field)
+    });
+    // For enums, we preped their variant index before the variant's fields so we can figure out
+    // the variant again when just seeing a valtree.
+    let branches = variant.into_iter().chain(fields);
+    let branches = branches.collect::<Result<Option<Vec<_>>, _>>()?;
+    Ok(branches.map(|val| ty::ValTree::Branch(ecx.tcx.arena.alloc_from_iter(val))))
+}
+
+/// Convert an evaluated constant to a type level constant
+fn const_to_valtree<'tcx>(
     ecx: &CompileTimeEvalContext<'tcx, 'tcx>,
     place: &MPlaceTy<'tcx>,
-) -> Option<ty::ValTree<'tcx>> {
-    let branches = |n, variant| {
-        let place = match variant {
-            Some(variant) => ecx.mplace_downcast(&place, variant).unwrap(),
-            None => *place,
-        };
-        let variant =
-            variant.map(|variant| Some(ty::ValTree::Leaf(ScalarInt::from(variant.as_u32()))));
-        let fields = (0..n).map(|i| {
-            let field = ecx.mplace_field(&place, i).unwrap();
-            const_to_valtree_inner(ecx, &field)
-        });
-        // For enums, we preped their variant index before the variant's fields so we can figure out
-        // the variant again when just seeing a valtree.
-        let branches = variant.into_iter().chain(fields);
-        Some(ty::ValTree::Branch(
-            ecx.tcx.arena.alloc_from_iter(branches.collect::<Option<Vec<_>>>()?),
-        ))
-    };
+) -> EvalToValTreeResult<'tcx> {
     match place.layout.ty.kind() {
-        ty::FnDef(..) => Some(ty::ValTree::zst()),
+        ty::FnDef(..) => Ok(Some(ty::ValTree::zst())),
         ty::Bool | ty::Int(_) | ty::Uint(_) | ty::Float(_) | ty::Char => {
             let val = ecx.read_immediate(&place.into()).unwrap();
             let val = val.to_scalar().unwrap();
-            Some(ty::ValTree::Leaf(val.assert_int()))
+            Ok(Some(ty::ValTree::Leaf(val.assert_int())))
         }
 
         // Raw pointers are not allowed in type level constants, as we cannot properly test them for
         // equality at compile-time (see `ptr_guaranteed_eq`/`_ne`).
         // Technically we could allow function pointers (represented as `ty::Instance`), but this is not guaranteed to
         // agree with runtime equality tests.
-        ty::FnPtr(_) | ty::RawPtr(_) => None,
-        ty::Ref(..) => unimplemented!("need to use deref_const"),
+        ty::FnPtr(_) | ty::RawPtr(_) => Ok(None),
+        ty::Ref(..) => {
+            let mplace = ecx.deref_operand(&place.into()).unwrap();
+            if let Scalar::Ptr(ptr) = mplace.ptr {
+                assert_eq!(
+                    ecx.memory.get_raw(ptr.alloc_id).unwrap().mutability,
+                    Mutability::Not,
+                    "const_to_valtree cannot be used with mutable allocations as \
+                    that could allow pattern matching to observe mutable statics",
+                );
+            }
+
+            match mplace.meta {
+                // We flatten references by encoding their dereferenced value directly.
+                MemPlaceMeta::None => const_to_valtree(ecx, &mplace),
+                MemPlaceMeta::Poison => bug!("poison metadata in `deref_const`: {:#?}", mplace),
+                // In case of unsized types, figure out the real type behind.
+                MemPlaceMeta::Meta(scalar) => {
+                    let array = |elem_ty| {
+                        let n = scalar.to_machine_usize(ecx).unwrap();
+                        let mut mplace = mplace;
+                        // Rewrite the layout to an array layout so the field accesses in `branches` work out.
+                        mplace.layout = ecx.layout_of(ecx.tcx.mk_array(elem_ty, n)).unwrap();
+                        branches(ecx, n.try_into().unwrap(), None, &mplace)
+                    };
+                    match mplace.layout.ty.kind() {
+                        // str slices are encoded as a `u8` array.
+                        ty::Str => array(ecx.tcx.types.u8),
+                        // Slices are encoded as an array
+                        ty::Slice(elem_ty) => array(elem_ty),
+                        // No other unsized types are structural match.
+                        _ => Ok(None),
+                    }
+                },
+            }
+        }
 
         // Trait objects are not allowed in type level constants, as we have no concept for
         // resolving their backing type, even if we can do that at const eval time. We may
         // hypothetically be able to allow `dyn StructuralEq` trait objects in the future,
         // but it is unclear if this is useful.
-        ty::Dynamic(..) => None,
+        ty::Dynamic(..) => Ok(None),
 
         ty::Slice(_) | ty::Str => {
-            unimplemented!("need to find the backing data of the slice/str and recurse on that")
+            bug!("these are behind references and should have been handled there")
         }
-        ty::Tuple(substs) => branches(substs.len(), None),
-        ty::Array(_, len) => branches(usize::try_from(len.eval_usize(ecx.tcx.tcx, ecx.param_env)).unwrap(), None),
+        ty::Tuple(substs) => branches(ecx, substs.len(), None, place),
+        ty::Array(_, len) => branches(ecx, usize::try_from(len.eval_usize(ecx.tcx.tcx, ecx.param_env)).unwrap(), None, place),
 
-        ty::Adt(def, _) => {
+        ty::Adt(def, _) if place.layout.ty.is_structural_eq_shallow(ecx.tcx.tcx) => {
             if def.variants.is_empty() {
                 bug!("uninhabited types should have errored and never gotten converted to valtree")
             }
 
             let variant = ecx.read_discriminant(&place.into()).unwrap().1;
 
-            branches(def.variants[variant].fields.len(), def.is_enum().then_some(variant))
+            branches(ecx, def.variants[variant].fields.len(), def.is_enum().then_some(variant), place)
         }
 
-        ty::Never
+        ty::Never => bug!("CTFE computed a value of never type without erroring"),
+
+        // Types that do not derive PartialEq are not converted to valtree
+        ty::Adt(..)
         | ty::Error(_)
         | ty::Foreign(..)
+        // These are probably unreachable
         | ty::Infer(ty::FreshIntTy(_))
         | ty::Infer(ty::FreshFloatTy(_))
         | ty::Projection(..)
+        // Should have errored out during CTFE due to being too polymorphic
         | ty::Param(_)
+        // These are probably unreachable
         | ty::Bound(..)
         | ty::Placeholder(..)
         // FIXME(oli-obk): we could look behind opaque types
         | ty::Opaque(..)
+        // This is probably unreachable
         | ty::Infer(_)
         // FIXME(oli-obk): we can probably encode closures just like structs
         | ty::Closure(..)
         | ty::Generator(..)
-        | ty::GeneratorWitness(..) => None,
+        | ty::GeneratorWitness(..) => Ok(None),
     }
 }
 

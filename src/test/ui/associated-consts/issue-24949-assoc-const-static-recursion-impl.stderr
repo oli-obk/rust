@@ -1,10 +1,10 @@
-error[E0391]: cycle detected when simplifying constant for the type system `IMPL_REF_BAR`
+error[E0391]: cycle detected when evaluating constant for MIR opt/codegen `IMPL_REF_BAR`
   --> $DIR/issue-24949-assoc-const-static-recursion-impl.rs:7:1
    |
 LL | const IMPL_REF_BAR: u32 = GlobalImplRef::BAR;
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-note: ...which requires simplifying constant for the type system `IMPL_REF_BAR`...
+note: ...which requires evaluating constant for MIR opt/codegen `IMPL_REF_BAR`...
   --> $DIR/issue-24949-assoc-const-static-recursion-impl.rs:7:1
    |
 LL | const IMPL_REF_BAR: u32 = GlobalImplRef::BAR;
@@ -14,6 +14,7 @@ note: ...which requires const-evaluating + checking `IMPL_REF_BAR`...
    |
 LL | const IMPL_REF_BAR: u32 = GlobalImplRef::BAR;
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<<<<<<< HEAD
    = note: ...which requires normalizing `<impl at $DIR/issue-24949-assoc-const-static-recursion-impl.rs:11:1: 13:2>::BAR`...
 note: ...which requires simplifying constant for the type system `<impl at $DIR/issue-24949-assoc-const-static-recursion-impl.rs:11:1: 13:2>::BAR`...
   --> $DIR/issue-24949-assoc-const-static-recursion-impl.rs:12:5
@@ -21,6 +22,11 @@ note: ...which requires simplifying constant for the type system `<impl at $DIR/
 LL |     const BAR: u32 = IMPL_REF_BAR;
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 note: ...which requires simplifying constant for the type system `<impl at $DIR/issue-24949-assoc-const-static-recursion-impl.rs:11:1: 13:2>::BAR`...
+||||||| parent of ab70bbeec72... Use ValTree in all type level constants
+note: ...which requires simplifying constant for the type system `<impl at $DIR/issue-24949-assoc-const-static-recursion-impl.rs:11:1: 13:2>::BAR`...
+=======
+note: ...which requires evaluating constant for MIR opt/codegen `<impl at $DIR/issue-24949-assoc-const-static-recursion-impl.rs:11:1: 13:2>::BAR`...
+>>>>>>> ab70bbeec72... Use ValTree in all type level constants
   --> $DIR/issue-24949-assoc-const-static-recursion-impl.rs:12:5
    |
 LL |     const BAR: u32 = IMPL_REF_BAR;
@@ -35,8 +41,14 @@ note: ...which requires caching mir of `<impl at $DIR/issue-24949-assoc-const-st
    |
 LL |     const BAR: u32 = IMPL_REF_BAR;
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<<<<<<< HEAD
    = note: ...which requires normalizing `IMPL_REF_BAR`...
    = note: ...which again requires simplifying constant for the type system `IMPL_REF_BAR`, completing the cycle
+||||||| parent of ab70bbeec72... Use ValTree in all type level constants
+   = note: ...which again requires simplifying constant for the type system `IMPL_REF_BAR`, completing the cycle
+=======
+   = note: ...which again requires evaluating constant for MIR opt/codegen `IMPL_REF_BAR`, completing the cycle
+>>>>>>> ab70bbeec72... Use ValTree in all type level constants
    = note: cycle used when running analysis passes on this crate
 
 error: aborting due to previous error

@@ -6,6 +6,7 @@ use rustc_middle::ty::layout::HasTyCtxt;
 use rustc_middle::ty::{self, Ty};
 use rustc_span::source_map::Span;
 use rustc_target::abi::Abi;
+use rustc_errors::ErrorReported;
 
 use super::FunctionCx;
 
@@ -17,17 +18,17 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
     ) -> Result<OperandRef<'tcx, Bx::Value>, ErrorHandled> {
         let val = self.eval_mir_constant(constant)?;
         let ty = self.monomorphize(constant.ty());
-        Ok(OperandRef::from_const(bx, val, ty))
+        Ok(OperandRef::from_const(bx, val, ty, constant.span))
     }
 
     pub fn eval_mir_constant(
         &self,
         constant: &mir::Constant<'tcx>,
-    ) -> Result<ConstValue<'tcx>, ErrorHandled> {
+    ) -> Result<Result<ConstValue<'tcx>, ty::ValTree<'tcx>>, ErrorHandled> {
         let ct = self.monomorphize(constant.literal);
         let ct = match ct {
             mir::ConstantKind::Ty(ct) => ct,
-            mir::ConstantKind::Val(val, _) => return Ok(val),
+            mir::ConstantKind::Val(val, _) => return Ok(Ok(val)),
         };
         match ct.val {
             ty::ConstKind::Unevaluated(ct) => self
@@ -37,8 +38,11 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                 .map_err(|err| {
                     self.cx.tcx().sess.span_err(constant.span, "erroneous constant encountered");
                     err
-                }),
-            ty::ConstKind::Value(value) => Ok(value),
+                })
+                .map(Ok),
+            ty::ConstKind::Value(value) => Ok(Err(value)),
+            // Already reported an error, nothing to do.
+            ty::ConstKind::Error(_) => Err(ErrorHandled::Reported(ErrorReported)),
             err => span_bug!(
                 constant.span,
                 "encountered bad ConstKind after monomorphizing: {:?}",

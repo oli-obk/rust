@@ -944,7 +944,7 @@ pub trait PrettyPrinter<'tcx>:
             ty::ConstKind::Infer(..) => print_underscore!(),
             ty::ConstKind::Param(ParamConst { name, .. }) => p!(write("{}", name)),
             ty::ConstKind::Value(value) => {
-                return self.pretty_print_const_value(value, ct.ty, print_ty);
+                return self.pretty_print_valtree(value, ct.ty, print_ty);
             }
 
             ty::ConstKind::Bound(debruijn, bound_var) => {
@@ -984,9 +984,7 @@ pub trait PrettyPrinter<'tcx>:
                     kind:
                         ty::Array(
                             ty::TyS { kind: ty::Uint(ty::UintTy::U8), .. },
-                            ty::Const {
-                                val: ty::ConstKind::Value(ConstValue::Scalar(int)), ..
-                            },
+                            ty::Const { val: ty::ConstKind::Value(ty::ValTree::Leaf(int)), .. },
                         ),
                     ..
                 },
@@ -996,7 +994,7 @@ pub trait PrettyPrinter<'tcx>:
                     let bytes = int.assert_bits(self.tcx().data_layout.pointer_size);
                     let size = Size::from_bytes(bytes);
                     if let Ok(byte_str) = alloc.get_bytes(&self.tcx(), ptr, size) {
-                        p!(pretty_print_byte_str(byte_str))
+                        p!(pretty_print_byte_str(byte_str.iter().copied()))
                     } else {
                         p!("<too short allocation>")
                     }
@@ -1073,6 +1071,9 @@ pub trait PrettyPrinter<'tcx>:
             ty::FnDef(d, s) if int == ScalarInt::ZST => {
                 p!(print_value_path(*d, s))
             }
+            ty::Tuple(elems) if elems.is_empty() => {
+                write!(self, "()")?;
+            }
             // Nontrivial types with scalar bit representation
             _ => {
                 let print = |mut this: Self| {
@@ -1116,16 +1117,65 @@ pub trait PrettyPrinter<'tcx>:
         }
     }
 
-    fn pretty_print_byte_str(mut self, byte_str: &'tcx [u8]) -> Result<Self::Const, Self::Error> {
+    fn pretty_print_byte_str(
+        mut self,
+        byte_str: impl IntoIterator<Item = u8>,
+    ) -> Result<Self::Const, Self::Error> {
         define_scoped_cx!(self);
         p!("b\"");
-        for &c in byte_str {
+        for c in byte_str {
             for e in std::ascii::escape_default(c) {
                 self.write_char(e as char)?;
             }
         }
         p!("\"");
         Ok(self)
+    }
+
+    fn pretty_print_valtree(
+        mut self,
+        ct: ty::ValTree<'tcx>,
+        ty: Ty<'tcx>,
+        print_ty: bool,
+    ) -> Result<Self::Const, Self::Error> {
+        let tcx = self.tcx();
+        define_scoped_cx!(self);
+        match ty.kind() {
+            ty::Ref(_, pointee, _) => match *pointee.kind() {
+                ty::Str => {
+                    let s: Vec<u8> = ct
+                        .unwrap_branch()
+                        .iter()
+                        .map(|b| u8::try_from(b.unwrap_leaf()).unwrap())
+                        .collect();
+                    let s = String::from_utf8(s).unwrap();
+                    p!(write("{:?}", s));
+                    Ok(self)
+                }
+                // Special case byte strings
+                ty::Slice(elem_ty) | ty::Array(elem_ty, _) if elem_ty == self.tcx().types.u8 => {
+                    let s =
+                        ct.unwrap_branch().iter().map(|b| u8::try_from(b.unwrap_leaf()).unwrap());
+                    self.pretty_print_byte_str(s)
+                }
+                _ => {
+                    // All other references directly print their content
+                    p!(write("&"));
+                    self.pretty_print_valtree(ct, pointee, print_ty)
+                }
+            },
+            ty::Slice(elem_ty) | ty::Array(elem_ty, _) => {
+                let fields =
+                    ct.unwrap_branch().iter().map(|&b| ty::Const::from_value(tcx, b, elem_ty));
+                p!("[", comma_sep(fields), "]");
+                Ok(self)
+            }
+            // FIXME: destructure Adts, tuples, ...
+            _ => match ct {
+                ty::ValTree::Leaf(int) => self.pretty_print_const_scalar_int(int, ty, print_ty),
+                ty::ValTree::Branch(branches) => bug!("{}: {:?}", ty, branches),
+            },
+        }
     }
 
     fn pretty_print_const_value(
@@ -1153,7 +1203,7 @@ pub trait PrettyPrinter<'tcx>:
                 // no relocations (we have an active slice reference here). We don't use
                 // this result to affect interpreter execution.
                 let byte_str = data.inspect_with_uninit_and_ptr_outside_interpreter(start..end);
-                self.pretty_print_byte_str(byte_str)
+                self.pretty_print_byte_str(byte_str.iter().copied())
             }
             (
                 ConstValue::Slice { data, start, end },
@@ -1175,7 +1225,7 @@ pub trait PrettyPrinter<'tcx>:
 
                 let byte_str = alloc.get_bytes(&self.tcx(), ptr, n).unwrap();
                 p!("*");
-                p!(pretty_print_byte_str(byte_str));
+                p!(pretty_print_byte_str(byte_str.iter().copied()));
                 Ok(self)
             }
 

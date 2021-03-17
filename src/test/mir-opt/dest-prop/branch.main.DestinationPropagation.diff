@@ -22,7 +22,7 @@
 +         _2 = val() -> bb1;               // scope 0 at $DIR/branch.rs:13:13: 13:18
                                            // mir::Constant
                                            // + span: $DIR/branch.rs:13:13: 13:16
-                                           // + literal: Const { ty: fn() -> i32 {val}, val: Value(Scalar(<ZST>)) }
+                                           // + literal: Const { ty: fn() -> i32 {val}, val: Value(Leaf(<ZST>)) }
       }
   
       bb1: {
@@ -32,7 +32,7 @@
           _3 = cond() -> bb2;              // scope 1 at $DIR/branch.rs:15:16: 15:22
                                            // mir::Constant
                                            // + span: $DIR/branch.rs:15:16: 15:20
-                                           // + literal: Const { ty: fn() -> bool {cond}, val: Value(Scalar(<ZST>)) }
+                                           // + literal: Const { ty: fn() -> bool {cond}, val: Value(Leaf(<ZST>)) }
       }
   
       bb2: {
@@ -50,7 +50,7 @@
           _4 = val() -> bb5;               // scope 1 at $DIR/branch.rs:18:9: 18:14
                                            // mir::Constant
                                            // + span: $DIR/branch.rs:18:9: 18:12
-                                           // + literal: Const { ty: fn() -> i32 {val}, val: Value(Scalar(<ZST>)) }
+                                           // + literal: Const { ty: fn() -> i32 {val}, val: Value(Leaf(<ZST>)) }
       }
   
       bb5: {

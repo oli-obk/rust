@@ -15,8 +15,7 @@ use rustc_hir::def::{CtorKind, CtorOf, DefKind, Res};
 use rustc_hir::pat_util::EnumerateAndAdjustIterator;
 use rustc_hir::RangeEnd;
 use rustc_index::vec::Idx;
-use rustc_middle::mir::interpret::{get_slice_bytes, ConstValue};
-use rustc_middle::mir::interpret::{ErrorHandled, LitToConstError, LitToConstInput};
+use rustc_middle::mir::interpret::{ConstValue, ErrorHandled, LitToConstError, LitToConstInput};
 use rustc_middle::mir::{BorrowKind, Field, Mutability};
 use rustc_middle::mir::{ConstantKind, UserTypeProjection};
 use rustc_middle::ty::subst::{GenericArg, SubstsRef};
@@ -448,8 +447,8 @@ impl<'a, 'tcx> PatCtxt<'a, 'tcx> {
         end: RangeEnd,
         span: Span,
     ) -> PatKind<'tcx> {
-        let lo_const = ty::Const::from_value(self.tcx, ConstValue::Scalar(lo.into()), ty);
-        let hi_const = ty::Const::from_value(self.tcx, ConstValue::Scalar(hi.into()), ty);
+        let lo_const = ty::Const::from_value(self.tcx, ty::ValTree::Leaf(lo), ty);
+        let hi_const = ty::Const::from_value(self.tcx, ty::ValTree::Leaf(hi), ty);
         let cmp = compare_const_vals(self.tcx, lo_const, hi_const, self.param_env, ty);
         match (end, cmp) {
             // `x..y` where `x < y`.
@@ -819,21 +818,30 @@ impl<'a, 'tcx> PatCtxt<'a, 'tcx> {
         debug!("mir_structural_match_violation({:?}) -> {}", qpath, mir_structural_match_violation);
 
         let ty = self.typeck_results.node_type(id);
-        let value = match self.tcx.const_eval_instance(param_env_reveal_all, instance, Some(span)) {
-            Ok(value) => {
-                ty::Const::from_value(self.tcx, value, self.typeck_results.node_type(id)).into()
-            }
-            Err(ErrorHandled::TooGeneric) => {
-                // While `Reported | Linted` cases will have diagnostics emitted already
-                // it is not true for TooGeneric case, so we need to give user more information.
-                self.tcx.sess.span_err(span, "constant pattern depends on a generic parameter");
-                return pat_from_kind(PatKind::Wild);
-            }
-            Err(_) => {
-                self.tcx.sess.span_err(span, "could not evaluate constant pattern");
-                return pat_from_kind(PatKind::Wild);
-            }
-        };
+        let value =
+            match self.tcx.const_eval_instance_for_ty(param_env_reveal_all, instance, Some(span)) {
+                Ok(Some(value)) => ConstantKind::Ty(ty::Const::from_value(self.tcx, value, ty)),
+                // Non-valtree means not structural match.
+                Ok(None) => {
+                    let value = self
+                    .tcx
+                    .const_eval_instance(param_env_reveal_all, instance, Some(span))
+                    .expect(
+                        "const_eval_instance_for_ty succeeded, so const_eval_instance can't fail",
+                    );
+                    ConstantKind::Val(value, ty)
+                }
+                Err(ErrorHandled::TooGeneric) => {
+                    // While `Reported | Linted` cases will have diagnostics emitted already
+                    // it is not true for TooGeneric case, so we need to give user more information.
+                    self.tcx.sess.span_err(span, "constant pattern depends on a generic parameter");
+                    return pat_from_kind(PatKind::Wild);
+                }
+                Err(_) => {
+                    self.tcx.sess.span_err(span, "could not evaluate constant pattern");
+                    return pat_from_kind(PatKind::Wild);
+                }
+            };
 
         let pattern = self.const_to_pat(value, id, span, mir_structural_match_violation);
 
@@ -1104,12 +1112,12 @@ crate fn compare_const_vals<'tcx>(
     }
 
     if let ty::Str = ty.kind() {
-        if let (Some(a_val @ ConstValue::Slice { .. }), Some(b_val @ ConstValue::Slice { .. })) =
-            (a.try_to_value(), b.try_to_value())
+        if let (
+            ty::ConstKind::Value(ty::ValTree::Branch(a_val)),
+            ty::ConstKind::Value(ty::ValTree::Branch(b_val)),
+        ) = (a.const_for_ty()?.val, b.const_for_ty()?.val)
         {
-            let a_bytes = get_slice_bytes(&tcx, a_val);
-            let b_bytes = get_slice_bytes(&tcx, b_val);
-            return from_bool(a_bytes == b_bytes);
+            return from_bool(a_val == b_val);
         }
     }
     fallback()

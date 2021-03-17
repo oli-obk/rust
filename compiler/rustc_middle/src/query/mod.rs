@@ -791,7 +791,7 @@ rustc_queries! {
     query eval_to_const_value_raw(key: ty::ParamEnvAnd<'tcx, GlobalId<'tcx>>)
         -> EvalToConstValueResult<'tcx> {
         desc { |tcx|
-            "simplifying constant for the type system `{}`",
+            "evaluating constant for MIR opt/codegen `{}`",
             key.value.display(tcx)
         }
         cache_on_disk_if { true }
@@ -799,10 +799,10 @@ rustc_queries! {
 
     /// Convert an evaluated constant to a type level constant or
     /// return `None` if that is not possible.
-    query const_to_valtree(
-        key: ty::ParamEnvAnd<'tcx, ConstAlloc<'tcx>>
-    ) -> Option<ty::ValTree<'tcx>> {
-        desc { "destructure constant" }
+    query eval_to_valtree(
+        key: ty::ParamEnvAnd<'tcx, GlobalId<'tcx>>
+    ) -> EvalToValTreeResult<'tcx> {
+        desc { "evaluating constant for use in types" }
     }
 
     /// Destructure a constant ADT or array into its variant index and its

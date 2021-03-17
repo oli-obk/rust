@@ -54,8 +54,8 @@ use rustc_index::vec::Idx;
 
 use rustc_hir::def_id::DefId;
 use rustc_hir::{HirId, RangeEnd};
-use rustc_middle::mir::interpret::ConstValue;
-use rustc_middle::mir::{self, Field};
+use rustc_middle::mir;
+use rustc_middle::mir::Field;
 use rustc_middle::ty::layout::IntegerExt;
 use rustc_middle::ty::{self, ScalarInt, Ty, TyCtxt};
 use rustc_session::lint;
@@ -210,7 +210,7 @@ impl IntRange {
 
         let kind = if lo == hi {
             PatKind::Constant {
-                value: mir::ConstantKind::Val(ConstValue::Scalar(lo_int.into()), ty),
+                value: ty::Const::from_value(tcx, ty::ValTree::Leaf(lo_int), ty).into(),
             }
         } else {
             PatKind::Range(PatRange {
@@ -774,26 +774,14 @@ impl<'tcx> Constructor<'tcx> {
                 FloatRange(self_from, self_to, self_end),
                 FloatRange(other_from, other_to, other_end),
             ) => {
-                let self_to = ty::Const::from_value(
-                    pcx.cx.tcx,
-                    ConstValue::Scalar((*self_to).into()),
-                    pcx.ty,
-                );
-                let other_to = ty::Const::from_value(
-                    pcx.cx.tcx,
-                    ConstValue::Scalar((*other_to).into()),
-                    pcx.ty,
-                );
-                let self_from = ty::Const::from_value(
-                    pcx.cx.tcx,
-                    ConstValue::Scalar((*self_from).into()),
-                    pcx.ty,
-                );
-                let other_from = ty::Const::from_value(
-                    pcx.cx.tcx,
-                    ConstValue::Scalar((*other_from).into()),
-                    pcx.ty,
-                );
+                let self_to =
+                    ty::Const::from_value(pcx.cx.tcx, ty::ValTree::Leaf(*self_to), pcx.ty);
+                let other_to =
+                    ty::Const::from_value(pcx.cx.tcx, ty::ValTree::Leaf(*other_to), pcx.ty);
+                let self_from =
+                    ty::Const::from_value(pcx.cx.tcx, ty::ValTree::Leaf(*self_from), pcx.ty);
+                let other_from =
+                    ty::Const::from_value(pcx.cx.tcx, ty::ValTree::Leaf(*other_from), pcx.ty);
                 match (
                     compare_const_vals(pcx.cx.tcx, self_to, other_to, pcx.cx.param_env, pcx.ty),
                     compare_const_vals(pcx.cx.tcx, self_from, other_from, pcx.cx.param_env, pcx.ty),

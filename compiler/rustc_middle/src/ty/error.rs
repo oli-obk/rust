@@ -233,10 +233,8 @@ impl<'tcx> ty::TyS<'tcx> {
                 }
 
                 let n = tcx.lift(n).unwrap();
-                if let ty::ConstKind::Value(v) = n.val {
-                    if let Some(n) = v.try_to_machine_usize(tcx) {
-                        return format!("array of {} element{}", n, pluralize!(n)).into();
-                    }
+                if let Some(n) = n.val.try_to_machine_usize(tcx) {
+                    return format!("array of {} element{}", n, pluralize!(n)).into();
                 }
                 "array".into()
             }

@@ -145,7 +145,7 @@ pub fn is_const_evaluatable<'cx, 'tcx>(
     // and hopefully soon change this to an error.
     //
     // See #74595 for more details about this.
-    let concrete = infcx.const_eval_resolve(
+    let concrete = infcx.const_eval_for_ty(
         param_env,
         ty::Unevaluated { def, substs, promoted: None },
         Some(span),

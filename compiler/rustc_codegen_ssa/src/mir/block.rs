@@ -12,11 +12,12 @@ use crate::MemFlags;
 use rustc_ast as ast;
 use rustc_hir::lang_items::LangItem;
 use rustc_index::vec::Idx;
-use rustc_middle::mir::interpret::ConstValue;
+use rustc_middle::mir::interpret::{ConstValue, Scalar};
 use rustc_middle::mir::AssertKind;
 use rustc_middle::mir::{self, SwitchTargets};
 use rustc_middle::ty::layout::{FnAbiExt, HasTyCtxt};
 use rustc_middle::ty::print::with_no_trimmed_paths;
+use rustc_middle::ty::ValTree;
 use rustc_middle::ty::{self, Instance, Ty, TypeFoldable};
 use rustc_span::source_map::Span;
 use rustc_span::{sym, Symbol};
@@ -634,7 +635,7 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                         // promotes any complex rvalues to constants.
                         if i == 2 && intrinsic.as_str().starts_with("simd_shuffle") {
                             if let mir::Operand::Constant(constant) = arg {
-                                let c = self.eval_mir_constant(constant);
+                                let c = self.eval_mir_constant(constant).map(Result::unwrap);
                                 let (llval, ty) =
                                     self.simd_shuffle_indices(&bx, constant.span, constant.ty(), c);
                                 return OperandRef {
@@ -829,7 +830,7 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                         let ty = constant.ty();
                         let size = bx.layout_of(ty).size;
                         let scalar = match const_value {
-                            ConstValue::Scalar(s) => s,
+                            Ok(ConstValue::Scalar(Scalar::Int(s))) | Err(ValTree::Leaf(s)) => s,
                             _ => span_bug!(
                                 span,
                                 "expected Scalar for promoted asm const, but got {:#?}",
@@ -1152,7 +1153,7 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
                 caller.line as u32,
                 caller.col_display as u32 + 1,
             ));
-            OperandRef::from_const(bx, const_loc, bx.tcx().caller_location_ty())
+            OperandRef::from_const(bx, Ok(const_loc), bx.tcx().caller_location_ty(), span)
         };
 
         // Walk up the `SourceScope`s, in case some of them are from MIR inlining.

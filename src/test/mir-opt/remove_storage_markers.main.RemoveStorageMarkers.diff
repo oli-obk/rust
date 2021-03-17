@@ -64,7 +64,7 @@
           _8 = <std::ops::Range<i32> as Iterator>::next(move _9) -> bb2; // scope 3 at $DIR/remove_storage_markers.rs:8:14: 8:19
                                            // mir::Constant
                                            // + span: $DIR/remove_storage_markers.rs:8:14: 8:19
-                                           // + literal: Const { ty: for<'r> fn(&'r mut std::ops::Range<i32>) -> std::option::Option<<std::ops::Range<i32> as std::iter::Iterator>::Item> {<std::ops::Range<i32> as std::iter::Iterator>::next}, val: Value(Scalar(<ZST>)) }
+                                           // + literal: Const { ty: for<'r> fn(&'r mut std::ops::Range<i32>) -> std::option::Option<<std::ops::Range<i32> as std::iter::Iterator>::Item> {<std::ops::Range<i32> as std::iter::Iterator>::next}, val: Value(Leaf(<ZST>)) }
       }
   
       bb2: {

@@ -10,10 +10,10 @@
           _1 = f::<fn() {main}>(main) -> bb1; // scope 0 at $DIR/cycle.rs:12:5: 12:12
                                            // mir::Constant
                                            // + span: $DIR/cycle.rs:12:5: 12:6
-                                           // + literal: Const { ty: fn(fn() {main}) {f::<fn() {main}>}, val: Value(Scalar(<ZST>)) }
+                                           // + literal: Const { ty: fn(fn() {main}) {f::<fn() {main}>}, val: Value(Leaf(<ZST>)) }
                                            // mir::Constant
                                            // + span: $DIR/cycle.rs:12:7: 12:11
-                                           // + literal: Const { ty: fn() {main}, val: Value(Scalar(<ZST>)) }
+                                           // + literal: Const { ty: fn() {main}, val: Value(Leaf(<ZST>)) }
       }
   
       bb1: {

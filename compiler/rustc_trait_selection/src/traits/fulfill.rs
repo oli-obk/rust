@@ -539,12 +539,16 @@ impl<'a, 'b, 'tcx> FulfillProcessor<'a, 'b, 'tcx> {
 
                     let mut evaluate = |c: &'tcx Const<'tcx>| {
                         if let ty::ConstKind::Unevaluated(unevaluated) = c.val {
-                            match self.selcx.infcx().const_eval_resolve(
+                            assert_eq!(unevaluated.promoted, None);
+                            match self.selcx.infcx().const_eval_for_ty(
                                 obligation.param_env,
                                 unevaluated,
                                 Some(obligation.cause.span),
                             ) {
-                                Ok(val) => Ok(Const::from_value(self.selcx.tcx(), val, c.ty)),
+                                Ok(Some(val)) => {
+                                    Ok(Some(Const::from_value(self.selcx.tcx(), val, c.ty)))
+                                }
+                                Ok(None) => Ok(None),
                                 Err(ErrorHandled::TooGeneric) => {
                                     stalled_on.extend(
                                         unevaluated
@@ -557,12 +561,12 @@ impl<'a, 'b, 'tcx> FulfillProcessor<'a, 'b, 'tcx> {
                                 Err(err) => Err(err),
                             }
                         } else {
-                            Ok(c)
+                            Ok(Some(c))
                         }
                     };
 
                     match (evaluate(c1), evaluate(c2)) {
-                        (Ok(c1), Ok(c2)) => {
+                        (Ok(Some(c1)), Ok(Some(c2))) => {
                             match self
                                 .selcx
                                 .infcx()
@@ -577,6 +581,17 @@ impl<'a, 'b, 'tcx> FulfillProcessor<'a, 'b, 'tcx> {
                                     ),
                                 ),
                             }
+                        }
+                        (Ok(None), _) | (_, Ok(None)) => {
+                            self.selcx.infcx().tcx.sess.delay_span_bug(
+                                obligation.cause.span,
+                                "could not evaluate constant in typesystem to valtree",
+                            );
+                            ProcessResult::Error(CodeSelectionError(
+                                SelectionError::NotConstEvaluatable(NotConstEvaluatable::Error(
+                                    ErrorReported,
+                                )),
+                            ))
                         }
                         (Err(ErrorHandled::Reported(ErrorReported)), _)
                         | (_, Err(ErrorHandled::Reported(ErrorReported))) => ProcessResult::Error(

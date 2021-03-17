@@ -18,9 +18,7 @@
 -         StorageLive(_5);                 // scope 0 at $DIR/const-promotion-extern-static.rs:9:33: 9:34
 -         _5 = const {alloc0: &i32};       // scope 0 at $DIR/const-promotion-extern-static.rs:9:33: 9:34
 +         _6 = const BAR::promoted[0];     // scope 0 at $DIR/const-promotion-extern-static.rs:9:31: 9:35
-                                           // ty::Const
--                                          // + ty: &i32
--                                          // + val: Value(Scalar(alloc0))
++                                          // ty::Const
 +                                          // + ty: &[&i32; 1]
 +                                          // + val: Unevaluated(BAR, [], Some(promoted[0]))
                                            // mir::Constant
@@ -38,7 +36,7 @@
           _0 = core::slice::<impl [&i32]>::as_ptr(move _1) -> [return: bb1, unwind: bb2]; // scope 0 at $DIR/const-promotion-extern-static.rs:9:31: 9:44
                                            // mir::Constant
                                            // + span: $DIR/const-promotion-extern-static.rs:9:36: 9:42
-                                           // + literal: Const { ty: for<'r> fn(&'r [&i32]) -> *const &i32 {core::slice::<impl [&i32]>::as_ptr}, val: Value(Scalar(<ZST>)) }
+                                           // + literal: Const { ty: for<'r> fn(&'r [&i32]) -> *const &i32 {core::slice::<impl [&i32]>::as_ptr}, val: Value(Leaf(<ZST>)) }
       }
   
       bb1: {

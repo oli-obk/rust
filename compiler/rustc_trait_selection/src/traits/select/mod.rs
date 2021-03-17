@@ -559,20 +559,23 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
 
                     let evaluate = |c: &'tcx ty::Const<'tcx>| {
                         if let ty::ConstKind::Unevaluated(unevaluated) = c.val {
+                            assert_eq!(unevaluated.promoted, None);
                             self.infcx
-                                .const_eval_resolve(
+                                .const_eval_for_ty(
                                     obligation.param_env,
                                     unevaluated,
                                     Some(obligation.cause.span),
                                 )
-                                .map(|val| ty::Const::from_value(self.tcx(), val, c.ty))
+                                .map(|val| {
+                                    val.map(|val| ty::Const::from_value(self.tcx(), val, c.ty))
+                                })
                         } else {
-                            Ok(c)
+                            Ok(Some(c))
                         }
                     };
 
                     match (evaluate(c1), evaluate(c2)) {
-                        (Ok(c1), Ok(c2)) => {
+                        (Ok(Some(c1)), Ok(Some(c2))) => {
                             match self
                                 .infcx()
                                 .at(&obligation.cause, obligation.param_env)
@@ -582,7 +585,9 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
                                 Err(_) => Ok(EvaluatedToErr),
                             }
                         }
-                        (Err(ErrorHandled::Reported(ErrorReported)), _)
+                        (Ok(None), _)
+                        | (_, Ok(None))
+                        | (Err(ErrorHandled::Reported(ErrorReported)), _)
                         | (_, Err(ErrorHandled::Reported(ErrorReported))) => Ok(EvaluatedToErr),
                         (Err(ErrorHandled::Linted), _) | (_, Err(ErrorHandled::Linted)) => {
                             span_bug!(

@@ -1,5 +1,4 @@
-use crate::mir::interpret::ConstValue;
-use crate::mir::interpret::{LitToConstInput, Scalar};
+use crate::mir::interpret::LitToConstInput;
 use crate::ty::subst::InternalSubsts;
 use crate::ty::{self, Ty, TyCtxt};
 use crate::ty::{ParamEnv, ParamEnvAnd};
@@ -110,14 +109,14 @@ impl<'tcx> Const<'tcx> {
 
     /// Interns the given value as a constant.
     #[inline]
-    pub fn from_value(tcx: TyCtxt<'tcx>, val: ConstValue<'tcx>, ty: Ty<'tcx>) -> &'tcx Self {
+    pub fn from_value(tcx: TyCtxt<'tcx>, val: ValTree<'tcx>, ty: Ty<'tcx>) -> &'tcx Self {
         tcx.mk_const(Self { val: ConstKind::Value(val), ty })
     }
 
     #[inline]
     /// Interns the given scalar as a constant.
-    pub fn from_scalar(tcx: TyCtxt<'tcx>, val: Scalar, ty: Ty<'tcx>) -> &'tcx Self {
-        Self::from_value(tcx, ConstValue::Scalar(val), ty)
+    pub fn from_scalar(tcx: TyCtxt<'tcx>, val: ScalarInt, ty: Ty<'tcx>) -> &'tcx Self {
+        Self::from_value(tcx, ValTree::Leaf(val), ty)
     }
 
     #[inline]
@@ -127,13 +126,13 @@ impl<'tcx> Const<'tcx> {
             .layout_of(ty)
             .unwrap_or_else(|e| panic!("could not compute layout for {:?}: {:?}", ty, e))
             .size;
-        Self::from_scalar(tcx, Scalar::from_uint(bits, size), ty.value)
+        Self::from_scalar(tcx, ScalarInt::from_uint(bits, size), ty.value)
     }
 
     #[inline]
     /// Creates an interned zst constant.
     pub fn zero_sized(tcx: TyCtxt<'tcx>, ty: Ty<'tcx>) -> &'tcx Self {
-        Self::from_scalar(tcx, Scalar::ZST, ty)
+        Self::from_scalar(tcx, ScalarInt::ZST, ty)
     }
 
     #[inline]
@@ -191,8 +190,13 @@ impl<'tcx> Const<'tcx> {
     #[inline]
     /// Panics if the value cannot be evaluated or doesn't contain a valid integer of the given type.
     pub fn eval_bits(&self, tcx: TyCtxt<'tcx>, param_env: ParamEnv<'tcx>, ty: Ty<'tcx>) -> u128 {
-        self.try_eval_bits(tcx, param_env, ty)
-            .unwrap_or_else(|| bug!("expected bits of {:#?}, got {:#?}", ty, self))
+        assert_eq!(self.ty, ty);
+        let size = tcx
+            .layout_of(param_env.with_reveal_all_normalized(tcx).and(ty))
+            .expect("could not normalize type layout")
+            .size;
+        // if `ty` does not depend on generic parameters, use an empty param_env
+        self.val.eval(tcx, param_env).try_to_scalar_int().unwrap().assert_bits(size)
     }
 
     #[inline]

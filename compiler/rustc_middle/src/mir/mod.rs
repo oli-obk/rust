@@ -2422,7 +2422,7 @@ pub enum ConstantKind<'tcx> {
 
 impl Constant<'tcx> {
     pub fn check_static_ptr(&self, tcx: TyCtxt<'_>) -> Option<DefId> {
-        match self.literal.const_for_ty()?.val.try_to_scalar() {
+        match self.literal.try_to_scalar() {
             Some(Scalar::Ptr(ptr)) => match tcx.global_alloc(ptr.alloc_id) {
                 GlobalAlloc::Static(def_id) => {
                     assert!(!tcx.is_thread_local_static(def_id));
@@ -2461,21 +2461,30 @@ impl ConstantKind<'tcx> {
     }
 
     #[inline]
+    // FIXME: get rid of this, it is a total footgun, because you only
+    // really want this when you know the value cannot be represented
+    // as a valtree value.
     pub fn try_to_value(self) -> Option<interpret::ConstValue<'tcx>> {
         match self {
-            ConstantKind::Ty(c) => c.val.try_to_value(),
+            ConstantKind::Ty(_) => None,
             ConstantKind::Val(val, _) => Some(val),
         }
     }
 
     #[inline]
+    // FIXME: get rid of this, it is a total footgun, because you only
+    // really want this when you know the value cannot be represented
+    // as a valtree value.
     pub fn try_to_scalar(self) -> Option<Scalar> {
         self.try_to_value()?.try_to_scalar()
     }
 
     #[inline]
     pub fn try_to_scalar_int(self) -> Option<ScalarInt> {
-        Some(self.try_to_value()?.try_to_scalar()?.assert_int())
+        match self {
+            ConstantKind::Ty(ct) => ct.val.try_to_scalar_int(),
+            ConstantKind::Val(val, _) => val.try_to_scalar_int(),
+        }
     }
 
     #[inline]

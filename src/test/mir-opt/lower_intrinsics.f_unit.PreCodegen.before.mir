@@ -16,7 +16,7 @@ fn f_unit() -> () {
         _2 = f_zst::<()>(const ()) -> bb1; // scope 1 at $DIR/lower_intrinsics.rs:29:5: 29:19
                                          // mir::Constant
                                          // + span: $DIR/lower_intrinsics.rs:29:5: 29:19
-                                         // + literal: Const { ty: fn(()) {f_zst::<()>}, val: Value(Scalar(<ZST>)) }
+                                         // + literal: Const { ty: fn(()) {f_zst::<()>}, val: Value(Leaf(<ZST>)) }
     }
 
     bb1: {

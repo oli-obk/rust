@@ -9,9 +9,11 @@ use crate::MemFlags;
 use rustc_middle::mir;
 use rustc_middle::mir::interpret::{ConstValue, Pointer, Scalar};
 use rustc_middle::ty::layout::TyAndLayout;
-use rustc_middle::ty::Ty;
+use rustc_middle::ty::{self, Ty, ValTree};
+use rustc_span::Span;
 use rustc_target::abi::{Abi, Align, LayoutOf, Size};
 
+use std::convert::{TryFrom, TryInto};
 use std::fmt;
 
 /// The representation of a Rust value. The enum variant is in fact
@@ -67,8 +69,9 @@ impl<'a, 'tcx, V: CodegenObject> OperandRef<'tcx, V> {
 
     pub fn from_const<Bx: BuilderMethods<'a, 'tcx, Value = V>>(
         bx: &mut Bx,
-        val: ConstValue<'tcx>,
+        val: Result<ConstValue<'tcx>, ValTree<'tcx>>,
         ty: Ty<'tcx>,
+        span: Span,
     ) -> Self {
         let layout = bx.layout_of(ty);
 
@@ -76,8 +79,65 @@ impl<'a, 'tcx, V: CodegenObject> OperandRef<'tcx, V> {
             return OperandRef::new_zst(bx, layout);
         }
 
+        let encode_slice = |valtree: ValTree<'_>| {
+            let s: Vec<u8> = valtree
+                .unwrap_branch()
+                .iter()
+                .map(|b| u8::try_from(b.unwrap_leaf()).unwrap())
+                .collect();
+            let alloc_id = bx.tcx().allocate_bytes(&s);
+
+            let a_scalar = match layout.abi {
+                Abi::ScalarPair(ref a, _) => a,
+                _ => bug!("from_const: invalid ScalarPair layout: {:#?}", layout),
+            };
+            let a = Scalar::from(Pointer::from(alloc_id));
+            let a_llval = bx.scalar_to_backend(
+                a,
+                a_scalar,
+                bx.scalar_pair_element_backend_type(layout, 0, true),
+            );
+            let b_llval = bx.const_usize(s.len().try_into().unwrap());
+            OperandValue::Pair(a_llval, b_llval)
+        };
+
         let val = match val {
-            ConstValue::Scalar(x) => {
+            Err(valtree) => match ty.kind() {
+                ty::Ref(_, pointee, _) => match *pointee.kind() {
+                    ty::Str => encode_slice(valtree),
+                    ty::Slice(elem_ty) if elem_ty == bx.tcx().types.u8 => encode_slice(valtree),
+                    ty::Array(elem_ty, _) if elem_ty == bx.tcx().types.u8 => {
+                        let s: Vec<u8> = valtree
+                            .unwrap_branch()
+                            .iter()
+                            .map(|b| u8::try_from(b.unwrap_leaf()).unwrap())
+                            .collect();
+                        let alloc_id = bx.tcx().allocate_bytes(&s);
+                        let cv = Scalar::from(Pointer::from(alloc_id));
+                        let scalar = match layout.abi {
+                            Abi::Scalar(ref x) => x,
+                            _ => bug!("from_const: invalid ByVal layout: {:#?}", layout),
+                        };
+                        let llval =
+                            bx.scalar_to_backend(cv, scalar, bx.immediate_backend_type(layout));
+                        OperandValue::Immediate(llval)
+                    }
+                    _ => span_bug!(span, "{}: {:?}", ty, valtree),
+                },
+                _ => {
+                    let scalar = match layout.abi {
+                        Abi::Scalar(ref x) => x,
+                        _ => bug!("from_const: invalid ByVal layout: {:#?}", layout),
+                    };
+                    let llval = bx.scalar_to_backend(
+                        valtree.unwrap_leaf().into(),
+                        scalar,
+                        bx.immediate_backend_type(layout),
+                    );
+                    OperandValue::Immediate(llval)
+                }
+            },
+            Ok(ConstValue::Scalar(x)) => {
                 let scalar = match layout.abi {
                     Abi::Scalar(ref x) => x,
                     _ => bug!("from_const: invalid ByVal layout: {:#?}", layout),
@@ -85,7 +145,7 @@ impl<'a, 'tcx, V: CodegenObject> OperandRef<'tcx, V> {
                 let llval = bx.scalar_to_backend(x, scalar, bx.immediate_backend_type(layout));
                 OperandValue::Immediate(llval)
             }
-            ConstValue::Slice { data, start, end } => {
+            Ok(ConstValue::Slice { data, start, end }) => {
                 let a_scalar = match layout.abi {
                     Abi::ScalarPair(ref a, _) => a,
                     _ => bug!("from_const: invalid ScalarPair layout: {:#?}", layout),
@@ -102,7 +162,7 @@ impl<'a, 'tcx, V: CodegenObject> OperandRef<'tcx, V> {
                 let b_llval = bx.const_usize((end - start) as u64);
                 OperandValue::Pair(a_llval, b_llval)
             }
-            ConstValue::ByRef { alloc, offset } => {
+            Ok(ConstValue::ByRef { alloc, offset }) => {
                 return bx.load_operand(bx.from_const_alloc(layout, alloc, offset));
             }
         };

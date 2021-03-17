@@ -82,24 +82,17 @@ pub(super) fn codegen_simd_intrinsic_call<'tcx>(
             let total_len = lane_count * 2;
 
             let indexes = {
-                use rustc_middle::mir::interpret::*;
-                let idx_const = crate::constant::mir_operand_get_const_val(fx, idx).expect("simd_shuffle* idx not const");
+                let idx_const = crate::constant::mir_operand_get_const(fx, idx).expect("simd_shuffle* idx not const").const_for_ty().expect("simd shuffle arg must be structural-eq");
 
-                let idx_bytes = match idx_const {
-                    ConstValue::ByRef { alloc, offset } => {
-                        let ptr = Pointer::new(AllocId(0 /* dummy */), offset);
-                        let size = Size::from_bytes(4 * u64::from(ret_lane_count) /* size_of([u32; ret_lane_count]) */);
-                        alloc.get_bytes(fx, ptr, size).unwrap()
-                    }
+                let idxs = match idx_const.val.try_to_value() {
+                    Some(ty::ValTree::Branch(branches)) => branches,
                     _ => unreachable!("{:?}", idx_const),
                 };
 
-                (0..ret_lane_count).map(|i| {
-                    let i = usize::try_from(i).unwrap();
-                    let idx = rustc_middle::mir::interpret::read_target_uint(
-                        fx.tcx.data_layout.endian,
-                        &idx_bytes[4*i.. 4*i + 4],
-                    ).expect("read_target_uint");
+                assert_eq!(u64::try_from(idxs.len()), Ok(ret_lane_count));
+                idxs.iter().map(|idx|{
+                    let idx = idx.unwrap_leaf();
+                    let idx = u32::try_from(idx).expect("simd_shuffle indices are u32");
                     u16::try_from(idx).expect("try_from u32")
                 }).collect::<Vec<u16>>()
             };
@@ -121,7 +114,7 @@ pub(super) fn codegen_simd_intrinsic_call<'tcx>(
 
         simd_insert, (c base, o idx, c val) {
             // FIXME validate
-            let idx_const = if let Some(idx_const) = crate::constant::mir_operand_get_const_val(fx, idx) {
+            let idx_const = if let Some(idx_const) = crate::constant::mir_operand_get_const_int(fx, idx) {
                 idx_const
             } else {
                 fx.tcx.sess.span_fatal(
@@ -130,7 +123,7 @@ pub(super) fn codegen_simd_intrinsic_call<'tcx>(
                 );
             };
 
-            let idx = idx_const.try_to_bits(Size::from_bytes(4 /* u32*/)).unwrap_or_else(|| panic!("kind not scalar: {:?}", idx_const));
+            let idx = idx_const.to_bits(Size::from_bytes(4 /* u32*/)).unwrap_or_else(|_| panic!("kind not scalar: {:?}", idx_const));
             let (lane_count, _lane_ty) = base.layout().ty.simd_size_and_type(fx.tcx);
             if idx >= lane_count.into() {
                 fx.tcx.sess.span_fatal(fx.mir.span, &format!("[simd_insert] idx {} >= lane_count {}", idx, lane_count));
@@ -143,7 +136,7 @@ pub(super) fn codegen_simd_intrinsic_call<'tcx>(
 
         simd_extract, (c v, o idx) {
             validate_simd_type!(fx, intrinsic, span, v.layout().ty);
-            let idx_const = if let Some(idx_const) = crate::constant::mir_operand_get_const_val(fx, idx) {
+            let idx_const = if let Some(idx_const) = crate::constant::mir_operand_get_const_int(fx, idx) {
                 idx_const
             } else {
                 fx.tcx.sess.span_warn(
@@ -159,7 +152,7 @@ pub(super) fn codegen_simd_intrinsic_call<'tcx>(
                 return;
             };
 
-            let idx = idx_const.try_to_bits(Size::from_bytes(4 /* u32*/)).unwrap_or_else(|| panic!("kind not scalar: {:?}", idx_const));
+            let idx = idx_const.to_bits(Size::from_bytes(4 /* u32*/)).unwrap_or_else(|_| panic!("kind not scalar: {:?}", idx_const));
             let (lane_count, _lane_ty) = v.layout().ty.simd_size_and_type(fx.tcx);
             if idx >= lane_count.into() {
                 fx.tcx.sess.span_fatal(fx.mir.span, &format!("[simd_extract] idx {} >= lane_count {}", idx, lane_count));

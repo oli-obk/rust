@@ -810,7 +810,7 @@ impl<'mir, 'tcx> ConstPropagator<'mir, 'tcx> {
         Operand::Constant(Box::new(Constant {
             span,
             user_ty: None,
-            literal: ty::Const::from_scalar(self.tcx, scalar, ty).into(),
+            literal: ConstantKind::Val(scalar.into(), ty),
         }))
     }
 
@@ -893,17 +893,10 @@ impl<'mir, 'tcx> ConstPropagator<'mir, 'tcx> {
                                 *rval = Rvalue::Use(Operand::Constant(Box::new(Constant {
                                     span: source_info.span,
                                     user_ty: None,
-                                    literal: self
-                                        .ecx
-                                        .tcx
-                                        .mk_const(ty::Const {
-                                            ty,
-                                            val: ty::ConstKind::Value(ConstValue::ByRef {
-                                                alloc,
-                                                offset: Size::ZERO,
-                                            }),
-                                        })
-                                        .into(),
+                                    literal: ConstantKind::Val(
+                                        ConstValue::ByRef { alloc, offset: Size::ZERO },
+                                        ty,
+                                    ),
                                 })));
                             }
                         }

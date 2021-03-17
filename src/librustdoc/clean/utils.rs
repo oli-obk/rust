@@ -10,7 +10,7 @@ use crate::core::DocContext;
 use rustc_hir as hir;
 use rustc_hir::def::{DefKind, Res};
 use rustc_hir::def_id::{DefId, LOCAL_CRATE};
-use rustc_middle::mir::interpret::ConstValue;
+use rustc_middle::mir::{self, interpret::ConstValue};
 use rustc_middle::ty::subst::{GenericArgKind, SubstsRef};
 use rustc_middle::ty::{self, DefIdTree, TyCtxt};
 use rustc_span::symbol::{kw, sym, Symbol};
@@ -331,8 +331,7 @@ crate fn print_evaluated_const(tcx: TyCtxt<'_>, def_id: DefId) -> Option<String>
             (_, &ty::Ref(..)) => None,
             (ConstValue::Scalar(_), &ty::Adt(_, _)) => None,
             (ConstValue::Scalar(_), _) => {
-                let const_ = ty::Const::from_value(tcx, val, ty);
-                Some(print_const_with_custom_print_scalar(tcx, const_))
+                Some(print_const_with_custom_print_scalar(tcx, mir::ConstantKind::Val(val, ty)))
             }
             _ => None,
         }
@@ -349,16 +348,23 @@ fn format_integer_with_underscore_sep(num: &str) -> String {
         .collect()
 }
 
-fn print_const_with_custom_print_scalar(tcx: TyCtxt<'_>, ct: &'tcx ty::Const<'tcx>) -> String {
+fn print_const_with_custom_print_scalar(tcx: TyCtxt<'_>, ct: mir::ConstantKind<'tcx>) -> String {
     // Use a slightly different format for integer types which always shows the actual value.
     // For all other types, fallback to the original `pretty_print_const`.
-    match (ct.val, ct.ty.kind()) {
-        (ty::ConstKind::Value(ConstValue::Scalar(int)), ty::Uint(ui)) => {
-            format!("{}{}", format_integer_with_underscore_sep(&int.to_string()), ui.name_str())
+    match ct.ty().kind() {
+        ty::Uint(ui) => {
+            let int = ct.try_to_scalar_int().unwrap();
+            let int = ty::ConstInt::new(int, false, ct.ty().is_ptr_sized_integral());
+            format!(
+                "{}{}",
+                format_integer_with_underscore_sep(&format!("{:?}", int)),
+                ui.name_str()
+            )
         }
-        (ty::ConstKind::Value(ConstValue::Scalar(int)), ty::Int(i)) => {
-            let ty = tcx.lift(ct.ty).unwrap();
+        ty::Int(i) => {
+            let ty = tcx.lift(ct.ty()).unwrap();
             let size = tcx.layout_of(ty::ParamEnv::empty().and(ty)).unwrap().size;
+            let int = ct.try_to_scalar_int().unwrap();
             let data = int.assert_bits(size);
             let sign_extended_data = size.sign_extend(data) as i128;
 

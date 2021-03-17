@@ -10,10 +10,10 @@
           _1 = f::<fn() {g}>(g) -> bb1;    // scope 0 at $DIR/cycle.rs:17:5: 17:9
                                            // mir::Constant
                                            // + span: $DIR/cycle.rs:17:5: 17:6
-                                           // + literal: Const { ty: fn(fn() {g}) {f::<fn() {g}>}, val: Value(Scalar(<ZST>)) }
+                                           // + literal: Const { ty: fn(fn() {g}) {f::<fn() {g}>}, val: Value(Leaf(<ZST>)) }
                                            // mir::Constant
                                            // + span: $DIR/cycle.rs:17:7: 17:8
-                                           // + literal: Const { ty: fn() {g}, val: Value(Scalar(<ZST>)) }
+                                           // + literal: Const { ty: fn() {g}, val: Value(Leaf(<ZST>)) }
       }
   
       bb1: {

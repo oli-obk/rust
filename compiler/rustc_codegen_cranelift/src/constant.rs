@@ -120,17 +120,19 @@ pub(crate) fn codegen_constant<'tcx>(
         ConstantKind::Ty(ct) => ct,
         ConstantKind::Val(val, ty) => return codegen_const_value(fx, val, ty),
     };
-    let const_val = match const_.val {
-        ConstKind::Value(const_val) => const_val,
-        ConstKind::Unevaluated(ty::Unevaluated { def, substs, promoted }) if fx.tcx.is_static(def.did) => {
+    match const_.val {
+        ConstKind::Value(valtree) => codegen_valtree(fx, valtree, const_.ty, constant.span),
+        ConstKind::Unevaluated(ty::Unevaluated { def, substs, promoted })
+            if fx.tcx.is_static(def.did) =>
+        {
             assert!(substs.is_empty());
             assert!(promoted.is_none());
 
-            return codegen_static_ref(fx, def.did, fx.layout_of(const_.ty)).to_cvalue(fx);
+            codegen_static_ref(fx, def.did, fx.layout_of(const_.ty)).to_cvalue(fx)
         }
         ConstKind::Unevaluated(unevaluated) => {
             match fx.tcx.const_eval_resolve(ParamEnv::reveal_all(), unevaluated, None) {
-                Ok(const_val) => const_val,
+                Ok(const_val) => codegen_const_value(fx, const_val, const_.ty),
                 Err(_) => {
                     span_bug!(constant.span, "erroneous constant not captured by required_consts");
                 }
@@ -141,9 +143,53 @@ pub(crate) fn codegen_constant<'tcx>(
         | ConstKind::Bound(_, _)
         | ConstKind::Placeholder(_)
         | ConstKind::Error(_) => unreachable!("{:?}", const_),
+    }
+}
+
+pub(crate) fn codegen_valtree<'tcx>(
+    fx: &mut FunctionCx<'_, '_, 'tcx>,
+    valtree: ty::ValTree<'tcx>,
+    ty: Ty<'tcx>,
+    span: Span,
+) -> CValue<'tcx> {
+    let layout = fx.layout_of(ty);
+    let tcx = fx.tcx;
+    let mut encode_slice = |valtree: ty::ValTree<'_>| {
+        let s: Vec<u8> = valtree
+            .unwrap_branch()
+            .iter()
+            .map(|b| u8::try_from(b.unwrap_leaf()).unwrap())
+            .collect();
+        let alloc_id = fx.tcx.allocate_bytes(&s);
+
+        let ptr = pointer_for_alloc_id(fx, alloc_id, Mutability::Not).get_addr(fx);
+        let len = fx.bcx.ins().iconst(fx.pointer_type, i64::try_from(s.len()).unwrap());
+        CValue::by_val_pair(ptr, len, layout)
     };
 
-    codegen_const_value(fx, const_val, const_.ty)
+    match *ty.kind() {
+        ty::Ref(_, pointee, _) => match *pointee.kind() {
+            ty::Str => encode_slice(valtree),
+            ty::Slice(elem_ty) if elem_ty == tcx.types.u8 => encode_slice(valtree),
+            ty::Array(elem_ty, _) if elem_ty == tcx.types.u8 => {
+                let s: Vec<u8> = valtree
+                    .unwrap_branch()
+                    .iter()
+                    .map(|b| u8::try_from(b.unwrap_leaf()).unwrap())
+                    .collect();
+                let alloc_id = fx.tcx.allocate_bytes(&s);
+                fx.cx.constants_cx.todo.push(TodoItem::Alloc(alloc_id));
+                let data_id = data_id_for_alloc_id(fx.cx.module, alloc_id, Mutability::Not);
+                let local_data_id = fx.cx.module.declare_data_in_func(data_id, &mut fx.bcx.func);
+                #[cfg(debug_assertions)]
+                fx.add_comment(local_data_id, format!("{:?}", alloc_id));
+                let ptr = fx.bcx.ins().global_value(fx.pointer_type, local_data_id);
+                CValue::by_val(ptr, layout)
+            }
+            _ => span_bug!(span, "{}: {:?}", ty, valtree),
+        },
+        _ => codegen_const_value(fx, ConstValue::Scalar(valtree.unwrap_leaf().into()), ty),
+    }
 }
 
 pub(crate) fn codegen_const_value<'tcx>(
@@ -237,8 +283,16 @@ fn pointer_for_allocation<'tcx>(
     alloc: &'tcx Allocation,
 ) -> crate::pointer::Pointer {
     let alloc_id = fx.tcx.create_memory_alloc(alloc);
+    pointer_for_alloc_id(fx, alloc_id, alloc.mutability)
+}
+
+fn pointer_for_alloc_id<'tcx>(
+    fx: &mut FunctionCx<'_, '_, 'tcx>,
+    alloc_id: AllocId,
+    mutability: Mutability,
+) -> crate::pointer::Pointer {
     fx.cx.constants_cx.todo.push(TodoItem::Alloc(alloc_id));
-    let data_id = data_id_for_alloc_id(fx.cx.module, alloc_id, alloc.mutability);
+    let data_id = data_id_for_alloc_id(fx.cx.module, alloc_id, mutability);
 
     let local_data_id = fx.cx.module.declare_data_in_func(data_id, &mut fx.bcx.func);
     #[cfg(debug_assertions)]
@@ -420,17 +474,19 @@ fn define_all_allocs(tcx: TyCtxt<'_>, module: &mut dyn Module, cx: &mut Constant
     assert!(cx.todo.is_empty(), "{:?}", cx.todo);
 }
 
-pub(crate) fn mir_operand_get_const_val<'tcx>(
+pub(crate) fn mir_operand_get_const_int<'tcx>(
     fx: &FunctionCx<'_, '_, 'tcx>,
     operand: &Operand<'tcx>,
-) -> Option<ConstValue<'tcx>> {
+) -> Option<ty::ScalarInt> {
+    mir_operand_get_const(fx, operand)?.try_to_scalar_int()
+}
+
+pub(crate) fn mir_operand_get_const<'tcx>(
+    _fx: &FunctionCx<'_, '_, 'tcx>,
+    operand: &Operand<'tcx>,
+) -> Option<mir::ConstantKind<'tcx>> {
     match operand {
         Operand::Copy(_) | Operand::Move(_) => None,
-        Operand::Constant(const_) => match const_.literal {
-            ConstantKind::Ty(const_) => {
-                fx.monomorphize(const_).eval(fx.tcx, ParamEnv::reveal_all()).val.try_to_value()
-            }
-            ConstantKind::Val(val, _) => Some(val),
-        },
+        Operand::Constant(const_) => Some(const_.literal),
     }
 }

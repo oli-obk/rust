@@ -9,6 +9,7 @@ use rustc_hir as hir;
 use rustc_hir::def_id::DefId;
 use rustc_middle::infer::canonical::Canonical;
 use rustc_middle::middle::region;
+use rustc_middle::mir::interpret::AllocId;
 use rustc_middle::mir::{BinOp, BorrowKind, FakeReadCause, Field, UnOp};
 use rustc_middle::ty::adjustment::PointerCast;
 use rustc_middle::ty::subst::SubstsRef;
@@ -292,11 +293,9 @@ pub enum ExprKind<'thir, 'tcx> {
         const_id: Option<DefId>,
     },
     /// A literal containing the address of a `static`.
-    ///
-    /// This is only distinguished from `Literal` so that we can register some
-    /// info for diagnostics.
     StaticRef {
-        literal: &'tcx Const<'tcx>,
+        address: AllocId,
+        ty: Ty<'tcx>,
         def_id: DefId,
     },
     InlineAsm {

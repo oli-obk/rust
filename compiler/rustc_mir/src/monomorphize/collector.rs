@@ -178,22 +178,23 @@ use crate::monomorphize;
 
 use rustc_data_structures::fx::{FxHashMap, FxHashSet};
 use rustc_data_structures::sync::{par_iter, MTLock, MTRef, ParallelIterator};
-use rustc_errors::{ErrorReported, FatalError};
+use rustc_errors::FatalError;
 use rustc_hir as hir;
 use rustc_hir::def_id::{DefId, DefIdMap, LocalDefId, LOCAL_CRATE};
 use rustc_hir::itemlikevisit::ItemLikeVisitor;
 use rustc_hir::lang_items::LangItem;
 use rustc_index::bit_set::GrowableBitSet;
+use rustc_middle::middle::codegen_fn_attrs::CodegenFnAttrFlags;
 use rustc_middle::mir::interpret::{AllocId, ConstValue};
-use rustc_middle::mir::interpret::{ErrorHandled, GlobalAlloc, Scalar};
+use rustc_middle::mir::interpret::{GlobalAlloc, Scalar, ErrorHandled};
 use rustc_middle::mir::mono::{InstantiationMode, MonoItem};
 use rustc_middle::mir::visit::Visitor as MirVisitor;
 use rustc_middle::mir::{self, Local, Location};
 use rustc_middle::ty::adjustment::{CustomCoerceUnsized, PointerCast};
 use rustc_middle::ty::subst::{GenericArgKind, InternalSubsts};
 use rustc_middle::ty::{self, GenericParamDefKind, Instance, Ty, TyCtxt, TypeFoldable};
-use rustc_middle::{middle::codegen_fn_attrs::CodegenFnAttrFlags, mir::visit::TyContext};
 use rustc_session::config::EntryFnType;
+use rustc_errors::ErrorReported;
 use rustc_span::source_map::{dummy_spanned, respan, Span, Spanned, DUMMY_SP};
 use smallvec::SmallVec;
 use std::iter;
@@ -642,11 +643,14 @@ impl<'a, 'tcx> MirVisitor<'tcx> for MirNeighborCollector<'a, 'tcx> {
     /// to walk it would attempt to evaluate the `ty::Const` inside, which doesn't necessarily
     /// work, as some constants cannot be represented in the type system.
     fn visit_constant(&mut self, constant: &mir::Constant<'tcx>, location: Location) {
+        self.super_constant(constant, location);
         let literal = self.monomorphize(constant.literal);
         let val = match literal {
             mir::ConstantKind::Val(val, _) => val,
             mir::ConstantKind::Ty(ct) => match ct.val {
-                ty::ConstKind::Value(val) => val,
+                // Type level constants cannot contain anything that we need to look at, they
+                // are pure values.
+                ty::ConstKind::Value(_) => return,
                 ty::ConstKind::Unevaluated(ct) => {
                     let param_env = ty::ParamEnv::reveal_all();
                     match self.tcx.const_eval_resolve(param_env, ct, None) {
@@ -664,38 +668,6 @@ impl<'a, 'tcx> MirVisitor<'tcx> for MirNeighborCollector<'a, 'tcx> {
             },
         };
         collect_const_value(self.tcx, val, self.output);
-        self.visit_ty(literal.ty(), TyContext::Location(location));
-    }
-
-    fn visit_const(&mut self, constant: &&'tcx ty::Const<'tcx>, location: Location) {
-        debug!("visiting const {:?} @ {:?}", *constant, location);
-
-        let substituted_constant = self.monomorphize(*constant);
-        let param_env = ty::ParamEnv::reveal_all();
-
-        match substituted_constant.val {
-            ty::ConstKind::Value(val) => collect_const_value(self.tcx, val, self.output),
-            ty::ConstKind::Unevaluated(unevaluated) => {
-                match self.tcx.const_eval_resolve(param_env, unevaluated, None) {
-                    // The `monomorphize` call should have evaluated that constant already.
-                    Ok(val) => span_bug!(
-                        self.body.source_info(location).span,
-                        "collection encountered the unevaluated constant {} which evaluated to {:?}",
-                        substituted_constant,
-                        val
-                    ),
-                    Err(ErrorHandled::Reported(ErrorReported) | ErrorHandled::Linted) => {}
-                    Err(ErrorHandled::TooGeneric) => span_bug!(
-                        self.body.source_info(location).span,
-                        "collection encountered polymorphic constant: {}",
-                        substituted_constant
-                    ),
-                }
-            }
-            _ => {}
-        }
-
-        self.super_const(constant);
     }
 
     fn visit_terminator(&mut self, terminator: &mir::Terminator<'tcx>, location: Location) {

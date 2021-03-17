@@ -9,6 +9,7 @@ use rustc_hir::def::Namespace;
 use rustc_macros::HashStable;
 use rustc_middle::ty::layout::{PrimitiveExt, TyAndLayout};
 use rustc_middle::ty::print::{FmtPrinter, PrettyPrinter, Printer};
+use rustc_middle::ty::ValTree;
 use rustc_middle::ty::{ConstInt, Ty};
 use rustc_middle::{mir, ty};
 use rustc_target::abi::{Abi, HasDataLayout, LayoutOf, Size, TagEncoding};
@@ -548,11 +549,10 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
         ops.iter().map(|op| self.eval_operand(op, None)).collect()
     }
 
-    // Used when the miri-engine runs into a constant and for extracting information from constants
-    // in patterns via the `const_eval` module
+    // Used when the miri-engine runs into a type level constant
     /// The `val` and `layout` are assumed to already be in our interpreter
     /// "universe" (param_env).
-    crate fn const_to_op(
+    fn const_to_op(
         &self,
         val: &ty::Const<'tcx>,
         layout: Option<TyAndLayout<'tcx>>,
@@ -567,7 +567,66 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
             ty::ConstKind::Infer(..) | ty::ConstKind::Placeholder(..) => {
                 span_bug!(self.cur_span(), "const_to_op: Unexpected ConstKind {:?}", val)
             }
-            ty::ConstKind::Value(val_val) => self.const_val_to_op(val_val, val.ty, layout),
+            ty::ConstKind::Value(valtree) => self.valtree_to_op(valtree, val.ty, layout),
+        }
+    }
+
+    crate fn valtree_to_op(
+        &self,
+        val: ValTree<'tcx>,
+        ty: Ty<'tcx>,
+        layout: Option<TyAndLayout<'tcx>>,
+    ) -> InterpResult<'tcx, OpTy<'tcx, M::PointerTag>> {
+        match ty.kind() {
+            ty::Ref(_, inner, _) => match *inner.kind() {
+                ty::Array(elem, _) if elem == self.tcx.types.u8 => {
+                    let bytes: Vec<u8> = val
+                        .unwrap_branch()
+                        .iter()
+                        .map(|vt| u8::try_from(vt.unwrap_leaf()).unwrap())
+                        .collect();
+                    let alloc_id = self.tcx.allocate_bytes(&bytes);
+                    let ptr = self.global_base_pointer(alloc_id.into())?;
+                    let layout =
+                        from_known_layout(self.tcx, self.param_env, layout, || self.layout_of(ty))?;
+                    let op = Operand::Immediate(Immediate::from(ptr));
+                    Ok(OpTy { op, layout })
+                }
+                ty::Str => {
+                    let bytes: Vec<u8> = val
+                        .unwrap_branch()
+                        .iter()
+                        .map(|vt| u8::try_from(vt.unwrap_leaf()).unwrap())
+                        .collect();
+                    let alloc_id = self.tcx.allocate_bytes(&bytes);
+                    let ptr = self.global_base_pointer(alloc_id.into())?;
+                    let layout =
+                        from_known_layout(self.tcx, self.param_env, layout, || self.layout_of(ty))?;
+                    let op = Operand::Immediate(Immediate::new_slice(
+                        ptr.into(),
+                        u64::try_from(bytes.len()).unwrap(),
+                        self,
+                    ));
+                    Ok(OpTy { op, layout })
+                }
+                _ => span_bug!(
+                    self.cur_span(),
+                    "complex valtrees of type {} are unimplemented: {:?}",
+                    ty,
+                    val,
+                ),
+            },
+            _ => match val {
+                ValTree::Leaf(int) => {
+                    self.const_val_to_op(ConstValue::Scalar(int.into()), ty, layout)
+                }
+                ValTree::Branch(branches) => span_bug!(
+                    self.cur_span(),
+                    "complex valtrees of type {} are unimplemented: {:?}",
+                    ty,
+                    branches
+                ),
+            },
         }
     }
 

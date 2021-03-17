@@ -169,6 +169,7 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                     sym::type_name => self.tcx.mk_static_str(),
                     _ => bug!("already checked for nullary intrinsics"),
                 };
+                // FIXME: use the const_eval_for_ty version once strings are implemented
                 let val =
                     self.tcx.const_eval_global_id(self.param_env, gid, Some(self.tcx.span))?;
                 let val = self.const_val_to_op(val, ty, Some(dest.layout))?;

@@ -73,7 +73,7 @@ fn main() -> () {
         _3 = Test::foo(move _4, move _6) -> [return: bb1, unwind: bb7]; // scope 1 at $DIR/retag.rs:32:17: 32:36
                                          // mir::Constant
                                          // + span: $DIR/retag.rs:32:25: 32:28
-                                         // + literal: Const { ty: for<'r, 'x> fn(&'r Test, &'x mut i32) -> &'x mut i32 {Test::foo}, val: Value(Scalar(<ZST>)) }
+                                         // + literal: Const { ty: for<'r, 'x> fn(&'r Test, &'x mut i32) -> &'x mut i32 {Test::foo}, val: Value(Leaf(<ZST>)) }
     }
 
     bb1: {
@@ -161,7 +161,7 @@ fn main() -> () {
         _19 = Test::foo_shr(move _20, move _22) -> [return: bb4, unwind: bb6]; // scope 7 at $DIR/retag.rs:47:5: 47:24
                                          // mir::Constant
                                          // + span: $DIR/retag.rs:47:13: 47:20
-                                         // + literal: Const { ty: for<'r, 'x> fn(&'r Test, &'x i32) -> &'x i32 {Test::foo_shr}, val: Value(Scalar(<ZST>)) }
+                                         // + literal: Const { ty: for<'r, 'x> fn(&'r Test, &'x i32) -> &'x i32 {Test::foo_shr}, val: Value(Leaf(<ZST>)) }
     }
 
     bb4: {

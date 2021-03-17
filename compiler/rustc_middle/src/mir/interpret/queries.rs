@@ -1,4 +1,4 @@
-use super::{ErrorHandled, EvalToConstValueResult, GlobalId};
+use super::{error::EvalToValTreeResult, ErrorHandled, EvalToConstValueResult, GlobalId};
 
 use crate::mir;
 use crate::ty::subst::InternalSubsts;
@@ -45,6 +45,38 @@ impl<'tcx> TyCtxt<'tcx> {
             }
             Ok(None) => Err(ErrorHandled::TooGeneric),
             Err(error_reported) => Err(ErrorHandled::Reported(error_reported)),
+        }
+    }
+
+    #[instrument(level = "debug", skip(self))]
+    pub fn const_eval_for_ty(
+        self,
+        param_env: ty::ParamEnv<'tcx>,
+        ct: ty::Unevaluated<'tcx>,
+        span: Option<Span>,
+    ) -> EvalToValTreeResult<'tcx> {
+        assert_eq!(ct.promoted, None);
+        match ty::Instance::resolve_opt_const_arg(self, param_env, ct.def, ct.substs) {
+            Ok(Some(instance)) => self.const_eval_instance_for_ty(param_env, instance, span),
+            Ok(None) => Err(ErrorHandled::TooGeneric),
+            Err(error_reported) => Err(ErrorHandled::Reported(error_reported)),
+        }
+    }
+
+    pub fn const_eval_instance_for_ty(
+        self,
+        param_env: ty::ParamEnv<'tcx>,
+        instance: ty::Instance<'tcx>,
+        span: Option<Span>,
+    ) -> EvalToValTreeResult<'tcx> {
+        let cid = GlobalId { instance, promoted: None };
+        // Const-eval shouldn't depend on lifetimes at all, so we can erase them, which should
+        // improve caching of queries.
+        let inputs = self.erase_regions(param_env.and(cid));
+        if let Some(span) = span {
+            self.at(span).eval_to_valtree(inputs)
+        } else {
+            self.eval_to_valtree(inputs)
         }
     }
 

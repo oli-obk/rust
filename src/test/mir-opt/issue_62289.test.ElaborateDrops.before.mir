@@ -33,7 +33,7 @@ fn test() -> Option<Box<u32>> {
         _3 = <Option<u32> as Try>::into_result(move _4) -> [return: bb1, unwind: bb12]; // scope 0 at $DIR/issue-62289.rs:9:15: 9:20
                                          // mir::Constant
                                          // + span: $DIR/issue-62289.rs:9:15: 9:20
-                                         // + literal: Const { ty: fn(std::option::Option<u32>) -> std::result::Result<<std::option::Option<u32> as std::ops::Try>::Ok, <std::option::Option<u32> as std::ops::Try>::Error> {<std::option::Option<u32> as std::ops::Try>::into_result}, val: Value(Scalar(<ZST>)) }
+                                         // + literal: Const { ty: fn(std::option::Option<u32>) -> std::result::Result<<std::option::Option<u32> as std::ops::Try>::Ok, <std::option::Option<u32> as std::ops::Try>::Error> {<std::option::Option<u32> as std::ops::Try>::into_result}, val: Value(Leaf(<ZST>)) }
     }
 
     bb1: {
@@ -64,7 +64,7 @@ fn test() -> Option<Box<u32>> {
         _8 = <NoneError as From<NoneError>>::from(move _9) -> [return: bb5, unwind: bb12]; // scope 2 at $DIR/issue-62289.rs:9:19: 9:20
                                          // mir::Constant
                                          // + span: $DIR/issue-62289.rs:9:19: 9:20
-                                         // + literal: Const { ty: fn(std::option::NoneError) -> std::option::NoneError {<std::option::NoneError as std::convert::From<std::option::NoneError>>::from}, val: Value(Scalar(<ZST>)) }
+                                         // + literal: Const { ty: fn(std::option::NoneError) -> std::option::NoneError {<std::option::NoneError as std::convert::From<std::option::NoneError>>::from}, val: Value(Leaf(<ZST>)) }
     }
 
     bb5: {
@@ -72,7 +72,7 @@ fn test() -> Option<Box<u32>> {
         _0 = <Option<Box<u32>> as Try>::from_error(move _8) -> [return: bb6, unwind: bb12]; // scope 2 at $DIR/issue-62289.rs:9:15: 9:20
                                          // mir::Constant
                                          // + span: $DIR/issue-62289.rs:9:15: 9:20
-                                         // + literal: Const { ty: fn(<std::option::Option<std::boxed::Box<u32>> as std::ops::Try>::Error) -> std::option::Option<std::boxed::Box<u32>> {<std::option::Option<std::boxed::Box<u32>> as std::ops::Try>::from_error}, val: Value(Scalar(<ZST>)) }
+                                         // + literal: Const { ty: fn(<std::option::Option<std::boxed::Box<u32>> as std::ops::Try>::Error) -> std::option::Option<std::boxed::Box<u32>> {<std::option::Option<std::boxed::Box<u32>> as std::ops::Try>::from_error}, val: Value(Leaf(<ZST>)) }
     }
 
     bb6: {

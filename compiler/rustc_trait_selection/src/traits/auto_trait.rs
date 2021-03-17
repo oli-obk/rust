@@ -807,13 +807,14 @@ impl AutoTraitFinder<'tcx> {
                 ty::PredicateKind::ConstEquate(c1, c2) => {
                     let evaluate = |c: &'tcx ty::Const<'tcx>| {
                         if let ty::ConstKind::Unevaluated(unevaluated) = c.val {
-                            match select.infcx().const_eval_resolve(
+                            assert_eq!(unevaluated.promoted, None);
+                            match select.infcx().const_eval_for_ty(
                                 obligation.param_env,
                                 unevaluated,
                                 Some(obligation.cause.span),
                             ) {
-                                Ok(val) => Ok(ty::Const::from_value(select.tcx(), val, c.ty)),
-                                Err(err) => Err(err),
+                                Ok(Some(val)) => Ok(ty::Const::from_value(select.tcx(), val, c.ty)),
+                                Ok(None) | Err(_) => Err(()),
                             }
                         } else {
                             Ok(c)

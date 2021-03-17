@@ -2,7 +2,7 @@ use rustc_data_structures::stable_hasher::{HashStable, StableHasher};
 use rustc_hir::def_id::CrateNum;
 use rustc_hir::definitions::{DefPathData, DisambiguatedDefPathData};
 use rustc_middle::ich::NodeIdHashingMode;
-use rustc_middle::mir::interpret::{ConstValue, Scalar};
+use rustc_middle::mir::interpret::ConstValue;
 use rustc_middle::ty::print::{PrettyPrinter, Print, Printer};
 use rustc_middle::ty::subst::{GenericArg, GenericArgKind};
 use rustc_middle::ty::{self, Instance, Ty, TyCtxt, TypeFoldable};
@@ -245,7 +245,7 @@ impl Printer<'tcx> for SymbolPrinter<'tcx> {
 
     fn print_const(mut self, ct: &'tcx ty::Const<'tcx>) -> Result<Self::Const, Self::Error> {
         // only print integers
-        if let ty::ConstKind::Value(ConstValue::Scalar(Scalar::Int { .. })) = ct.val {
+        if let ty::ConstKind::Value(ty::ValTree::Leaf(_)) = ct.val {
             if ct.ty.is_integral() {
                 return self.pretty_print_const(ct, true);
             }

@@ -4,7 +4,6 @@
 //! types or regions but can be other things. Examples of type relations are
 //! subtyping, type equality, etc.
 
-use crate::mir::interpret::{get_slice_bytes, ConstValue, GlobalAlloc, Scalar};
 use crate::ty::error::{ExpectedFound, TypeError};
 use crate::ty::subst::{GenericArg, GenericArgKind, SubstsRef};
 use crate::ty::{self, Ty, TyCtxt, TypeFoldable};
@@ -514,9 +513,7 @@ pub fn super_relate_consts<R: TypeRelation<'tcx>>(
 
         (ty::ConstKind::Param(a_p), ty::ConstKind::Param(b_p)) => a_p.index == b_p.index,
         (ty::ConstKind::Placeholder(p1), ty::ConstKind::Placeholder(p2)) => p1 == p2,
-        (ty::ConstKind::Value(a_val), ty::ConstKind::Value(b_val)) => {
-            check_const_value_eq(relation, a_val, b_val, a.ty, b.ty)?
-        }
+        (ty::ConstKind::Value(a_val), ty::ConstKind::Value(b_val)) => a_val == b_val,
 
         (ty::ConstKind::Unevaluated(au), ty::ConstKind::Unevaluated(bu))
             if tcx.features().const_evaluatable_checked =>
@@ -544,58 +541,6 @@ pub fn super_relate_consts<R: TypeRelation<'tcx>>(
         _ => false,
     };
     if is_match { Ok(a) } else { Err(TypeError::ConstMismatch(expected_found(relation, a, b))) }
-}
-
-fn check_const_value_eq<R: TypeRelation<'tcx>>(
-    relation: &mut R,
-    a_val: ConstValue<'tcx>,
-    b_val: ConstValue<'tcx>,
-    a_ty: Ty<'tcx>,
-    b_ty: Ty<'tcx>,
-) -> RelateResult<'tcx, bool> {
-    let tcx = relation.tcx();
-    Ok(match (a_val, b_val) {
-        (ConstValue::Scalar(Scalar::Int(a_val)), ConstValue::Scalar(Scalar::Int(b_val))) => {
-            a_val == b_val
-        }
-        (ConstValue::Scalar(Scalar::Ptr(a_val)), ConstValue::Scalar(Scalar::Ptr(b_val))) => {
-            a_val == b_val
-                || match (tcx.global_alloc(a_val.alloc_id), tcx.global_alloc(b_val.alloc_id)) {
-                    (GlobalAlloc::Function(a_instance), GlobalAlloc::Function(b_instance)) => {
-                        a_instance == b_instance
-                    }
-                    _ => false,
-                }
-        }
-
-        (ConstValue::Slice { .. }, ConstValue::Slice { .. }) => {
-            get_slice_bytes(&tcx, a_val) == get_slice_bytes(&tcx, b_val)
-        }
-
-        (ConstValue::ByRef { .. }, ConstValue::ByRef { .. }) => {
-            let a_destructured = tcx.destructure_const(relation.param_env().and((a_val, a_ty)));
-            let b_destructured = tcx.destructure_const(relation.param_env().and((b_val, b_ty)));
-
-            // Both the variant and each field have to be equal.
-            if a_destructured.variant == b_destructured.variant {
-                for (&(a_val, a_ty), &(b_val, b_ty)) in iter::zip(a_destructured.fields, b_destructured.fields)
-                {
-                    let is_match = check_const_value_eq(relation, a_val, b_val, a_ty, b_ty)?;
-                    if !is_match {
-                        let a = ty::Const::from_value(relation.tcx(), a_val, a_ty);
-                        let b = ty::Const::from_value(relation.tcx(), b_val, b_ty);
-                        return Err(TypeError::ConstMismatch(expected_found(relation, a, b)));
-                    }
-                }
-
-                true
-            } else {
-                false
-            }
-        }
-
-        _ => false,
-    })
 }
 
 impl<'tcx> Relate<'tcx> for &'tcx ty::List<ty::Binder<ty::ExistentialPredicate<'tcx>>> {

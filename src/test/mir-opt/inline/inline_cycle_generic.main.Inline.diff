@@ -15,9 +15,9 @@
 +         _1 = <A as Call>::call() -> bb1; // scope 2 at $DIR/inline-cycle-generic.rs:9:5: 9:24
                                            // mir::Constant
 -                                          // + span: $DIR/inline-cycle-generic.rs:9:5: 9:22
--                                          // + literal: Const { ty: fn() {<C as Call>::call}, val: Value(Scalar(<ZST>)) }
+-                                          // + literal: Const { ty: fn() {<C as Call>::call}, val: Value(Leaf(<ZST>)) }
 +                                          // + span: $DIR/inline-cycle-generic.rs:9:5: 9:24
-+                                          // + literal: Const { ty: fn() {<A as Call>::call}, val: Value(Scalar(<ZST>)) }
++                                          // + literal: Const { ty: fn() {<A as Call>::call}, val: Value(Leaf(<ZST>)) }
       }
   
       bb1: {

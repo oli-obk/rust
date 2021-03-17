@@ -1,4 +1,4 @@
-error[E0391]: cycle detected when simplifying constant for the type system `Foo::B::{constant#0}`
+error[E0391]: cycle detected when evaluating constant for MIR opt/codegen `Foo::B::{constant#0}`
   --> $DIR/issue-36163.rs:4:9
    |
 LL |     B = A,
@@ -14,6 +14,7 @@ note: ...which requires const-evaluating + checking `Foo::B::{constant#0}`...
    |
 LL |     B = A,
    |         ^
+<<<<<<< HEAD
    = note: ...which requires normalizing `A`...
 note: ...which requires simplifying constant for the type system `A`...
   --> $DIR/issue-36163.rs:1:1
@@ -21,6 +22,11 @@ note: ...which requires simplifying constant for the type system `A`...
 LL | const A: isize = Foo::B as isize;
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 note: ...which requires simplifying constant for the type system `A`...
+||||||| parent of ab70bbeec72... Use ValTree in all type level constants
+note: ...which requires simplifying constant for the type system `A`...
+=======
+note: ...which requires evaluating constant for MIR opt/codegen `A`...
+>>>>>>> ab70bbeec72... Use ValTree in all type level constants
   --> $DIR/issue-36163.rs:1:1
    |
 LL | const A: isize = Foo::B as isize;
@@ -30,10 +36,20 @@ note: ...which requires const-evaluating + checking `A`...
    |
 LL | const A: isize = Foo::B as isize;
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<<<<<<< HEAD
    = note: ...which requires normalizing `A`...
    = note: ...which again requires simplifying constant for the type system `Foo::B::{constant#0}`, completing the cycle
 note: cycle used when collecting item types in top-level module
   --> $DIR/issue-36163.rs:1:1
+||||||| parent of ab70bbeec72... Use ValTree in all type level constants
+   = note: ...which again requires simplifying constant for the type system `Foo::B::{constant#0}`, completing the cycle
+note: cycle used when simplifying constant for the type system `Foo::B::{constant#0}`
+  --> $DIR/issue-36163.rs:4:9
+=======
+   = note: ...which again requires evaluating constant for MIR opt/codegen `Foo::B::{constant#0}`, completing the cycle
+note: cycle used when evaluating constant for MIR opt/codegen `Foo::B::{constant#0}`
+  --> $DIR/issue-36163.rs:4:9
+>>>>>>> ab70bbeec72... Use ValTree in all type level constants
    |
 LL | / const A: isize = Foo::B as isize;
 LL | |

@@ -1,7 +1,5 @@
 use std::convert::TryInto;
 
-use crate::mir::interpret::ConstValue;
-use crate::mir::interpret::Scalar;
 use crate::mir::Promoted;
 use crate::ty::subst::{InternalSubsts, SubstsRef};
 use crate::ty::ParamEnv;
@@ -42,7 +40,7 @@ pub enum ConstKind<'tcx> {
     Unevaluated(Unevaluated<'tcx>),
 
     /// Used to hold computed value.
-    Value(ConstValue<'tcx>),
+    Value(ty::ValTree<'tcx>),
 
     /// A placeholder for a const which could not be computed; this is
     /// propagated to avoid useless error messages.
@@ -54,18 +52,13 @@ static_assert_size!(ConstKind<'_>, 40);
 
 impl<'tcx> ConstKind<'tcx> {
     #[inline]
-    pub fn try_to_value(self) -> Option<ConstValue<'tcx>> {
+    pub fn try_to_value(self) -> Option<ty::ValTree<'tcx>> {
         if let ConstKind::Value(val) = self { Some(val) } else { None }
     }
 
     #[inline]
-    pub fn try_to_scalar(self) -> Option<Scalar> {
-        self.try_to_value()?.try_to_scalar()
-    }
-
-    #[inline]
     pub fn try_to_scalar_int(self) -> Option<ScalarInt> {
-        Some(self.try_to_value()?.try_to_scalar()?.assert_int())
+        self.try_to_value()?.try_to_scalar_int()
     }
 
     #[inline]
@@ -80,7 +73,7 @@ impl<'tcx> ConstKind<'tcx> {
 
     #[inline]
     pub fn try_to_machine_usize(self, tcx: TyCtxt<'tcx>) -> Option<u64> {
-        self.try_to_value()?.try_to_machine_usize(tcx)
+        self.try_to_scalar_int()?.try_to_machine_usize(tcx).ok()
     }
 }
 
@@ -109,11 +102,16 @@ impl<'tcx> ConstKind<'tcx> {
         self,
         tcx: TyCtxt<'tcx>,
         param_env: ParamEnv<'tcx>,
-    ) -> Option<Result<ConstValue<'tcx>, ErrorReported>> {
+    ) -> Option<Result<ty::ValTree<'tcx>, ErrorReported>> {
         if let ConstKind::Unevaluated(Unevaluated { def, substs, promoted }) = self {
+            // Promoteds can't get implicitly evaluated as they may contain non-valtree things.
+            // The only way to evaluate promoteds is `const_eval_resolve`.
+            if promoted.is_some() {
+                return None;
+            }
             use crate::mir::interpret::ErrorHandled;
 
-            // HACK(eddyb) this erases lifetimes even though `const_eval_resolve`
+            // HACK(eddyb) this erases lifetimes even though `const_eval_for_ty`
             // also does later, but we want to do it before checking for
             // inference variables.
             // Note that we erase regions *before* calling `with_reveal_all_normalized`,
@@ -128,7 +126,7 @@ impl<'tcx> ConstKind<'tcx> {
             // attempt using identity substs and `ParamEnv` instead, that will succeed
             // when the expression doesn't depend on any parameters.
             // FIXME(eddyb, skinny121) pass `InferCtxt` into here when it's available, so that
-            // we can call `infcx.const_eval_resolve` which handles inference variables.
+            // we can call `infcx.const_eval_for_ty` which handles inference variables.
             let param_env_and_substs = if param_env_and_substs.needs_infer() {
                 tcx.param_env(def.did).and(InternalSubsts::identity_for_item(tcx, def.did))
             } else {
@@ -140,13 +138,13 @@ impl<'tcx> ConstKind<'tcx> {
             let (param_env, substs) = param_env_and_substs.into_parts();
             // try to resolve e.g. associated constants to their definition on an impl, and then
             // evaluate the const.
-            match tcx.const_eval_resolve(param_env, ty::Unevaluated { def, substs, promoted }, None)
+            match tcx.const_eval_for_ty(param_env, ty::Unevaluated { def, substs, promoted }, None)
             {
                 // NOTE(eddyb) `val` contains no lifetimes/types/consts,
                 // and we use the original type, so nothing from `substs`
                 // (which may be identity substs, see above),
                 // can leak through `val` into the const we return.
-                Ok(val) => Some(Ok(val)),
+                Ok(val) => Some(Ok(val?)),
                 Err(ErrorHandled::TooGeneric | ErrorHandled::Linted) => None,
                 Err(ErrorHandled::Reported(e)) => Some(Err(e)),
             }

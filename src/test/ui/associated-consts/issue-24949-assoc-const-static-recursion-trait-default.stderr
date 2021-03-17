@@ -1,10 +1,10 @@
-error[E0391]: cycle detected when simplifying constant for the type system `DEFAULT_REF_BAR`
+error[E0391]: cycle detected when evaluating constant for MIR opt/codegen `DEFAULT_REF_BAR`
   --> $DIR/issue-24949-assoc-const-static-recursion-trait-default.rs:11:1
    |
 LL | const DEFAULT_REF_BAR: u32 = <GlobalDefaultRef>::BAR;
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-note: ...which requires simplifying constant for the type system `DEFAULT_REF_BAR`...
+note: ...which requires evaluating constant for MIR opt/codegen `DEFAULT_REF_BAR`...
   --> $DIR/issue-24949-assoc-const-static-recursion-trait-default.rs:11:1
    |
 LL | const DEFAULT_REF_BAR: u32 = <GlobalDefaultRef>::BAR;
@@ -14,6 +14,7 @@ note: ...which requires const-evaluating + checking `DEFAULT_REF_BAR`...
    |
 LL | const DEFAULT_REF_BAR: u32 = <GlobalDefaultRef>::BAR;
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<<<<<<< HEAD
    = note: ...which requires normalizing `<GlobalDefaultRef as FooDefault>::BAR`...
 note: ...which requires simplifying constant for the type system `FooDefault::BAR`...
   --> $DIR/issue-24949-assoc-const-static-recursion-trait-default.rs:8:5
@@ -21,6 +22,11 @@ note: ...which requires simplifying constant for the type system `FooDefault::BA
 LL |     const BAR: u32 = DEFAULT_REF_BAR;
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 note: ...which requires simplifying constant for the type system `FooDefault::BAR`...
+||||||| parent of ab70bbeec72... Use ValTree in all type level constants
+note: ...which requires simplifying constant for the type system `FooDefault::BAR`...
+=======
+note: ...which requires evaluating constant for MIR opt/codegen `FooDefault::BAR`...
+>>>>>>> ab70bbeec72... Use ValTree in all type level constants
   --> $DIR/issue-24949-assoc-const-static-recursion-trait-default.rs:8:5
    |
 LL |     const BAR: u32 = DEFAULT_REF_BAR;
@@ -35,8 +41,14 @@ note: ...which requires caching mir of `FooDefault::BAR` for CTFE...
    |
 LL |     const BAR: u32 = DEFAULT_REF_BAR;
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+<<<<<<< HEAD
    = note: ...which requires normalizing `DEFAULT_REF_BAR`...
    = note: ...which again requires simplifying constant for the type system `DEFAULT_REF_BAR`, completing the cycle
+||||||| parent of ab70bbeec72... Use ValTree in all type level constants
+   = note: ...which again requires simplifying constant for the type system `DEFAULT_REF_BAR`, completing the cycle
+=======
+   = note: ...which again requires evaluating constant for MIR opt/codegen `DEFAULT_REF_BAR`, completing the cycle
+>>>>>>> ab70bbeec72... Use ValTree in all type level constants
    = note: cycle used when running analysis passes on this crate
 
 error: aborting due to previous error

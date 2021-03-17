@@ -3,6 +3,7 @@ use rustc_index::vec::Idx;
 use rustc_infer::infer::{InferCtxt, TyCtxtInferExt};
 use rustc_middle::mir::{ConstantKind, Field};
 use rustc_middle::ty::print::with_no_trimmed_paths;
+use rustc_middle::ty::ValTree;
 use rustc_middle::ty::{self, AdtDef, Ty, TyCtxt};
 use rustc_session::lint;
 use rustc_span::Span;
@@ -12,6 +13,7 @@ use rustc_trait_selection::traits::query::evaluate_obligation::InferCtxtExt;
 use rustc_trait_selection::traits::{self, ObligationCause, PredicateObligation};
 
 use std::cell::Cell;
+use std::convert::{TryFrom, TryInto};
 
 use super::{FieldPat, Pat, PatCtxt, PatKind};
 
@@ -269,8 +271,14 @@ impl<'a, 'tcx> ConstToPat<'a, 'tcx> {
                     ty::ConstKind::Value(val) => val,
                     _ => span_bug!(self.span, "invalid constant for pat: {}", ct),
                 };
-                let (val, ty) = tcx.deref_const(self.param_env.and((val, ct.ty)));
-                ConstantKind::Ty(ty::Const::from_value(tcx, val, ty))
+                let deref_ty = ct.ty.builtin_deref(false).unwrap().ty;
+                if let ty::Slice(elem_ty) = deref_ty.kind() {
+                    let branches = val.unwrap_branch();
+                    let array_ty = tcx.mk_array(elem_ty, branches.len().try_into().unwrap());
+                    ty::Const::from_value(tcx, ValTree::Branch(branches), array_ty).into()
+                } else {
+                    ty::Const::from_value(tcx, val, deref_ty).into()
+                }
             }
             ConstantKind::Val(val, ty) => {
                 let (val, ty) = tcx.deref_const(self.param_env.and((val, ty)));
@@ -286,19 +294,70 @@ impl<'a, 'tcx> ConstToPat<'a, 'tcx> {
         let tcx = self.tcx();
         match value {
             ConstantKind::Ty(ct) => {
-                let val = match ct.val.eval(tcx, self.param_env) {
+                let valtree = match ct.val.eval(tcx, self.param_env) {
                     ty::ConstKind::Value(val) => val,
                     _ => span_bug!(self.span, "invalid constant for pat: {}", ct),
                 };
-                let d = tcx.destructure_const(self.param_env.and((val, ct.ty)));
-                (
-                    d.variant,
-                    d.fields
-                        .iter()
-                        .copied()
-                        .map(|(val, ty)| ConstantKind::Ty(ty::Const::from_value(tcx, val, ty)))
-                        .collect(),
-                )
+                let branches = valtree.unwrap_branch();
+                match ct.ty.kind() {
+                    ty::Array(elem_ty, _) => (
+                        None,
+                        branches
+                            .iter()
+                            .map(|&val| ty::Const::from_value(tcx, val, elem_ty).into())
+                            .collect(),
+                    ),
+                    ty::Adt(def, _) if def.variants.is_empty() => (None, Vec::new()),
+                    ty::Adt(def, substs) if def.is_enum() => {
+                        let variant = VariantIdx::new(
+                            u32::try_from(branches[0].unwrap_leaf()).unwrap().try_into().unwrap(),
+                        );
+                        (
+                            Some(variant),
+                            def.variants[variant]
+                                .fields
+                                .iter()
+                                .zip(&branches[1..])
+                                .map(|(field, &val)| {
+                                    let ty = field.ty(tcx, substs);
+                                    // Need to normalize types so that the field types don't end up containing
+                                    // projections. We can't eagerly normalize the type at the start of const_to_pat
+                                    // as that normalization doesn't go through Adt fields.
+                                    let ty =
+                                        self.tcx().normalize_erasing_regions(self.param_env, ty);
+                                    ty::Const::from_value(tcx, val, ty).into()
+                                })
+                                .collect(),
+                        )
+                    }
+                    ty::Adt(def, substs) => (
+                        None,
+                        def.non_enum_variant()
+                            .fields
+                            .iter()
+                            .zip(branches)
+                            .map(|(field, &val)| {
+                                let ty = field.ty(tcx, substs);
+                                // Need to normalize types so that the field types don't end up containing
+                                // projections. We can't eagerly normalize the type at the start of const_to_pat
+                                // as that normalization doesn't go through Adt fields.
+                                let ty = self.tcx().normalize_erasing_regions(self.param_env, ty);
+                                ty::Const::from_value(tcx, val, ty).into()
+                            })
+                            .collect(),
+                    ),
+                    ty::Tuple(substs) => (
+                        None,
+                        substs
+                            .iter()
+                            .zip(branches)
+                            .map(|(ty, &val)| {
+                                ty::Const::from_value(tcx, val, ty.expect_ty()).into()
+                            })
+                            .collect(),
+                    ),
+                    _ => bug!("cannot destructure constant {:?}", ct),
+                }
             }
             ConstantKind::Val(val, ty) => {
                 let d = tcx.destructure_const(self.param_env.and((val, ty)));

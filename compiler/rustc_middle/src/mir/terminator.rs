@@ -1,5 +1,4 @@
-use crate::mir::interpret::Scalar;
-use crate::ty::{self, Ty, TyCtxt};
+use crate::ty::{self, ScalarInt, Ty, TyCtxt};
 use rustc_ast::{InlineAsmOptions, InlineAsmTemplatePiece};
 use smallvec::{smallvec, SmallVec};
 
@@ -557,7 +556,7 @@ impl<'tcx> TerminatorKind<'tcx> {
                     .values
                     .iter()
                     .map(|&u| {
-                        ty::Const::from_scalar(tcx, Scalar::from_uint(u, size), switch_ty)
+                        ty::Const::from_scalar(tcx, ScalarInt::from_uint(u, size), switch_ty)
                             .to_string()
                             .into()
                     })

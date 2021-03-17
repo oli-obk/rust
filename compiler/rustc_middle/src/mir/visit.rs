@@ -872,7 +872,8 @@ macro_rules! make_mir_visitor {
                 self.visit_span(span);
                 drop(user_ty); // no visit method for this
                 match literal {
-                    ConstantKind::Ty(ct) => self.visit_const(ct, location),
+                    // Type level constants don't contain anything interesting
+                    ConstantKind::Ty(_) => {},
                     ConstantKind::Val(_, t) => self.visit_ty(t, TyContext::Location(location)),
                 }
             }

@@ -65,9 +65,9 @@ pub fn provide(providers: &mut Providers) {
         let (param_env, (value, ty)) = param_env_and_value.into_parts();
         const_eval::destructure_const(tcx, param_env, value, ty)
     };
-    providers.const_to_valtree = |tcx, param_env_and_value| {
+    providers.eval_to_valtree = |tcx, param_env_and_value| {
         let (param_env, raw) = param_env_and_value.into_parts();
-        const_eval::const_to_valtree(tcx, param_env, raw)
+        const_eval::eval_to_valtree(tcx, param_env, raw)
     };
     providers.deref_const = |tcx, param_env_and_value| {
         let (param_env, (value, ty)) = param_env_and_value.into_parts();

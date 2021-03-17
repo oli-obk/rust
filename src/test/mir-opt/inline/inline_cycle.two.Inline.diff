@@ -21,10 +21,10 @@
 +         _2 = f;                          // scope 0 at $DIR/inline-cycle.rs:49:5: 49:12
                                            // mir::Constant
 -                                          // + span: $DIR/inline-cycle.rs:49:5: 49:9
--                                          // + literal: Const { ty: fn(fn() {f}) {call::<fn() {f}>}, val: Value(Scalar(<ZST>)) }
+-                                          // + literal: Const { ty: fn(fn() {f}) {call::<fn() {f}>}, val: Value(Leaf(<ZST>)) }
 -                                          // mir::Constant
                                            // + span: $DIR/inline-cycle.rs:49:10: 49:11
-                                           // + literal: Const { ty: fn() {f}, val: Value(Scalar(<ZST>)) }
+                                           // + literal: Const { ty: fn() {f}, val: Value(Leaf(<ZST>)) }
 +         StorageLive(_3);                 // scope 1 at $DIR/inline-cycle.rs:49:5: 49:12
 +         StorageLive(_4);                 // scope 1 at $DIR/inline-cycle.rs:49:5: 49:12
 +         _4 = move _2;                    // scope 1 at $DIR/inline-cycle.rs:49:5: 49:12

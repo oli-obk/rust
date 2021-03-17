@@ -1,9 +1,7 @@
 use rustc_apfloat::Float;
 use rustc_ast as ast;
-use rustc_middle::mir::interpret::{
-    Allocation, ConstValue, LitToConstError, LitToConstInput, Scalar,
-};
-use rustc_middle::ty::{self, ParamEnv, TyCtxt};
+use rustc_middle::mir::interpret::{LitToConstError, LitToConstInput};
+use rustc_middle::ty::{self, ParamEnv, ScalarInt, TyCtxt, ValTree};
 use rustc_span::symbol::Symbol;
 use rustc_target::abi::Size;
 
@@ -19,48 +17,41 @@ crate fn lit_to_const<'tcx>(
         trace!("trunc {} with size {} and shift {}", n, width.bits(), 128 - width.bits());
         let result = width.truncate(n);
         trace!("trunc result: {}", result);
-        Ok(ConstValue::Scalar(Scalar::from_uint(result, width)))
+        Ok(ValTree::Leaf(ScalarInt::from_uint(result, width)))
     };
 
-    let lit = match (lit, &ty.kind()) {
-        (ast::LitKind::Str(s, _), ty::Ref(_, inner_ty, _)) if inner_ty.is_str() => {
-            let s = s.as_str();
-            let allocation = Allocation::from_byte_aligned_bytes(s.as_bytes());
-            let allocation = tcx.intern_const_alloc(allocation);
-            ConstValue::Slice { data: allocation, start: 0, end: s.len() }
-        }
-        (ast::LitKind::ByteStr(data), ty::Ref(_, inner_ty, _))
-            if matches!(inner_ty.kind(), ty::Slice(_)) =>
-        {
-            let allocation = Allocation::from_byte_aligned_bytes(data as &[u8]);
-            let allocation = tcx.intern_const_alloc(allocation);
-            ConstValue::Slice { data: allocation, start: 0, end: data.len() }
-        }
-        (ast::LitKind::ByteStr(data), ty::Ref(_, inner_ty, _)) if inner_ty.is_array() => {
-            let id = tcx.allocate_bytes(data);
-            ConstValue::Scalar(Scalar::Ptr(id.into()))
-        }
+    let byte_array = |bytes: &[u8]| {
+        let bytes = bytes
+            .iter()
+            .copied()
+            .map(|b| ValTree::Leaf(ScalarInt::from_uint(b, Size::from_bytes(1))));
+        ValTree::Branch(tcx.arena.alloc_from_iter(bytes))
+    };
+
+    let val = match (lit, &ty.kind()) {
+        (ast::LitKind::Str(s, _), ty::Ref(..)) => byte_array(s.as_str().as_bytes()),
+        (ast::LitKind::ByteStr(data), ty::Ref(..)) => byte_array(data),
         (ast::LitKind::Byte(n), ty::Uint(ty::UintTy::U8)) => {
-            ConstValue::Scalar(Scalar::from_uint(*n, Size::from_bytes(1)))
+            ValTree::Leaf(ScalarInt::from_uint(*n, Size::from_bytes(1)))
         }
         (ast::LitKind::Int(n, _), ty::Uint(_)) | (ast::LitKind::Int(n, _), ty::Int(_)) => {
             trunc(if neg { (*n as i128).overflowing_neg().0 as u128 } else { *n })?
         }
-        (ast::LitKind::Float(n, _), ty::Float(fty)) => {
-            parse_float(*n, *fty, neg).map_err(|_| LitToConstError::UnparseableFloat)?
-        }
-        (ast::LitKind::Bool(b), ty::Bool) => ConstValue::Scalar(Scalar::from_bool(*b)),
-        (ast::LitKind::Char(c), ty::Char) => ConstValue::Scalar(Scalar::from_char(*c)),
+        (ast::LitKind::Float(n, _), ty::Float(fty)) => ValTree::Leaf(
+            parse_float(*n, *fty, neg).map_err(|_| LitToConstError::UnparseableFloat)?,
+        ),
+        (ast::LitKind::Bool(b), ty::Bool) => ValTree::Leaf(ScalarInt::from_bool(*b)),
+        (ast::LitKind::Char(c), ty::Char) => ValTree::Leaf(ScalarInt::from_char(*c)),
         (ast::LitKind::Err(_), _) => return Err(LitToConstError::Reported),
         _ => return Err(LitToConstError::TypeError),
     };
-    Ok(ty::Const::from_value(tcx, lit, ty))
+    Ok(ty::Const::from_value(tcx, val, ty))
 }
 
-fn parse_float<'tcx>(num: Symbol, fty: ty::FloatTy, neg: bool) -> Result<ConstValue<'tcx>, ()> {
+fn parse_float(num: Symbol, fty: ty::FloatTy, neg: bool) -> Result<ScalarInt, ()> {
     let num = num.as_str();
     use rustc_apfloat::ieee::{Double, Single};
-    let scalar = match fty {
+    match fty {
         ty::FloatTy::F32 => {
             let rust_f = num.parse::<f32>().map_err(|_| ())?;
             let mut f = num.parse::<Single>().unwrap_or_else(|e| {
@@ -79,7 +70,7 @@ fn parse_float<'tcx>(num: Symbol, fty: ty::FloatTy, neg: bool) -> Result<ConstVa
             if neg {
                 f = -f;
             }
-            Scalar::from_f32(f)
+            Ok(ScalarInt::from(f))
         }
         ty::FloatTy::F64 => {
             let rust_f = num.parse::<f64>().map_err(|_| ())?;
@@ -99,9 +90,7 @@ fn parse_float<'tcx>(num: Symbol, fty: ty::FloatTy, neg: bool) -> Result<ConstVa
             if neg {
                 f = -f;
             }
-            Scalar::from_f64(f)
+            Ok(ScalarInt::from(f))
         }
-    };
-
-    Ok(ConstValue::Scalar(scalar))
+    }
 }
