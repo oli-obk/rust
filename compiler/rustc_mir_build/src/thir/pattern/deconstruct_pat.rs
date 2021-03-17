@@ -55,9 +55,9 @@ use rustc_index::vec::Idx;
 use rustc_hir::def_id::DefId;
 use rustc_hir::{HirId, RangeEnd};
 use rustc_middle::mir::interpret::ConstValue;
-use rustc_middle::mir::Field;
+use rustc_middle::mir::{self, Field};
 use rustc_middle::ty::layout::IntegerExt;
-use rustc_middle::ty::{self, Const, ScalarInt, Ty, TyCtxt};
+use rustc_middle::ty::{self, ScalarInt, Ty, TyCtxt};
 use rustc_session::lint;
 use rustc_span::{Span, DUMMY_SP};
 use rustc_target::abi::{Integer, Size, VariantIdx};
@@ -114,11 +114,11 @@ impl IntRange {
     fn from_const<'tcx>(
         tcx: TyCtxt<'tcx>,
         param_env: ty::ParamEnv<'tcx>,
-        value: &Const<'tcx>,
+        value: &mir::ConstantKind<'tcx>,
     ) -> Option<IntRange> {
-        let (target_size, bias) = Self::integral_size_and_signed_bias(tcx, value.ty)?;
-        let ty = value.ty;
-        let val = if let Some(int) = value.val.try_to_scalar_int() {
+        let (target_size, bias) = Self::integral_size_and_signed_bias(tcx, value.ty())?;
+        let ty = value.ty();
+        let val = if let Some(int) = value.try_to_scalar_int() {
             // For this specific pattern we can skip a lot of effort and go
             // straight to the result, after doing a bit of checking. (We
             // could remove this branch and just always use try_eval_bits, which
@@ -204,14 +204,17 @@ impl IntRange {
         let bias = IntRange::signed_bias(tcx, ty);
         let (lo, hi) = (lo ^ bias, hi ^ bias);
 
+        let param_env_and_ty = ty::ParamEnv::empty().and(ty);
+        let size = tcx.layout_of(param_env_and_ty).unwrap().size;
+        let lo_int = ScalarInt::from_uint(lo, size);
+
         let kind = if lo == hi {
-            let ty = ty::ParamEnv::empty().and(ty);
-            PatKind::Constant { value: ty::Const::from_bits(tcx, lo, ty) }
+            PatKind::Constant {
+                value: mir::ConstantKind::Val(ConstValue::Scalar(lo_int.into()), ty),
+            }
         } else {
-            let param_env_and_ty = ty::ParamEnv::empty().and(ty);
-            let size = tcx.layout_of(param_env_and_ty).unwrap().size;
             PatKind::Range(PatRange {
-                lo: ScalarInt::from_uint(lo, size),
+                lo: lo_int,
                 hi: ScalarInt::from_uint(hi, size),
                 end: RangeEnd::Included,
                 ty,
@@ -657,13 +660,13 @@ impl<'tcx> Constructor<'tcx> {
                     match pat.ty.kind() {
                         ty::Float(_) => {
                             let value =
-                                value.val.eval(cx.tcx, cx.param_env).try_to_scalar_int().unwrap();
+                                value.try_to_scalar_int().unwrap();
                             FloatRange(value, value, RangeEnd::Included)
                         }
                         // In `expand_pattern`, we convert string literals to `&CONST` patterns with
                         // `CONST` a pattern of type `str`. In truth this contains a constant of type
                         // `&str`.
-                        ty::Str => Str(value),
+                        ty::Str => Str(value.const_for_ty().unwrap()),
                         // All constants that can be structurally matched have already been expanded
                         // into the corresponding `Pat`s by `const_to_pat`. Constants that remain are
                         // opaque.
@@ -805,8 +808,13 @@ impl<'tcx> Constructor<'tcx> {
             }
             (Str(self_val), Str(other_val)) => {
                 // FIXME: there's probably a more direct way of comparing for equality
-                match compare_const_vals(pcx.cx.tcx, self_val, other_val, pcx.cx.param_env, pcx.ty)
-                {
+                match compare_const_vals(
+                    pcx.cx.tcx,
+                    *self_val,
+                    *other_val,
+                    pcx.cx.param_env,
+                    pcx.ty,
+                ) {
                     Some(comparison) => comparison == Ordering::Equal,
                     None => false,
                 }
@@ -1284,7 +1292,7 @@ impl<'p, 'tcx> Fields<'p, 'tcx> {
                     PatKind::Slice { prefix, slice: Some(wild), suffix }
                 }
             },
-            &Str(value) => PatKind::Constant { value },
+            &Str(value) => PatKind::Constant { value: value.into() },
             &FloatRange(lo, hi, end) => PatKind::Range(PatRange { lo, hi, end, ty: pcx.ty }),
             IntRange(range) => return range.to_pat(pcx.cx.tcx, pcx.ty),
             NonExhaustive => PatKind::Wild,

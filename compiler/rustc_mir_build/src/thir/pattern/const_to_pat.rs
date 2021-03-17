@@ -1,12 +1,12 @@
 use rustc_hir as hir;
 use rustc_index::vec::Idx;
 use rustc_infer::infer::{InferCtxt, TyCtxtInferExt};
-use rustc_middle::mir::Field;
-use rustc_middle::mir::interpret::ConstValue;
+use rustc_middle::mir::{ConstantKind, Field};
 use rustc_middle::ty::print::with_no_trimmed_paths;
 use rustc_middle::ty::{self, AdtDef, Ty, TyCtxt};
 use rustc_session::lint;
 use rustc_span::Span;
+use rustc_target::abi::VariantIdx;
 use rustc_trait_selection::traits::predicate_for_trait_def;
 use rustc_trait_selection::traits::query::evaluate_obligation::InferCtxtExt;
 use rustc_trait_selection::traits::{self, ObligationCause, PredicateObligation};
@@ -22,7 +22,7 @@ impl<'a, 'tcx> PatCtxt<'a, 'tcx> {
     #[instrument(level = "debug", skip(self))]
     pub(super) fn const_to_pat(
         &self,
-        cv: &'tcx ty::Const<'tcx>,
+        cv: ConstantKind<'tcx>,
         id: hir::HirId,
         span: Span,
         mir_structural_match_violation: bool,
@@ -156,9 +156,10 @@ impl<'a, 'tcx> ConstToPat<'a, 'tcx> {
 
     fn to_pat(
         &mut self,
-        cv: &'tcx ty::Const<'tcx>,
+        cv: ConstantKind<'tcx>,
         mir_structural_match_violation: bool,
     ) -> Pat<'tcx> {
+        let cv = self.tcx().normalize_mir_const_after_erasing_regions(self.param_env.and(cv));
         trace!(self.treat_byte_string_as_slice);
         // This method is just a wrapper handling a validity check; the heavy lifting is
         // performed by the recursive `recur` method, which is not meant to be
@@ -173,10 +174,11 @@ impl<'a, 'tcx> ConstToPat<'a, 'tcx> {
             // If we were able to successfully convert the const to some pat,
             // double-check that all types in the const implement `Structural`.
 
-            let structural = self.search_for_structural_match_violation(cv.ty);
+            let structural = self.search_for_structural_match_violation(cv.ty());
             debug!(
                 "search_for_structural_match_violation cv.ty: {:?} returned: {:?}",
-                cv.ty, structural
+                cv.ty(),
+                structural
             );
 
             // This can occur because const qualification treats all associated constants as
@@ -191,7 +193,7 @@ impl<'a, 'tcx> ConstToPat<'a, 'tcx> {
             }
 
             if let Some(msg) = structural {
-                if !self.type_may_have_partial_eq_impl(cv.ty) {
+                if !self.type_may_have_partial_eq_impl(cv.ty()) {
                     // span_fatal avoids ICE from resolution of non-existent method (rare case).
                     self.tcx().sess.span_fatal(self.span, &msg);
                 } else if mir_structural_match_violation && !self.saw_const_match_lint.get() {
@@ -249,30 +251,78 @@ impl<'a, 'tcx> ConstToPat<'a, 'tcx> {
 
     fn field_pats(
         &self,
-        vals: impl Iterator<Item = (ConstValue<'tcx>, Ty<'tcx>)>,
+        vals: impl Iterator<Item = ConstantKind<'tcx>>,
     ) -> Result<Vec<FieldPat<'tcx>>, FallbackToConstRef> {
-        let tcx = self.tcx();
         vals.enumerate()
-            .map(|(idx, (val, ty))| {
+            .map(|(idx, val)| {
                 let field = Field::new(idx);
-                let val = ty::Const::from_value(tcx, val, ty);
                 Ok(FieldPat { field, pattern: self.recur(val, false)? })
             })
             .collect()
     }
 
+    fn deref(&self, value: ConstantKind<'tcx>) -> ConstantKind<'tcx> {
+        let tcx = self.tcx();
+        match value {
+            ConstantKind::Ty(ct) => {
+                let val = match ct.val.eval(tcx, self.param_env) {
+                    ty::ConstKind::Value(val) => val,
+                    _ => span_bug!(self.span, "invalid constant for pat: {}", ct),
+                };
+                let (val, ty) = tcx.deref_const(self.param_env.and((val, ct.ty)));
+                ConstantKind::Ty(ty::Const::from_value(tcx, val, ty))
+            }
+            ConstantKind::Val(val, ty) => {
+                let (val, ty) = tcx.deref_const(self.param_env.and((val, ty)));
+                ConstantKind::Val(val, ty)
+            }
+        }
+    }
+
+    fn destructure(
+        &self,
+        value: ConstantKind<'tcx>,
+    ) -> (Option<VariantIdx>, Vec<ConstantKind<'tcx>>) {
+        let tcx = self.tcx();
+        match value {
+            ConstantKind::Ty(ct) => {
+                let val = match ct.val.eval(tcx, self.param_env) {
+                    ty::ConstKind::Value(val) => val,
+                    _ => span_bug!(self.span, "invalid constant for pat: {}", ct),
+                };
+                let d = tcx.destructure_const(self.param_env.and((val, ct.ty)));
+                (
+                    d.variant,
+                    d.fields
+                        .iter()
+                        .copied()
+                        .map(|(val, ty)| ConstantKind::Ty(ty::Const::from_value(tcx, val, ty)))
+                        .collect(),
+                )
+            }
+            ConstantKind::Val(val, ty) => {
+                let d = tcx.destructure_const(self.param_env.and((val, ty)));
+                (
+                    d.variant,
+                    d.fields.iter().copied().map(|(val, ty)| ConstantKind::Val(val, ty)).collect(),
+                )
+            }
+        }
+    }
+
     // Recursive helper for `to_pat`; invoke that (instead of calling this directly).
     fn recur(
         &self,
-        cv: &'tcx ty::Const<'tcx>,
+        value: ConstantKind<'tcx>,
         mir_structural_match_violation: bool,
     ) -> Result<Pat<'tcx>, FallbackToConstRef> {
         let id = self.id;
         let span = self.span;
         let tcx = self.tcx();
         let param_env = self.param_env;
+        let ty = value.ty();
 
-        let kind = match cv.ty.kind() {
+        let kind = match ty.kind() {
             ty::Float(_) => {
                 tcx.struct_span_lint_hir(
                     lint::builtin::ILLEGAL_FLOATING_POINT_LITERAL_PATTERN,
@@ -280,7 +330,7 @@ impl<'a, 'tcx> ConstToPat<'a, 'tcx> {
                     span,
                     |lint| lint.build("floating-point types cannot be used in patterns").emit(),
                 );
-                PatKind::Constant { value: cv }
+                PatKind::Constant { value }
             }
             ty::Adt(adt_def, _) if adt_def.is_union() => {
                 // Matching on union fields is unsafe, we can't hide it in constants
@@ -294,14 +344,14 @@ impl<'a, 'tcx> ConstToPat<'a, 'tcx> {
                 PatKind::Wild
             }
             ty::Adt(..)
-                if !self.type_may_have_partial_eq_impl(cv.ty)
+                if !self.type_may_have_partial_eq_impl(ty)
                     // FIXME(#73448): Find a way to bring const qualification into parity with
                     // `search_for_structural_match_violation` and then remove this condition.
-                    && self.search_for_structural_match_violation(cv.ty).is_some() =>
+                    && self.search_for_structural_match_violation(ty).is_some() =>
             {
                 // Obtain the actual type that isn't annotated. If we just looked at `cv.ty` we
                 // could get `Option<NonStructEq>`, even though `Option` is annotated with derive.
-                let msg = self.search_for_structural_match_violation(cv.ty).unwrap();
+                let msg = self.search_for_structural_match_violation(ty).unwrap();
                 self.saw_const_match_error.set(true);
                 if self.include_lint_checks {
                     tcx.sess.span_err(self.span, &msg);
@@ -319,7 +369,7 @@ impl<'a, 'tcx> ConstToPat<'a, 'tcx> {
             // details.
             // Backwards compatibility hack because we can't cause hard errors on these
             // types, so we compare them via `PartialEq::eq` at runtime.
-            ty::Adt(..) if !self.type_marked_structural(cv.ty) && self.behind_reference.get() => {
+            ty::Adt(..) if !self.type_marked_structural(ty) && self.behind_reference.get() => {
                 if self.include_lint_checks
                     && !self.saw_const_match_error.get()
                     && !self.saw_const_match_lint.get()
@@ -328,7 +378,7 @@ impl<'a, 'tcx> ConstToPat<'a, 'tcx> {
                     let msg = format!(
                         "to use a constant of type `{}` in a pattern, \
                         `{}` must be annotated with `#[derive(PartialEq, Eq)]`",
-                        cv.ty, cv.ty,
+                        ty, ty,
                     );
                     tcx.struct_span_lint_hir(
                         lint::builtin::INDIRECT_STRUCTURAL_MATCH,
@@ -342,8 +392,8 @@ impl<'a, 'tcx> ConstToPat<'a, 'tcx> {
                 // `PartialEq::eq` on it.
                 return Err(fallback_to_const_ref(self));
             }
-            ty::Adt(adt_def, _) if !self.type_marked_structural(cv.ty) => {
-                debug!("adt_def {:?} has !type_marked_structural for cv.ty: {:?}", adt_def, cv.ty);
+            ty::Adt(adt_def, _) if !self.type_marked_structural(ty) => {
+                debug!("adt_def {:?} has !type_marked_structural for cv.ty: {:?}", adt_def, ty);
                 let path = tcx.def_path_str(adt_def.did);
                 let msg = format!(
                     "to use a constant of type `{}` in a pattern, \
@@ -359,26 +409,24 @@ impl<'a, 'tcx> ConstToPat<'a, 'tcx> {
                 PatKind::Wild
             }
             ty::Adt(adt_def, substs) if adt_def.is_enum() => {
-                let destructured = tcx.destructure_const(param_env.and((cv.val.eval(tcx, param_env).try_to_value().unwrap(), cv.ty)));
+                let (variant, fields) = self.destructure(value);
                 PatKind::Variant {
                     adt_def,
                     substs,
-                    variant_index: destructured
-                        .variant
-                        .expect("destructed const of adt without variant id"),
-                    subpatterns: self.field_pats(destructured.fields.iter().copied())?,
+                    variant_index: variant.expect("destructed const of adt without variant id"),
+                    subpatterns: self.field_pats(fields.iter().copied())?,
                 }
             }
             ty::Tuple(_) | ty::Adt(_, _) => {
-                let destructured = tcx.destructure_const(param_env.and((cv.val.eval(tcx, param_env).try_to_value().unwrap(), cv.ty)));
-                PatKind::Leaf { subpatterns: self.field_pats(destructured.fields.iter().copied())? }
+                let (_, fields) = self.destructure(value);
+                PatKind::Leaf { subpatterns: self.field_pats(fields.iter().copied())? }
             }
             ty::Array(..) => PatKind::Array {
-                prefix: tcx
-                    .destructure_const(param_env.and((cv.val.eval(tcx, param_env).try_to_value().unwrap(), cv.ty)))
-                    .fields
-                    .iter()
-                    .map(|&(val, ty)| self.recur(ty::Const::from_value(tcx, val, ty), false))
+                prefix: self
+                    .destructure(value)
+                    .1
+                    .into_iter()
+                    .map(|val| self.recur(val, false))
                     .collect::<Result<_, _>>()?,
                 slice: None,
                 suffix: Vec::new(),
@@ -387,7 +435,7 @@ impl<'a, 'tcx> ConstToPat<'a, 'tcx> {
                 // These are not allowed and will error elsewhere anyway.
                 ty::Dynamic(..) => {
                     self.saw_const_match_error.set(true);
-                    let msg = format!("`{}` cannot be used in patterns", cv.ty);
+                    let msg = format!("`{}` cannot be used in patterns", ty);
                     if self.include_lint_checks {
                         tcx.sess.span_err(span, &msg);
                     } else {
@@ -397,7 +445,7 @@ impl<'a, 'tcx> ConstToPat<'a, 'tcx> {
                 }
                 // `&str` is represented as `ConstValue::Slice`, let's keep using this
                 // optimization for now.
-                ty::Str => PatKind::Constant { value: cv },
+                ty::Str => PatKind::Constant { value },
                 // `b"foo"` produces a `&[u8; 3]`, but you can't use constants of array type when
                 // matching against references, you can only use byte string literals.
                 // The typechecker has a special case for byte string literals, by treating them
@@ -406,15 +454,15 @@ impl<'a, 'tcx> ConstToPat<'a, 'tcx> {
                 // arrays.
                 ty::Array(..) if !self.treat_byte_string_as_slice => {
                     let old = self.behind_reference.replace(true);
-                    let array = tcx.deref_const(self.param_env.and((cv.val.eval(tcx, param_env).try_to_value().unwrap(), cv.ty)));
+                    let array = self.deref(value);
                     let val = PatKind::Deref {
                         subpattern: Pat {
                             kind: Box::new(PatKind::Array {
-                                prefix: tcx
-                                    .destructure_const(param_env.and(array))
-                                    .fields
-                                    .iter()
-                                    .map(|&(val, ty)| self.recur(ty::Const::from_value(tcx, val, ty), false))
+                                prefix: self
+                                    .destructure(array)
+                                    .1
+                                    .into_iter()
+                                    .map(|val| self.recur(val, false))
                                     .collect::<Result<_, _>>()?,
                                 slice: None,
                                 suffix: vec![],
@@ -432,15 +480,15 @@ impl<'a, 'tcx> ConstToPat<'a, 'tcx> {
                 // pattern.
                 ty::Slice(elem_ty) => {
                     let old = self.behind_reference.replace(true);
-                    let array = tcx.deref_const(self.param_env.and((cv.val.eval(tcx, param_env).try_to_value().unwrap(), cv.ty)));
+                    let array = self.deref(value);
                     let val = PatKind::Deref {
                         subpattern: Pat {
                             kind: Box::new(PatKind::Slice {
-                                prefix: tcx
-                                    .destructure_const(param_env.and(array))
-                                    .fields
-                                    .iter()
-                                    .map(|&(val, ty)| self.recur(ty::Const::from_value(tcx, val, ty), false))
+                                prefix: self
+                                    .destructure(array)
+                                    .1
+                                    .into_iter()
+                                    .map(|val| self.recur(val, false))
                                     .collect::<Result<_, _>>()?,
                                 slice: None,
                                 suffix: vec![],
@@ -472,7 +520,7 @@ impl<'a, 'tcx> ConstToPat<'a, 'tcx> {
                                 |lint| lint.build(&msg).emit(),
                             );
                         }
-                        PatKind::Constant { value: cv }
+                        PatKind::Constant { value }
                     } else {
                         if !self.saw_const_match_error.get() {
                             self.saw_const_match_error.set(true);
@@ -495,21 +543,19 @@ impl<'a, 'tcx> ConstToPat<'a, 'tcx> {
                     // we fall back to a const pattern. If we do not do this, we may end up with
                     // a !structural-match constant that is not of reference type, which makes it
                     // very hard to invoke `PartialEq::eq` on it as a fallback.
-                    let (val, ty) = tcx.deref_const(self.param_env.and((cv.val.eval(tcx, param_env).try_to_value().unwrap(), cv.ty)));
-                    let deref_cv = ty::Const::from_value(tcx, val, ty);
-                    let val = match self.recur(deref_cv, false) {
+                    let val = match self.recur(self.deref(value), false) {
                         Ok(subpattern) => PatKind::Deref { subpattern },
-                        Err(_) => PatKind::Constant { value: cv },
+                        Err(_) => PatKind::Constant { value },
                     };
                     self.behind_reference.set(old);
                     val
                 }
             },
             ty::Bool | ty::Char | ty::Int(_) | ty::Uint(_) | ty::FnDef(..) => {
-                PatKind::Constant { value: cv }
+                PatKind::Constant { value }
             }
             ty::RawPtr(pointee) if pointee.ty.is_sized(tcx.at(span), param_env) => {
-                PatKind::Constant { value: cv }
+                PatKind::Constant { value }
             }
             // FIXME: these can have very suprising behaviour where optimization levels or other
             // compilation choices change the runtime behaviour of the match.
@@ -530,11 +576,11 @@ impl<'a, 'tcx> ConstToPat<'a, 'tcx> {
                         |lint| lint.build(&msg).emit(),
                     );
                 }
-                PatKind::Constant { value: cv }
+                PatKind::Constant { value }
             }
             _ => {
                 self.saw_const_match_error.set(true);
-                let msg = format!("`{}` cannot be used in patterns", cv.ty);
+                let msg = format!("`{}` cannot be used in patterns", ty);
                 if self.include_lint_checks {
                     tcx.sess.span_err(span, &msg);
                 } else {
@@ -550,12 +596,12 @@ impl<'a, 'tcx> ConstToPat<'a, 'tcx> {
             && mir_structural_match_violation
             // FIXME(#73448): Find a way to bring const qualification into parity with
             // `search_for_structural_match_violation` and then remove this condition.
-            && self.search_for_structural_match_violation(cv.ty).is_some()
+            && self.search_for_structural_match_violation(ty).is_some()
         {
             self.saw_const_match_lint.set(true);
             // Obtain the actual type that isn't annotated. If we just looked at `cv.ty` we
             // could get `Option<NonStructEq>`, even though `Option` is annotated with derive.
-            let msg = self.search_for_structural_match_violation(cv.ty).unwrap().replace(
+            let msg = self.search_for_structural_match_violation(ty).unwrap().replace(
                 "in a pattern,",
                 "in a pattern, the constant's initializer must be trivial or",
             );
@@ -567,6 +613,6 @@ impl<'a, 'tcx> ConstToPat<'a, 'tcx> {
             );
         }
 
-        Ok(Pat { span, ty: cv.ty, kind: Box::new(kind) })
+        Ok(Pat { span, ty, kind: Box::new(kind) })
     }
 }

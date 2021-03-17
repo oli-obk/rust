@@ -28,7 +28,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
     crate fn literal_operand(
         &mut self,
         span: Span,
-        literal: &'tcx ty::Const<'tcx>,
+        literal: impl Into<ConstantKind<'tcx>>,
     ) -> Operand<'tcx> {
         let literal = literal.into();
         let constant = box Constant { span, user_ty: None, literal };

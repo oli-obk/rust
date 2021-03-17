@@ -85,7 +85,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
         test_place: &PlaceBuilder<'tcx>,
         candidate: &Candidate<'pat, 'tcx>,
         switch_ty: Ty<'tcx>,
-        options: &mut FxIndexMap<&'tcx ty::Const<'tcx>, u128>,
+        options: &mut FxIndexMap<ConstantKind<'tcx>, u128>,
     ) -> bool {
         let match_pair = match candidate.match_pairs.iter().find(|mp| mp.place == *test_place) {
             Some(match_pair) => match_pair,
@@ -262,7 +262,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                         ty,
                     );
                 } else if let [success, fail] = *make_target_blocks(self) {
-                    assert_eq!(value.ty, ty);
+                    assert_eq!(value.ty(), ty);
                     let expect = self.literal_operand(test.span, value);
                     let val = Operand::Copy(place);
                     self.compare(block, success, fail, source_info, BinOp::Eq, expect, val);
@@ -364,7 +364,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
         block: BasicBlock,
         make_target_blocks: impl FnOnce(&mut Self) -> Vec<BasicBlock>,
         source_info: SourceInfo,
-        value: &'tcx ty::Const<'tcx>,
+        value: ConstantKind<'tcx>,
         place: Place<'tcx>,
         mut ty: Ty<'tcx>,
     ) {
@@ -385,7 +385,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
             _ => None,
         };
         let opt_ref_ty = unsize(ty);
-        let opt_ref_test_ty = unsize(value.ty);
+        let opt_ref_test_ty = unsize(value.ty());
         match (opt_ref_ty, opt_ref_test_ty) {
             // nothing to do, neither is an array
             (None, None) => {}
@@ -773,16 +773,16 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
     fn const_range_contains(
         &self,
         range: PatRange<'tcx>,
-        value: &'tcx ty::Const<'tcx>,
+        value: ConstantKind<'tcx>,
     ) -> Option<bool> {
         use std::cmp::Ordering::*;
 
         let tcx = self.tcx;
 
-        let lo = ty::Const::from_value(tcx, ConstValue::Scalar(range.lo.into()), value.ty);
-        let hi = ty::Const::from_value(tcx, ConstValue::Scalar(range.hi.into()), value.ty);
-        let a = compare_const_vals(tcx, lo, value, self.param_env, value.ty)?;
-        let b = compare_const_vals(tcx, value, hi, self.param_env, value.ty)?;
+        let lo = ConstantKind::Val(ConstValue::Scalar(range.lo.into()), value.ty());
+        let hi = ConstantKind::Val(ConstValue::Scalar(range.hi.into()), value.ty());
+        let a = compare_const_vals(tcx, lo, value, self.param_env, value.ty())?;
+        let b = compare_const_vals(tcx, value, hi, self.param_env, value.ty())?;
 
         match (b, range.end) {
             (Less, _) | (Equal, RangeEnd::Included) if a != Greater => Some(true),
@@ -793,7 +793,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
     fn values_not_contained_in_range(
         &self,
         range: PatRange<'tcx>,
-        options: &FxIndexMap<&'tcx ty::Const<'tcx>, u128>,
+        options: &FxIndexMap<ConstantKind<'tcx>, u128>,
     ) -> Option<bool> {
         for &val in options.keys() {
             if self.const_range_contains(range, val)? {

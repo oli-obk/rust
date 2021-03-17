@@ -17,8 +17,8 @@ use rustc_hir::RangeEnd;
 use rustc_index::vec::Idx;
 use rustc_middle::mir::interpret::{get_slice_bytes, ConstValue};
 use rustc_middle::mir::interpret::{ErrorHandled, LitToConstError, LitToConstInput};
-use rustc_middle::mir::UserTypeProjection;
 use rustc_middle::mir::{BorrowKind, Field, Mutability};
+use rustc_middle::mir::{ConstantKind, UserTypeProjection};
 use rustc_middle::ty::subst::{GenericArg, SubstsRef};
 use rustc_middle::ty::{self, AdtDef, DefIdTree, Region, Ty, TyCtxt, UserType};
 use rustc_middle::ty::{
@@ -167,7 +167,7 @@ pub enum PatKind<'tcx> {
     /// * Opaque constants, that must not be matched structurally. So anything that does not derive
     ///   `PartialEq` and `Eq`.
     Constant {
-        value: &'tcx ty::Const<'tcx>,
+        value: ConstantKind<'tcx>,
     },
 
     Range(PatRange<'tcx>),
@@ -469,7 +469,9 @@ impl<'a, 'tcx> PatCtxt<'a, 'tcx> {
                 PatKind::Wild
             }
             // `x..=y` where `x == y`.
-            (RangeEnd::Included, Some(Ordering::Equal)) => PatKind::Constant { value: lo_const },
+            (RangeEnd::Included, Some(Ordering::Equal)) => {
+                PatKind::Constant { value: ConstantKind::Val(ConstValue::Scalar(lo.into()), ty) }
+            }
             // `x..=y` where `x < y`.
             (RangeEnd::Included, Some(Ordering::Less)) => {
                 PatKind::Range(PatRange { lo, hi, end, ty })
@@ -505,7 +507,7 @@ impl<'a, 'tcx> PatCtxt<'a, 'tcx> {
         hi: Option<&PatKind<'tcx>>,
     ) -> Option<(ScalarInt, ScalarInt)> {
         let eval =
-            |value: &ty::Const<'tcx>| value.val.eval(self.tcx, self.param_env).try_to_scalar_int();
+            |value: &ConstantKind<'tcx>| value.try_to_scalar_int();
         match (lo, hi) {
             (Some(PatKind::Constant { value: lo }), Some(PatKind::Constant { value: hi })) => {
                 Some((eval(lo)?, eval(hi)?))
@@ -816,48 +818,48 @@ impl<'a, 'tcx> PatCtxt<'a, 'tcx> {
         let mir_structural_match_violation = self.tcx.mir_const_qualif(instance.def_id()).custom_eq;
         debug!("mir_structural_match_violation({:?}) -> {}", qpath, mir_structural_match_violation);
 
-        match self.tcx.const_eval_instance(param_env_reveal_all, instance, Some(span)) {
+        let ty = self.typeck_results.node_type(id);
+        let value = match self.tcx.const_eval_instance(param_env_reveal_all, instance, Some(span)) {
             Ok(value) => {
-                let const_ =
-                    ty::Const::from_value(self.tcx, value, self.typeck_results.node_type(id));
-
-                let pattern = self.const_to_pat(&const_, id, span, mir_structural_match_violation);
-
-                if !is_associated_const {
-                    return pattern;
-                }
-
-                let user_provided_types = self.typeck_results().user_provided_types();
-                if let Some(u_ty) = user_provided_types.get(id) {
-                    let user_ty = PatTyProj::from_user_type(*u_ty);
-                    Pat {
-                        span,
-                        kind: Box::new(PatKind::AscribeUserType {
-                            subpattern: pattern,
-                            ascription: Ascription {
-                                /// Note that use `Contravariant` here. See the
-                                /// `variance` field documentation for details.
-                                variance: ty::Variance::Contravariant,
-                                user_ty,
-                                user_ty_span: span,
-                            },
-                        }),
-                        ty: const_.ty,
-                    }
-                } else {
-                    pattern
-                }
+                ty::Const::from_value(self.tcx, value, self.typeck_results.node_type(id)).into()
             }
             Err(ErrorHandled::TooGeneric) => {
                 // While `Reported | Linted` cases will have diagnostics emitted already
                 // it is not true for TooGeneric case, so we need to give user more information.
                 self.tcx.sess.span_err(span, "constant pattern depends on a generic parameter");
-                pat_from_kind(PatKind::Wild)
+                return pat_from_kind(PatKind::Wild);
             }
             Err(_) => {
                 self.tcx.sess.span_err(span, "could not evaluate constant pattern");
-                pat_from_kind(PatKind::Wild)
+                return pat_from_kind(PatKind::Wild);
             }
+        };
+
+        let pattern = self.const_to_pat(value, id, span, mir_structural_match_violation);
+
+        if !is_associated_const {
+            return pattern;
+        }
+
+        let user_provided_types = self.typeck_results().user_provided_types();
+        if let Some(u_ty) = user_provided_types.get(id) {
+            let user_ty = PatTyProj::from_user_type(*u_ty);
+            Pat {
+                span,
+                kind: Box::new(PatKind::AscribeUserType {
+                    subpattern: pattern,
+                    ascription: Ascription {
+                        /// Note that use `Contravariant` here. See the
+                        /// `variance` field documentation for details.
+                        variance: ty::Variance::Contravariant,
+                        user_ty,
+                        user_ty_span: span,
+                    },
+                }),
+                ty,
+            }
+        } else {
+            pattern
         }
     }
 
@@ -873,7 +875,7 @@ impl<'a, 'tcx> PatCtxt<'a, 'tcx> {
                 hir::ExprKind::ConstBlock(ref anon_const) => {
                     let anon_const_def_id = self.tcx.hir().local_def_id(anon_const.hir_id);
                     let value = ty::Const::from_anon_const(self.tcx, anon_const_def_id);
-                    return *self.const_to_pat(value, expr.hir_id, expr.span, false).kind;
+                    return *self.const_to_pat(value.into(), expr.hir_id, expr.span, false).kind;
                 }
                 hir::ExprKind::Lit(ref lit) => (lit, false),
                 hir::ExprKind::Unary(hir::UnOp::Neg, ref expr) => {
@@ -889,7 +891,7 @@ impl<'a, 'tcx> PatCtxt<'a, 'tcx> {
             let lit_input =
                 LitToConstInput { lit: &lit.node, ty: self.typeck_results.expr_ty(expr), neg };
             match self.tcx.at(expr.span).lit_to_const(lit_input) {
-                Ok(val) => *self.const_to_pat(val, expr.hir_id, lit.span, false).kind,
+                Ok(val) => *self.const_to_pat(val.into(), expr.hir_id, lit.span, false).kind,
                 Err(LitToConstError::UnparseableFloat) => {
                     self.errors.push(PatternError::FloatBug);
                     PatKind::Wild
@@ -1050,11 +1052,13 @@ impl<'tcx> PatternFoldable<'tcx> for PatKind<'tcx> {
 
 crate fn compare_const_vals<'tcx>(
     tcx: TyCtxt<'tcx>,
-    a: &'tcx ty::Const<'tcx>,
-    b: &'tcx ty::Const<'tcx>,
+    a: impl Into<ConstantKind<'tcx>>,
+    b: impl Into<ConstantKind<'tcx>>,
     param_env: ty::ParamEnv<'tcx>,
     ty: Ty<'tcx>,
 ) -> Option<Ordering> {
+    let a = a.into();
+    let b = b.into();
     trace!("compare_const_vals: {:?}, {:?}", a, b);
 
     let from_bool = |v: bool| v.then_some(Ordering::Equal);
@@ -1062,13 +1066,13 @@ crate fn compare_const_vals<'tcx>(
     let fallback = || from_bool(a == b);
 
     // Use the fallback if any type differs
-    if a.ty != b.ty || a.ty != ty {
+    if a.ty() != b.ty() || a.ty() != ty {
         return fallback();
     }
 
     // Early return for equal constants (so e.g. references to ZSTs can be compared, even if they
     // are just integer addresses).
-    if a.val == b.val {
+    if a == b {
         return from_bool(true);
     }
 
@@ -1100,10 +1104,8 @@ crate fn compare_const_vals<'tcx>(
     }
 
     if let ty::Str = ty.kind() {
-        if let (
-            ty::ConstKind::Value(a_val @ ConstValue::Slice { .. }),
-            ty::ConstKind::Value(b_val @ ConstValue::Slice { .. }),
-        ) = (a.val, b.val)
+        if let (Some(a_val @ ConstValue::Slice { .. }), Some(b_val @ ConstValue::Slice { .. })) =
+            (a.try_to_value(), b.try_to_value())
         {
             let a_bytes = get_slice_bytes(&tcx, a_val);
             let b_bytes = get_slice_bytes(&tcx, b_val);
