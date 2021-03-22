@@ -192,10 +192,10 @@ static XXX: &Foo = {
         _2 = Foo { tup: const "hi", data: move _3 }; // scope 0 at $DIR/storage_live_dead_in_statics.rs:5:29: 23:2
                                          // ty::Const
                                          // + ty: &str
-                                         // + val: Value(Branch([Leaf(0x68), Leaf(0x69)]))
+                                         // + val: Value(Str("hi"))
                                          // mir::Constant
                                          // + span: $DIR/storage_live_dead_in_statics.rs:6:10: 6:14
-                                         // + literal: Const { ty: &str, val: Value(Branch([Leaf(0x68), Leaf(0x69)])) }
+                                         // + literal: Const { ty: &str, val: Value(Str("hi")) }
         StorageDead(_3);                 // scope 0 at $DIR/storage_live_dead_in_statics.rs:23:1: 23:2
         _1 = &_2;                        // scope 0 at $DIR/storage_live_dead_in_statics.rs:5:28: 23:2
         _0 = &(*_1);                     // scope 0 at $DIR/storage_live_dead_in_statics.rs:5:28: 23:2

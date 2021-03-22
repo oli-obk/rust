@@ -43,10 +43,10 @@
 +                                          // + literal: Const { ty: fn(&str) -> ! {std::rt::begin_panic::<&str>}, val: Value(Leaf(<ZST>)) }
 +                                          // ty::Const
 +                                          // + ty: &str
-+                                          // + val: Value(Branch([Leaf(0x65), Leaf(0x78), Leaf(0x70), Leaf(0x6c), Leaf(0x69), Leaf(0x63), Leaf(0x69), Leaf(0x74), Leaf(0x20), Leaf(0x70), Leaf(0x61), Leaf(0x6e), Leaf(0x69), Leaf(0x63)]))
++                                          // + val: Value(Str("explicit panic"))
 +                                          // mir::Constant
 +                                          // + span: $DIR/inline-diverging.rs:16:9: 16:16
-+                                          // + literal: Const { ty: &str, val: Value(Branch([Leaf(0x65), Leaf(0x78), Leaf(0x70), Leaf(0x6c), Leaf(0x69), Leaf(0x63), Leaf(0x69), Leaf(0x74), Leaf(0x20), Leaf(0x70), Leaf(0x61), Leaf(0x6e), Leaf(0x69), Leaf(0x63)])) }
++                                          // + literal: Const { ty: &str, val: Value(Str("explicit panic")) }
       }
   }
   

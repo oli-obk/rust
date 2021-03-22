@@ -593,18 +593,14 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                     Ok(OpTy { op, layout })
                 }
                 ty::Str => {
-                    let bytes: Vec<u8> = val
-                        .unwrap_branch()
-                        .iter()
-                        .map(|vt| u8::try_from(vt.unwrap_leaf()).unwrap())
-                        .collect();
-                    let alloc_id = self.tcx.allocate_bytes(&bytes);
+                    let s = val.unwrap_str().as_str();
+                    let alloc_id = self.tcx.allocate_bytes(s.as_bytes());
                     let ptr = self.global_base_pointer(alloc_id.into())?;
                     let layout =
                         from_known_layout(self.tcx, self.param_env, layout, || self.layout_of(ty))?;
                     let op = Operand::Immediate(Immediate::new_slice(
                         ptr.into(),
-                        u64::try_from(bytes.len()).unwrap(),
+                        u64::try_from(s.len()).unwrap(),
                         self,
                     ));
                     Ok(OpTy { op, layout })
@@ -620,11 +616,11 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
                 ValTree::Leaf(int) => {
                     self.const_val_to_op(ConstValue::Scalar(int.into()), ty, layout)
                 }
-                ValTree::Branch(branches) => span_bug!(
+                ValTree::Str(_) | ValTree::Branch(_) => span_bug!(
                     self.cur_span(),
                     "complex valtrees of type {} are unimplemented: {:?}",
                     ty,
-                    branches
+                    val
                 ),
             },
         }

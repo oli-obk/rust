@@ -154,13 +154,8 @@ pub(crate) fn codegen_valtree<'tcx>(
 ) -> CValue<'tcx> {
     let layout = fx.layout_of(ty);
     let tcx = fx.tcx;
-    let mut encode_slice = |valtree: ty::ValTree<'_>| {
-        let s: Vec<u8> = valtree
-            .unwrap_branch()
-            .iter()
-            .map(|b| u8::try_from(b.unwrap_leaf()).unwrap())
-            .collect();
-        let alloc_id = fx.tcx.allocate_bytes(&s);
+    let mut encode_slice = |s| {
+        let alloc_id = fx.tcx.allocate_bytes(s);
 
         let ptr = pointer_for_alloc_id(fx, alloc_id, Mutability::Not).get_addr(fx);
         let len = fx.bcx.ins().iconst(fx.pointer_type, i64::try_from(s.len()).unwrap());
@@ -169,8 +164,18 @@ pub(crate) fn codegen_valtree<'tcx>(
 
     match *ty.kind() {
         ty::Ref(_, pointee, _) => match *pointee.kind() {
-            ty::Str => encode_slice(valtree),
-            ty::Slice(elem_ty) if elem_ty == tcx.types.u8 => encode_slice(valtree),
+            ty::Str => {
+                let s = valtree.unwrap_str().as_str();
+                encode_slice(s.as_bytes())
+            }
+            ty::Slice(elem_ty) if elem_ty == tcx.types.u8 => {
+                let s: Vec<u8> = valtree
+                    .unwrap_branch()
+                    .iter()
+                    .map(|b| u8::try_from(b.unwrap_leaf()).unwrap())
+                    .collect();
+                encode_slice(&s)
+            }
             ty::Array(elem_ty, _) if elem_ty == tcx.types.u8 => {
                 let s: Vec<u8> = valtree
                     .unwrap_branch()

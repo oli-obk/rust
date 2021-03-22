@@ -15,10 +15,10 @@ fn main() -> () {
         _4 = const "";                   // scope 0 at $DIR/no-spurious-drop-after-call.rs:9:20: 9:22
                                          // ty::Const
                                          // + ty: &str
-                                         // + val: Value(Branch([]))
+                                         // + val: Value(Str(""))
                                          // mir::Constant
                                          // + span: $DIR/no-spurious-drop-after-call.rs:9:20: 9:22
-                                         // + literal: Const { ty: &str, val: Value(Branch([])) }
+                                         // + literal: Const { ty: &str, val: Value(Str("")) }
         _3 = &(*_4);                     // scope 0 at $DIR/no-spurious-drop-after-call.rs:9:20: 9:22
         _2 = <str as ToString>::to_string(move _3) -> bb1; // scope 0 at $DIR/no-spurious-drop-after-call.rs:9:20: 9:34
                                          // mir::Constant

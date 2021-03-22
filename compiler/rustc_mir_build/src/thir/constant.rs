@@ -29,7 +29,7 @@ crate fn lit_to_const<'tcx>(
     };
 
     let val = match (lit, &ty.kind()) {
-        (ast::LitKind::Str(s, _), ty::Ref(..)) => byte_array(s.as_str().as_bytes()),
+        (ast::LitKind::Str(s, _), ty::Ref(..)) => ValTree::Str(*s),
         (ast::LitKind::ByteStr(data), ty::Ref(..)) => byte_array(data),
         (ast::LitKind::Byte(n), ty::Uint(ty::UintTy::U8)) => {
             ValTree::Leaf(ScalarInt::from_uint(*n, Size::from_bytes(1)))

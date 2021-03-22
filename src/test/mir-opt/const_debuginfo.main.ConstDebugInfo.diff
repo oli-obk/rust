@@ -77,10 +77,10 @@
           _9 = const "hello, world!";      // scope 4 at $DIR/const_debuginfo.rs:14:13: 14:28
                                            // ty::Const
                                            // + ty: &str
-                                           // + val: Value(Branch([Leaf(0x68), Leaf(0x65), Leaf(0x6c), Leaf(0x6c), Leaf(0x6f), Leaf(0x2c), Leaf(0x20), Leaf(0x77), Leaf(0x6f), Leaf(0x72), Leaf(0x6c), Leaf(0x64), Leaf(0x21)]))
+                                           // + val: Value(Str("hello, world!"))
                                            // mir::Constant
                                            // + span: $DIR/const_debuginfo.rs:14:13: 14:28
-                                           // + literal: Const { ty: &str, val: Value(Branch([Leaf(0x68), Leaf(0x65), Leaf(0x6c), Leaf(0x6c), Leaf(0x6f), Leaf(0x2c), Leaf(0x20), Leaf(0x77), Leaf(0x6f), Leaf(0x72), Leaf(0x6c), Leaf(0x64), Leaf(0x21)])) }
+                                           // + literal: Const { ty: &str, val: Value(Str("hello, world!")) }
           StorageLive(_10);                // scope 5 at $DIR/const_debuginfo.rs:16:9: 16:10
           (_10.0: bool) = const true;      // scope 5 at $DIR/const_debuginfo.rs:16:13: 16:34
           (_10.1: bool) = const false;     // scope 5 at $DIR/const_debuginfo.rs:16:13: 16:34

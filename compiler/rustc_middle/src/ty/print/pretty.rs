@@ -1143,13 +1143,7 @@ pub trait PrettyPrinter<'tcx>:
         match ty.kind() {
             ty::Ref(_, pointee, _) => match *pointee.kind() {
                 ty::Str => {
-                    let s: Vec<u8> = ct
-                        .unwrap_branch()
-                        .iter()
-                        .map(|b| u8::try_from(b.unwrap_leaf()).unwrap())
-                        .collect();
-                    let s = String::from_utf8(s).unwrap();
-                    p!(write("{:?}", s));
+                    p!(write("{:?}", ct.unwrap_str().as_str()));
                     Ok(self)
                 }
                 // Special case byte strings
@@ -1174,6 +1168,7 @@ pub trait PrettyPrinter<'tcx>:
             _ => match ct {
                 ty::ValTree::Leaf(int) => self.pretty_print_const_scalar_int(int, ty, print_ty),
                 ty::ValTree::Branch(branches) => bug!("{}: {:?}", ty, branches),
+                ty::ValTree::Str(s) => bug!("{}: {}", ty, s),
             },
         }
     }

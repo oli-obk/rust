@@ -10,7 +10,7 @@ use rustc_middle::{
     ty::{self, Ty, TyCtxt},
 };
 use rustc_span::{source_map::DUMMY_SP, symbol::Symbol};
-use rustc_target::abi::{LayoutOf, VariantIdx};
+use rustc_target::abi::{LayoutOf, Size, VariantIdx};
 
 use crate::interpret::{
     intern_const_alloc_recursive, ConstValue, InternKind, InterpCx, MPlaceTy, MemPlaceMeta, Scalar,
@@ -123,8 +123,22 @@ fn const_to_valtree<'tcx>(
                         branches(ecx, n.try_into().unwrap(), None, &mplace)
                     };
                     match mplace.layout.ty.kind() {
-                        // str slices are encoded as a `u8` array.
-                        ty::Str => array(ecx.tcx.types.u8),
+                        ty::Str => {
+                            let n = scalar.to_machine_usize(ecx).unwrap();
+                            if n > 0 {
+                                let ptr = mplace.ptr.assert_ptr();
+                                let s = ecx.memory.get_raw(ptr.alloc_id).unwrap().get_bytes(
+                                    ecx,
+                                    ptr,
+                                    Size::from_bytes(n),
+                                ).unwrap();
+                                let s = std::str::from_utf8(s).unwrap();
+                                let s = Symbol::intern(s);
+                                Ok(Some(ty::ValTree::Str(s)))
+                            } else {
+                                Ok(Some(ty::ValTree::Str(Symbol::intern(""))))
+                            }
+                        },
                         // Slices are encoded as an array
                         ty::Slice(elem_ty) => array(elem_ty),
                         // No other unsized types are structural match.

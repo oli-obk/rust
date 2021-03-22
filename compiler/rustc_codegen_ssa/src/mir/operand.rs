@@ -79,13 +79,8 @@ impl<'a, 'tcx, V: CodegenObject> OperandRef<'tcx, V> {
             return OperandRef::new_zst(bx, layout);
         }
 
-        let encode_slice = |valtree: ValTree<'_>| {
-            let s: Vec<u8> = valtree
-                .unwrap_branch()
-                .iter()
-                .map(|b| u8::try_from(b.unwrap_leaf()).unwrap())
-                .collect();
-            let alloc_id = bx.tcx().allocate_bytes(&s);
+        let encode_slice = |s| {
+            let alloc_id = bx.tcx().allocate_bytes(s);
 
             let a_scalar = match layout.abi {
                 Abi::ScalarPair(ref a, _) => a,
@@ -104,8 +99,18 @@ impl<'a, 'tcx, V: CodegenObject> OperandRef<'tcx, V> {
         let val = match val {
             Err(valtree) => match ty.kind() {
                 ty::Ref(_, pointee, _) => match *pointee.kind() {
-                    ty::Str => encode_slice(valtree),
-                    ty::Slice(elem_ty) if elem_ty == bx.tcx().types.u8 => encode_slice(valtree),
+                    ty::Str => {
+                        let s = valtree.unwrap_str().as_str();
+                        encode_slice(s.as_bytes())
+                    }
+                    ty::Slice(elem_ty) if elem_ty == bx.tcx().types.u8 => {
+                        let s: Vec<u8> = valtree
+                            .unwrap_branch()
+                            .iter()
+                            .map(|b| u8::try_from(b.unwrap_leaf()).unwrap())
+                            .collect();
+                        encode_slice(&s)
+                    }
                     ty::Array(elem_ty, _) if elem_ty == bx.tcx().types.u8 => {
                         let s: Vec<u8> = valtree
                             .unwrap_branch()

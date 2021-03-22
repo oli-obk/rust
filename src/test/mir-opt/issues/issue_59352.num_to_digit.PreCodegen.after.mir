@@ -92,10 +92,10 @@ fn num_to_digit(_1: char) -> u32 {
                                          // + literal: Const { ty: fn(&'static str) -> ! {core::panicking::panic}, val: Value(Leaf(<ZST>)) }
                                          // ty::Const
                                          // + ty: &str
-                                         // + val: Value(Branch([Leaf(0x63), Leaf(0x61), Leaf(0x6c), Leaf(0x6c), Leaf(0x65), Leaf(0x64), Leaf(0x20), Leaf(0x60), Leaf(0x4f), Leaf(0x70), Leaf(0x74), Leaf(0x69), Leaf(0x6f), Leaf(0x6e), Leaf(0x3a), Leaf(0x3a), Leaf(0x75), Leaf(0x6e), Leaf(0x77), Leaf(0x72), Leaf(0x61), Leaf(0x70), Leaf(0x28), Leaf(0x29), Leaf(0x60), Leaf(0x20), Leaf(0x6f), Leaf(0x6e), Leaf(0x20), Leaf(0x61), Leaf(0x20), Leaf(0x60), Leaf(0x4e), Leaf(0x6f), Leaf(0x6e), Leaf(0x65), Leaf(0x60), Leaf(0x20), Leaf(0x76), Leaf(0x61), Leaf(0x6c), Leaf(0x75), Leaf(0x65)]))
+                                         // + val: Value(Str("called `Option::unwrap()` on a `None` value"))
                                          // mir::Constant
                                          // + span: $DIR/issue-59352.rs:14:26: 14:50
-                                         // + literal: Const { ty: &str, val: Value(Branch([Leaf(0x63), Leaf(0x61), Leaf(0x6c), Leaf(0x6c), Leaf(0x65), Leaf(0x64), Leaf(0x20), Leaf(0x60), Leaf(0x4f), Leaf(0x70), Leaf(0x74), Leaf(0x69), Leaf(0x6f), Leaf(0x6e), Leaf(0x3a), Leaf(0x3a), Leaf(0x75), Leaf(0x6e), Leaf(0x77), Leaf(0x72), Leaf(0x61), Leaf(0x70), Leaf(0x28), Leaf(0x29), Leaf(0x60), Leaf(0x20), Leaf(0x6f), Leaf(0x6e), Leaf(0x20), Leaf(0x61), Leaf(0x20), Leaf(0x60), Leaf(0x4e), Leaf(0x6f), Leaf(0x6e), Leaf(0x65), Leaf(0x60), Leaf(0x20), Leaf(0x76), Leaf(0x61), Leaf(0x6c), Leaf(0x75), Leaf(0x65)])) }
+                                         // + literal: Const { ty: &str, val: Value(Str("called `Option::unwrap()` on a `None` value")) }
     }
 
     bb7: {

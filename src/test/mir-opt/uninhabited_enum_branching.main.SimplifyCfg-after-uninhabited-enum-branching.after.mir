@@ -21,10 +21,10 @@ fn main() -> () {
         _5 = const "C";                  // scope 0 at $DIR/uninhabited_enum_branching.rs:23:21: 23:24
                                          // ty::Const
                                          // + ty: &str
-                                         // + val: Value(Branch([Leaf(0x43)]))
+                                         // + val: Value(Str("C"))
                                          // mir::Constant
                                          // + span: $DIR/uninhabited_enum_branching.rs:23:21: 23:24
-                                         // + literal: Const { ty: &str, val: Value(Branch([Leaf(0x43)])) }
+                                         // + literal: Const { ty: &str, val: Value(Str("C")) }
         _1 = &(*_5);                     // scope 0 at $DIR/uninhabited_enum_branching.rs:23:21: 23:24
         StorageDead(_5);                 // scope 0 at $DIR/uninhabited_enum_branching.rs:23:23: 23:24
         StorageDead(_2);                 // scope 0 at $DIR/uninhabited_enum_branching.rs:24:6: 24:7
@@ -41,10 +41,10 @@ fn main() -> () {
         _9 = const "E";                  // scope 0 at $DIR/uninhabited_enum_branching.rs:28:21: 28:24
                                          // ty::Const
                                          // + ty: &str
-                                         // + val: Value(Branch([Leaf(0x45)]))
+                                         // + val: Value(Str("E"))
                                          // mir::Constant
                                          // + span: $DIR/uninhabited_enum_branching.rs:28:21: 28:24
-                                         // + literal: Const { ty: &str, val: Value(Branch([Leaf(0x45)])) }
+                                         // + literal: Const { ty: &str, val: Value(Str("E")) }
         _6 = &(*_9);                     // scope 0 at $DIR/uninhabited_enum_branching.rs:28:21: 28:24
         StorageDead(_9);                 // scope 0 at $DIR/uninhabited_enum_branching.rs:28:23: 28:24
         goto -> bb3;                     // scope 0 at $DIR/uninhabited_enum_branching.rs:26:5: 29:6
@@ -54,10 +54,10 @@ fn main() -> () {
         _6 = const "D";                  // scope 0 at $DIR/uninhabited_enum_branching.rs:27:21: 27:24
                                          // ty::Const
                                          // + ty: &str
-                                         // + val: Value(Branch([Leaf(0x44)]))
+                                         // + val: Value(Str("D"))
                                          // mir::Constant
                                          // + span: $DIR/uninhabited_enum_branching.rs:27:21: 27:24
-                                         // + literal: Const { ty: &str, val: Value(Branch([Leaf(0x44)])) }
+                                         // + literal: Const { ty: &str, val: Value(Str("D")) }
         goto -> bb3;                     // scope 0 at $DIR/uninhabited_enum_branching.rs:26:5: 29:6
     }
 
