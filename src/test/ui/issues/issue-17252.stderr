@@ -1,33 +1,10 @@
-<<<<<<< HEAD
-error[E0391]: cycle detected when normalizing `FOO`
-   |
-note: ...which requires simplifying constant for the type system `FOO`...
-||||||| parent of ab70bbeec72... Use ValTree in all type level constants
-error[E0391]: cycle detected when simplifying constant for the type system `FOO`
-=======
-error[E0391]: cycle detected when evaluating constant for MIR opt/codegen `FOO`
->>>>>>> ab70bbeec72... Use ValTree in all type level constants
+error[E0391]: cycle detected when const-evaluating + checking `FOO`
   --> $DIR/issue-17252.rs:1:1
    |
 LL | const FOO: usize = FOO;
    | ^^^^^^^^^^^^^^^^^^^^^^^
-note: ...which requires simplifying constant for the type system `FOO`...
-  --> $DIR/issue-17252.rs:1:1
    |
-LL | const FOO: usize = FOO;
-   | ^^^^^^^^^^^^^^^^^^^^^^^
-note: ...which requires const-evaluating + checking `FOO`...
-  --> $DIR/issue-17252.rs:1:1
-   |
-LL | const FOO: usize = FOO;
-   | ^^^^^^^^^^^^^^^^^^^^^^^
-<<<<<<< HEAD
-   = note: ...which again requires normalizing `FOO`, completing the cycle
-||||||| parent of ab70bbeec72... Use ValTree in all type level constants
-   = note: ...which again requires simplifying constant for the type system `FOO`, completing the cycle
-=======
-   = note: ...which again requires evaluating constant for MIR opt/codegen `FOO`, completing the cycle
->>>>>>> ab70bbeec72... Use ValTree in all type level constants
+   = note: ...which again requires const-evaluating + checking `FOO`, completing the cycle
 note: cycle used when const-evaluating + checking `main::{constant#0}`
   --> $DIR/issue-17252.rs:4:18
    |

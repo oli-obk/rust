@@ -431,6 +431,10 @@ impl<'a, 'tcx> TypeFolder<'tcx> for RegionFolder<'a, 'tcx> {
             }
         }
     }
+
+    fn fold_mir_const(&mut self, constant: mir::ConstantKind<'tcx>) -> mir::ConstantKind<'tcx> {
+        constant.super_fold_with(self)
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////

@@ -1,54 +1,20 @@
-error[E0391]: cycle detected when evaluating constant for MIR opt/codegen `A`
+error[E0391]: cycle detected when const-evaluating + checking `A`
   --> $DIR/issue-23302-3.rs:1:1
    |
 LL | const A: i32 = B;
    | ^^^^^^^^^^^^^^^^^
    |
-note: ...which requires simplifying constant for the type system `A`...
-  --> $DIR/issue-23302-3.rs:1:1
-   |
-LL | const A: i32 = B;
-   | ^^^^^^^^^^^^^^^^^
-note: ...which requires const-evaluating + checking `A`...
-  --> $DIR/issue-23302-3.rs:1:1
-   |
-LL | const A: i32 = B;
-   | ^^^^^^^^^^^^^^^^^
-<<<<<<< HEAD
-   = note: ...which requires normalizing `B`...
-note: ...which requires simplifying constant for the type system `B`...
-||||||| parent of ab70bbeec72... Use ValTree in all type level constants
-note: ...which requires simplifying constant for the type system `B`...
-=======
-note: ...which requires evaluating constant for MIR opt/codegen `B`...
->>>>>>> ab70bbeec72... Use ValTree in all type level constants
-  --> $DIR/issue-23302-3.rs:3:1
-   |
-LL | const B: i32 = A;
-   | ^^^^^^^^^^^^^^^^^
-note: ...which requires simplifying constant for the type system `B`...
-  --> $DIR/issue-23302-3.rs:3:1
-   |
-LL | const B: i32 = A;
-   | ^^^^^^^^^^^^^^^^^
-<<<<<<< HEAD
 note: ...which requires const-evaluating + checking `B`...
   --> $DIR/issue-23302-3.rs:3:1
-||||||| parent of ab70bbeec72... Use ValTree in all type level constants
-   = note: ...which again requires simplifying constant for the type system `A`, completing the cycle
-note: cycle used when simplifying constant for the type system `A`
-  --> $DIR/issue-23302-3.rs:1:1
-=======
-   = note: ...which again requires evaluating constant for MIR opt/codegen `A`, completing the cycle
-note: cycle used when evaluating constant for MIR opt/codegen `A`
-  --> $DIR/issue-23302-3.rs:1:1
->>>>>>> ab70bbeec72... Use ValTree in all type level constants
    |
 LL | const B: i32 = A;
    | ^^^^^^^^^^^^^^^^^
-   = note: ...which requires normalizing `A`...
-   = note: ...which again requires simplifying constant for the type system `A`, completing the cycle
-   = note: cycle used when running analysis passes on this crate
+   = note: ...which again requires const-evaluating + checking `A`, completing the cycle
+note: cycle used when evaluating constant for MIR opt/codegen `A`
+  --> $DIR/issue-23302-3.rs:1:1
+   |
+LL | const A: i32 = B;
+   | ^^^^^^^^^^^^^^^^^
 
 error: aborting due to previous error
 

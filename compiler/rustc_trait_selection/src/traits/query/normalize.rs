@@ -217,6 +217,9 @@ impl<'cx, 'tcx> TypeFolder<'tcx> for QueryNormalizer<'cx, 'tcx> {
     }
 
     fn fold_mir_const(&mut self, constant: mir::ConstantKind<'tcx>) -> mir::ConstantKind<'tcx> {
-        constant.super_fold_with(self)
+        match constant {
+            mir::ConstantKind::Ty(ct) => mir::ConstantKind::Ty(ct.super_fold_with(self)),
+            mir::ConstantKind::Val(val, ty) => mir::ConstantKind::Val(val, ty.fold_with(self)),
+        }
     }
 }
