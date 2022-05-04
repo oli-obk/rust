@@ -241,6 +241,11 @@ impl<'ll> CodegenCx<'ll, '_> {
         }
     }
 
+    crate fn get_static_name(&self, def_id: DefId) -> &'tcx str {
+        let instance = Instance::mono(self.tcx, def_id);
+        self.tcx.symbol_name(instance).name
+    }
+
     crate fn get_static(&self, def_id: DefId) -> &'ll Value {
         let instance = Instance::mono(self.tcx, def_id);
         if let Some(&g) = self.instances.borrow().get(&instance) {
@@ -257,7 +262,7 @@ impl<'ll> CodegenCx<'ll, '_> {
         );
 
         let ty = instance.ty(self.tcx, ty::ParamEnv::reveal_all());
-        let sym = self.tcx.symbol_name(instance).name;
+        let sym = self.get_static_name(def_id);
         let fn_attrs = self.tcx.codegen_fn_attrs(def_id);
 
         debug!("get_static: sym={} instance={:?} fn_attrs={:?}", sym, instance, fn_attrs);

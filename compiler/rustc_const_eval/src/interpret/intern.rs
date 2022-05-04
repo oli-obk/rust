@@ -15,6 +15,7 @@
 //! that contains allocations whose mutability we cannot identify.)
 
 use super::validity::RefTracking;
+use hir::def_id::DefId;
 use rustc_data_structures::fx::{FxHashMap, FxHashSet};
 use rustc_errors::ErrorGuaranteed;
 use rustc_hir as hir;
@@ -48,6 +49,9 @@ struct InternVisitor<'rt, 'mir, 'tcx, M: CompileTimeMachine<'mir, 'tcx, const_ev
     /// A list of all encountered allocations. After type-based interning, we traverse this list to
     /// also intern allocations that are only referenced by a raw pointer or inside a union.
     leftover_allocations: &'rt mut FxHashSet<AllocId>,
+    /// A counter to generate ids for allocations. These are used to uniquely identify an allocation
+    /// that is part of a static item.
+    running_item_local_index: &'rt mut usize,
     /// The root kind of the value that we're looking at. This field is never mutated for a
     /// particular allocation. It is primarily used to make as many allocations as possible
     /// read-only so LLVM can place them in const memory.
@@ -62,7 +66,7 @@ enum InternMode {
     /// A static and its current mutability.  Below shared references inside a `static mut`,
     /// this is *immutable*, and below mutable references inside an `UnsafeCell`, this
     /// is *mutable*.
-    Static(hir::Mutability),
+    Static(hir::Mutability, DefId),
     /// A `const`.
     Const,
 }
@@ -80,6 +84,7 @@ struct IsStaticOrFn;
 fn intern_shallow<'rt, 'mir, 'tcx, M: CompileTimeMachine<'mir, 'tcx, const_eval::MemoryKind>>(
     ecx: &'rt mut InterpCx<'mir, 'tcx, M>,
     leftover_allocations: &'rt mut FxHashSet<AllocId>,
+    running_item_local_index: &mut usize,
     alloc_id: AllocId,
     mode: InternMode,
     ty: Option<Ty<'tcx>>,
@@ -111,7 +116,7 @@ fn intern_shallow<'rt, 'mir, 'tcx, M: CompileTimeMachine<'mir, 'tcx, const_eval:
     // Set allocation mutability as appropriate. This is used by LLVM to put things into
     // read-only memory, and also by Miri when evaluating other globals that
     // access this one.
-    if let InternMode::Static(mutability) = mode {
+    if let InternMode::Static(mutability, item) = mode {
         // For this, we need to take into account `UnsafeCell`. When `ty` is `None`, we assume
         // no interior mutability.
         let frozen = ty.map_or(true, |ty| ty.is_freeze(ecx.tcx, ecx.param_env));
@@ -125,6 +130,11 @@ fn intern_shallow<'rt, 'mir, 'tcx, M: CompileTimeMachine<'mir, 'tcx, const_eval:
             // Just making sure we are not "upgrading" an immutable allocation to mutable.
             assert_eq!(alloc.mutability, Mutability::Mut);
         }
+        // Part of a static (e.g. `static FOO: &&i32 = &&42;`). Make sure all pointers point to
+        // what essentially amounts to an "inline static". So unlike anonymous statics, these
+        // have names and thus don't get (de)duplicated.
+        alloc.extra = Some(StaticAllocation { item, local_index: *running_item_local_index });
+        *running_item_local_index += 1;
     } else {
         // No matter what, *constants are never mutable*. Mutating them is UB.
         // See const_eval::machine::MemoryExtra::can_access_statics for why
@@ -149,7 +159,14 @@ impl<'rt, 'mir, 'tcx, M: CompileTimeMachine<'mir, 'tcx, const_eval::MemoryKind>>
         mode: InternMode,
         ty: Option<Ty<'tcx>>,
     ) -> Option<IsStaticOrFn> {
-        intern_shallow(self.ecx, self.leftover_allocations, alloc_id, mode, ty)
+        intern_shallow(
+            self.ecx,
+            self.leftover_allocations,
+            self.running_item_local_index,
+            alloc_id,
+            mode,
+            ty,
+        )
     }
 }
 
@@ -220,7 +237,7 @@ impl<'rt, 'mir, 'tcx: 'mir, M: CompileTimeMachine<'mir, 'tcx, const_eval::Memory
                 // Compute the mode with which we intern this. Our goal here is to make as many
                 // statics as we can immutable so they can be placed in read-only memory by LLVM.
                 let ref_mode = match self.mode {
-                    InternMode::Static(mutbl) => {
+                    InternMode::Static(mutbl, item_id) => {
                         // In statics, merge outer mutability with reference mutability and
                         // take into account whether we are in an `UnsafeCell`.
 
@@ -233,7 +250,7 @@ impl<'rt, 'mir, 'tcx: 'mir, M: CompileTimeMachine<'mir, 'tcx, const_eval::Memory
                             _ if self.inside_unsafe_cell => {
                                 // Inside an `UnsafeCell` is like inside a `static mut`, the "outer"
                                 // mutability does not matter.
-                                InternMode::Static(ref_mutability)
+                                InternMode::Static(ref_mutability, item_id)
                             }
                             Mutability::Not => {
                                 // A shared reference, things become immutable.
@@ -244,11 +261,11 @@ impl<'rt, 'mir, 'tcx: 'mir, M: CompileTimeMachine<'mir, 'tcx, const_eval::Memory
                                 // `UnsafeCell`). This makes sure that `&(&i32, &Cell<i32>)` still
                                 // has the left inner reference interned into a read-only
                                 // allocation.
-                                InternMode::Static(Mutability::Not)
+                                InternMode::Static(Mutability::Not, item_id)
                             }
                             Mutability::Mut => {
                                 // Mutable reference.
-                                InternMode::Static(mutbl)
+                                InternMode::Static(mutbl, item_id)
                             }
                         }
                     }
@@ -280,7 +297,7 @@ impl<'rt, 'mir, 'tcx: 'mir, M: CompileTimeMachine<'mir, 'tcx, const_eval::Memory
 #[derive(Copy, Clone, Debug, PartialEq, Hash, Eq)]
 pub enum InternKind {
     /// The `mutability` of the static, ignoring the type which may have interior mutability.
-    Static(hir::Mutability),
+    Static(hir::Mutability, DefId),
     Constant,
     Promoted,
 }
@@ -303,7 +320,7 @@ pub fn intern_const_alloc_recursive<
 ) -> Result<(), ErrorGuaranteed> {
     let tcx = ecx.tcx;
     let base_intern_mode = match intern_kind {
-        InternKind::Static(mutbl) => InternMode::Static(mutbl),
+        InternKind::Static(mutbl, item_id) => InternMode::Static(mutbl, item_id),
         // `Constant` includes array lengths.
         InternKind::Constant | InternKind::Promoted => InternMode::Const,
     };
@@ -315,11 +332,13 @@ pub fn intern_const_alloc_recursive<
     // be available in a typed way. They get interned at the end.
     let mut ref_tracking = RefTracking::empty();
     let leftover_allocations = &mut FxHashSet::default();
+    let mut running_item_local_index = 0;
 
     // start with the outermost allocation
     intern_shallow(
         ecx,
         leftover_allocations,
+        &mut running_item_local_index,
         // The outermost allocation must exist, because we allocated it with
         // `Memory::allocate`.
         ret.ptr.provenance.unwrap(),
@@ -336,6 +355,7 @@ pub fn intern_const_alloc_recursive<
             mode,
             leftover_allocations,
             inside_unsafe_cell: false,
+            running_item_local_index: &mut running_item_local_index,
         }
         .visit_value(&mplace);
         // We deliberately *ignore* interpreter errors here.  When there is a problem, the remaining
@@ -370,7 +390,11 @@ pub fn intern_const_alloc_recursive<
                 // Statics may contain mutable allocations even behind relocations.
                 // Even for immutable statics it would be ok to have mutable allocations behind
                 // raw pointers, e.g. for `static FOO: *const AtomicUsize = &AtomicUsize::new(42)`.
-                InternKind::Static(_) => {}
+                InternKind::Static(_, item) => {
+                    alloc.extra =
+                        Some(StaticAllocation { item, local_index: running_item_local_index });
+                    running_item_local_index += 1;
+                }
                 // Raw pointers in promoteds may only point to immutable things so we mark
                 // everything as immutable.
                 // It is UB to mutate through a raw pointer obtained via an immutable reference:

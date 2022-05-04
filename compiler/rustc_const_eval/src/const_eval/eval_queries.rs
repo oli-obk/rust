@@ -72,7 +72,7 @@ fn eval_body_using_ecx<'mir, 'tcx>(
         InternKind::Promoted
     } else {
         match tcx.static_mutability(cid.instance.def_id()) {
-            Some(m) => InternKind::Static(m),
+            Some(m) => InternKind::Static(m, cid.instance.def_id()),
             None => InternKind::Constant,
         }
     };
