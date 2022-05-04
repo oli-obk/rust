@@ -10,6 +10,7 @@ use std::ptr;
 use rustc_ast::Mutability;
 use rustc_data_structures::intern::Interned;
 use rustc_data_structures::sorted_map::SortedMap;
+use rustc_hir::def_id::DefId;
 use rustc_span::DUMMY_SP;
 use rustc_target::abi::{Align, HasDataLayout, Size};
 
@@ -20,6 +21,17 @@ use super::{
 };
 use crate::ty;
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Hash, TyEncodable, TyDecodable)]
+#[derive(HashStable)]
+/// Allocations inside statics must not get (de)duplicated. So we mark them with the static
+/// that they are part of and a running item-local index. This allows backends to give
+/// these allocations generated unique names, just like with the main static item.
+
+pub struct StaticAllocation {
+    pub item: DefId,
+    pub local_index: usize,
+}
+
 /// This type represents an Allocation in the Miri/CTFE core engine.
 ///
 /// Its public API is rather low-level, working directly with allocation offsets and a custom error
@@ -27,7 +39,7 @@ use crate::ty;
 /// module provides higher-level access.
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Hash, TyEncodable, TyDecodable)]
 #[derive(HashStable)]
-pub struct Allocation<Tag = AllocId, Extra = ()> {
+pub struct Allocation<Tag = AllocId, Extra = Option<StaticAllocation>> {
     /// The actual bytes of the allocation.
     /// Note that the bytes of a pointer represent the offset of the pointer.
     bytes: Box<[u8]>,
@@ -59,7 +71,7 @@ pub struct Allocation<Tag = AllocId, Extra = ()> {
 /// (`ConstAllocation`) are used quite a bit.
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, HashStable)]
 #[rustc_pass_by_value]
-pub struct ConstAllocation<'tcx, Tag = AllocId, Extra = ()>(
+pub struct ConstAllocation<'tcx, Tag = AllocId, Extra = Option<StaticAllocation>>(
     pub Interned<'tcx, Allocation<Tag, Extra>>,
 );
 
@@ -161,7 +173,7 @@ impl<Tag> Allocation<Tag> {
             init_mask: InitMask::new(size, true),
             align,
             mutability,
-            extra: (),
+            extra: None,
         }
     }
 
@@ -194,7 +206,7 @@ impl<Tag> Allocation<Tag> {
             init_mask: InitMask::new(size, false),
             align,
             mutability: Mutability::Mut,
-            extra: (),
+            extra: None,
         })
     }
 }

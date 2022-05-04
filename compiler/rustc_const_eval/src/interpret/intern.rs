@@ -18,7 +18,7 @@ use super::validity::RefTracking;
 use rustc_data_structures::fx::{FxHashMap, FxHashSet};
 use rustc_errors::ErrorGuaranteed;
 use rustc_hir as hir;
-use rustc_middle::mir::interpret::InterpResult;
+use rustc_middle::mir::interpret::{InterpResult, StaticAllocation};
 use rustc_middle::ty::{self, layout::TyAndLayout, Ty};
 
 use rustc_ast::Mutability;
@@ -36,7 +36,7 @@ pub trait CompileTimeMachine<'mir, 'tcx, T> = Machine<
     PointerTag = AllocId,
     ExtraFnVal = !,
     FrameExtra = (),
-    AllocExtra = (),
+    AllocExtra = Option<StaticAllocation>,
     MemoryMap = FxHashMap<AllocId, (MemoryKind<T>, Allocation)>,
 >;
 
