@@ -4,6 +4,7 @@ use rustc_target::abi::Align;
 
 pub trait StaticMethods: BackendTypes {
     fn static_addr_of(&self, cv: Self::Value, align: Align, kind: Option<&str>) -> Self::Value;
+    fn set_value_name(&self, cv: Self::Value, name: &str);
     fn codegen_static(&self, def_id: DefId, is_mutable: bool);
 
     /// Mark the given global value as "used", to prevent the compiler and linker from potentially

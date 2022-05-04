@@ -247,7 +247,7 @@ impl<'ll, 'tcx> ConstMethods<'tcx> for CodegenCx<'ll, 'tcx> {
                             _ => self.static_addr_of(init, alloc.align, None),
                         };
                         if !self.sess().fewer_names() {
-                            llvm::set_value_name(value, format!("{:?}", alloc_id).as_bytes());
+                            self.set_value_name(value, &format!("{:?}", alloc_id));
                         }
                         (value, AddressSpace::DATA)
                     }

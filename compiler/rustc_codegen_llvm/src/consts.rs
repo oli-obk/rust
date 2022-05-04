@@ -224,7 +224,7 @@ impl<'ll> CodegenCx<'ll, '_> {
     ) -> &'ll Value {
         unsafe {
             let gv = match kind {
-                Some(kind) if !self.tcx.sess.fewer_names() => {
+                Some(kind) => {
                     let name = self.generate_local_symbol_name(kind);
                     let gv = self.define_global(&name, self.val_ty(cv)).unwrap_or_else(|| {
                         bug!("symbol `{}` is already defined", name);
@@ -346,6 +346,10 @@ impl<'ll> CodegenCx<'ll, '_> {
 }
 
 impl<'ll> StaticMethods for CodegenCx<'ll, '_> {
+    fn set_value_name(&self, cv: Self::Value, name: &str) {
+        crate::llvm::set_value_name(cv, name.as_bytes())
+    }
+
     fn static_addr_of(&self, cv: &'ll Value, align: Align, kind: Option<&str>) -> &'ll Value {
         if let Some(&gv) = self.const_globals.borrow().get(&cv) {
             unsafe {
