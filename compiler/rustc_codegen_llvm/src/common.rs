@@ -11,7 +11,7 @@ use rustc_ast::Mutability;
 use rustc_codegen_ssa::mir::place::PlaceRef;
 use rustc_codegen_ssa::traits::*;
 use rustc_middle::bug;
-use rustc_middle::mir::interpret::{ConstAllocation, GlobalAlloc, Scalar};
+use rustc_middle::mir::interpret::{ConstAllocation, GlobalAlloc, Scalar, StaticAllocation};
 use rustc_middle::ty::layout::{LayoutOf, TyAndLayout};
 use rustc_middle::ty::ScalarInt;
 use rustc_span::symbol::Symbol;
@@ -242,8 +242,9 @@ impl<'ll, 'tcx> ConstMethods<'tcx> for CodegenCx<'ll, 'tcx> {
                     GlobalAlloc::Memory(alloc) => {
                         let init = const_alloc_to_llvm(self, alloc);
                         let alloc = alloc.inner();
-                        let name = alloc.extra.map(|(item, idx)| {
-                            let item_name = self.get_static_name(item);
+                        let name = alloc.extra.map(|salloc: StaticAllocation| {
+                            let item_name = self.get_static_name(salloc.item);
+                            let idx = salloc.local_index;
                             format!("{item_name}[{idx}]")
                         });
                         let name = name.as_deref();

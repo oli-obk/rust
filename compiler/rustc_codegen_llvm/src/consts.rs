@@ -241,7 +241,7 @@ impl<'ll> CodegenCx<'ll, '_> {
         }
     }
 
-    crate fn get_static_name(&self, def_id: DefId) -> &'tcx str {
+    crate fn get_static_name(&self, def_id: DefId) -> &'_ str {
         let instance = Instance::mono(self.tcx, def_id);
         self.tcx.symbol_name(instance).name
     }
