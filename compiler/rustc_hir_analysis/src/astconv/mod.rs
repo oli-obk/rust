@@ -2705,47 +2705,46 @@ impl<'o, 'tcx> dyn AstConv<'tcx> + 'o {
         origin: OpaqueTyOrigin,
         in_trait: bool,
     ) -> Ty<'tcx> {
-        debug!("impl_trait_ty_to_ty(def_id={:?}, lifetimes={:?})", def_id, lifetimes);
         let tcx = self.tcx();
 
         let generics = tcx.generics_of(def_id);
 
-        debug!("impl_trait_ty_to_ty: generics={:?}", generics);
-        let substs = InternalSubsts::for_item(tcx, def_id, |param, _| {
-            if let Some(i) = (param.index as usize).checked_sub(generics.parent_count) {
-                // Our own parameters are the resolved lifetimes.
-                if let GenericParamDefKind::Lifetime = param.kind {
-                    if let hir::GenericArg::Lifetime(lifetime) = &lifetimes[i] {
-                        self.ast_region_to_region(lifetime, None).into()
+        let substs = if matches!(
+            origin,
+            hir::OpaqueTyOrigin::FnReturn(..) | hir::OpaqueTyOrigin::AsyncFn(..)
+        ) {
+            // For RPIT (return position impl trait), only lifetimes
+            // mentioned in the impl Trait predicate are captured by
+            // the opaque type, so the lifetime parameters from the
+            // parent item need to be replaced with `'static`.
+            //
+            // For `impl Trait` in the types of statics, constants,
+            // locals and type aliases. These capture all parent
+            // lifetimes, so they can use their identity subst.
+            InternalSubsts::for_item(tcx, def_id, |param, _| {
+                if let Some(i) = (param.index as usize).checked_sub(generics.parent_count) {
+                    // Our own parameters are the resolved lifetimes.
+                    if let GenericParamDefKind::Lifetime = param.kind {
+                        if let hir::GenericArg::Lifetime(lifetime) = &lifetimes[i] {
+                            self.ast_region_to_region(lifetime, None).into()
+                        } else {
+                            bug!()
+                        }
                     } else {
                         bug!()
                     }
                 } else {
-                    bug!()
-                }
-            } else {
-                match param.kind {
-                    // For RPIT (return position impl trait), only lifetimes
-                    // mentioned in the impl Trait predicate are captured by
-                    // the opaque type, so the lifetime parameters from the
-                    // parent item need to be replaced with `'static`.
-                    //
-                    // For `impl Trait` in the types of statics, constants,
-                    // locals and type aliases. These capture all parent
-                    // lifetimes, so they can use their identity subst.
-                    GenericParamDefKind::Lifetime
-                        if matches!(
-                            origin,
-                            hir::OpaqueTyOrigin::FnReturn(..) | hir::OpaqueTyOrigin::AsyncFn(..)
-                        ) =>
-                    {
-                        tcx.lifetimes.re_static.into()
+                    match param.kind {
+                        GenericParamDefKind::Lifetime => tcx.lifetimes.re_static.into(),
+                        _ => tcx.mk_param_from_def(param),
                     }
-                    _ => tcx.mk_param_from_def(param),
                 }
-            }
-        });
-        debug!("impl_trait_ty_to_ty: substs={:?}", substs);
+            })
+        } else {
+            assert!(lifetimes.is_empty(), "{:#?}", lifetimes);
+            InternalSubsts::for_item(tcx, def_id, |param, _| tcx.mk_param_from_def(param))
+        };
+        debug!(?substs);
 
         if in_trait { tcx.mk_projection(def_id, substs) } else { tcx.mk_opaque(def_id, substs) }
     }

@@ -420,6 +420,7 @@ impl<T> Lock<T> {
 
     #[cfg(not(parallel_compiler))]
     #[inline(always)]
+    #[track_caller]
     pub fn lock(&self) -> LockGuard<'_, T> {
         self.0.borrow_mut()
     }

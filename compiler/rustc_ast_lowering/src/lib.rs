@@ -1463,7 +1463,7 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
         // to capture the lifetimes that appear in the bounds. So visit the bounds to find out
         // exactly which ones those are.
         let lifetimes_to_remap = if origin == hir::OpaqueTyOrigin::TyAlias {
-            // in a TAIT like `type Foo<'a> = impl Foo<'a>`, we don't keep all the lifetime parameters
+            // in a TAIT like `type Foo<'a> = impl Foo<'a>`, we handle this in the generics_of query
             Vec::new()
         } else {
             // in fn return position, like the `fn test<'a>() -> impl Debug + 'a` example,

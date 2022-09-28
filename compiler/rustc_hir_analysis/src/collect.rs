@@ -20,6 +20,7 @@ use crate::check::intrinsic::intrinsic_operation_unsafety;
 use crate::constrained_generic_params as cgp;
 use crate::errors;
 use crate::middle::resolve_lifetime as rl;
+use hir::definitions::DefPathData;
 use rustc_ast as ast;
 use rustc_ast::{MetaItemKind, NestedMetaItem};
 use rustc_attr::{list_contains_name, InlineAttr, InstructionSetAttr, OptimizeAttr};
@@ -1599,8 +1600,10 @@ fn generics_of(tcx: TyCtxt<'_>, def_id: DefId) -> ty::Generics {
                 let parent_id = tcx.hir().get_parent_item(hir_id);
                 assert_ne!(parent_id, hir::CRATE_OWNER_ID);
                 debug!("generics_of: parent of opaque ty {:?} is {:?}", def_id, parent_id);
-                // Opaque types are always nested within another item, and
-                // inherit the generics of the item.
+                // Opaque types are always nested within a type alias or associated type,
+                // so we need to get the parent's parent for parent generics.
+                let parent_hir_id = tcx.hir().local_def_id_to_hir_id(parent_id.def_id);
+                let parent_id = tcx.hir().get_parent_item(parent_hir_id);
                 Some(parent_id.to_def_id())
             }
             _ => None,
@@ -1657,6 +1660,42 @@ fn generics_of(tcx: TyCtxt<'_>, def_id: DefId) -> ty::Generics {
 
         _ => (None, Defaults::FutureCompatDisallowed),
     };
+
+    // Some types (like TAITs) are nominally children, but we don't want to have a parent
+    // relationship for generics, as we don't want to capture all generics.
+    let modified_fake_parent_generics: Vec<_> = match node {
+        Node::Item(item) => match item.kind {
+            // Example:
+            // ```rust
+            // type Foo<'a, 'b> = (impl Sized + 'a, &'b ());
+            // ```
+            // should only have `'a` in the opaque type's generics list.
+            ItemKind::OpaqueTy(OpaqueTy { origin: OpaqueTyOrigin::TyAlias, bounds, .. }) => {
+                let parent_id = tcx.hir().get_parent_item(hir_id);
+                assert!(ast_generics.params.is_empty(), "{:#?}", ast_generics.params);
+                assert!(ast_generics.predicates.is_empty(), "{:#?}", ast_generics.predicates);
+
+                let lifetimes = all_mentioned_lifetimes_on_opaque_type_bounds(bounds);
+                let params = &tcx.generics_of(parent_id.to_def_id()).params;
+                params
+                    .iter()
+                    .filter_map(|param| {
+                        // Filter out lifetimes that do not appear in the opaque type bounds
+                        if matches!(param.kind, ty::GenericParamDefKind::Lifetime)
+                            && !lifetimes.contains(&param.def_id.expect_local())
+                        {
+                            None
+                        } else {
+                            Some(param)
+                        }
+                    })
+                    .collect()
+            }
+            _ => vec![],
+        },
+        _ => vec![],
+    };
+    trace!(?modified_fake_parent_generics);
 
     let has_self = opt_self.is_some();
     let mut parent_has_self = false;
@@ -1748,6 +1787,30 @@ fn generics_of(tcx: TyCtxt<'_>, def_id: DefId) -> ty::Generics {
         }
     }));
 
+    if !modified_fake_parent_generics.is_empty() {
+        assert!(params.is_empty());
+    }
+
+    for param in modified_fake_parent_generics {
+        let parent_def_id = parent_def_id.unwrap().expect_local();
+        // FIXME: should we use `tcx.def_path_data` on the original instead?
+        let data = match param.kind {
+            ty::GenericParamDefKind::Lifetime => DefPathData::LifetimeNs(param.name),
+            ty::GenericParamDefKind::Type { .. } => DefPathData::TypeNs(param.name),
+            ty::GenericParamDefKind::Const { .. } => DefPathData::ValueNs(param.name),
+        };
+        let def_id = tcx.create_def(parent_def_id, data).to_def_id();
+        let param_def = ty::GenericParamDef {
+            index: type_start + i as u32,
+            name: param.name,
+            def_id,
+            pure_wrt_drop: param.pure_wrt_drop,
+            kind: param.kind.clone(),
+        };
+        i += 1;
+        params.push(param_def);
+    }
+
     // provide junk type parameter defs - the only place that
     // cares about anything but the length is instantiation,
     // and we don't do that for closures.
@@ -1795,6 +1858,27 @@ fn generics_of(tcx: TyCtxt<'_>, def_id: DefId) -> ty::Generics {
         has_self: has_self || parent_has_self,
         has_late_bound_regions: has_late_bound_regions(tcx, node),
     }
+}
+
+fn all_mentioned_lifetimes_on_opaque_type_bounds(
+    bounds: &[hir::GenericBound<'_>],
+) -> FxHashSet<LocalDefId> {
+    #[derive(Default)]
+    struct LifetimeCollector {
+        set: FxHashSet<LocalDefId>,
+    }
+    impl<'v> hir::intravisit::Visitor<'v> for LifetimeCollector {
+        fn visit_lifetime(&mut self, lifetime: &'v hir::Lifetime) {
+            if let hir::LifetimeName::Param(did, _) = lifetime.name {
+                self.set.insert(did);
+            }
+        }
+    }
+    let mut collector = LifetimeCollector::default();
+    for bound in bounds {
+        collector.visit_param_bound(bound);
+    }
+    collector.set
 }
 
 fn are_suggestable_generic_args(generic_args: &[hir::GenericArg<'_>]) -> bool {
