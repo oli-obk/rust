@@ -318,6 +318,8 @@ pub struct CommonLifetimes<'tcx> {
 
 pub struct CommonConsts<'tcx> {
     pub unit: Const<'tcx>,
+    pub true_: Const<'tcx>,
+    pub false_: Const<'tcx>,
 }
 
 impl<'tcx> CommonTypes<'tcx> {
@@ -417,6 +419,14 @@ impl<'tcx> CommonConsts<'tcx> {
             unit: mk_const(ty::ConstData {
                 kind: ty::ConstKind::Value(ty::ValTree::zst()),
                 ty: types.unit,
+            }),
+            true_: mk_const(ty::ConstData {
+                kind: ty::ConstKind::Value(ty::ValTree::Leaf(ty::ScalarInt::TRUE)),
+                ty: types.bool,
+            }),
+            false_: mk_const(ty::ConstData {
+                kind: ty::ConstKind::Value(ty::ValTree::Leaf(ty::ScalarInt::FALSE)),
+                ty: types.bool,
             }),
         }
     }
@@ -834,6 +844,17 @@ impl<'tcx> TyCtxt<'tcx> {
 
     pub fn features(self) -> &'tcx rustc_feature::Features {
         self.features_query(())
+    }
+
+    #[inline(always)]
+    pub fn effects(self) -> bool {
+        self.features().effects
+            || (cfg!(debug_assertions) && std::env::var_os("RUSTC_ENABLE_EFFECTS").is_some())
+    }
+
+    /// A helper while effects are not enabled unconditionally.
+    pub fn host_effect(self) -> Option<ty::GenericArg<'tcx>> {
+        self.effects().then_some(self.consts.true_.into())
     }
 
     pub fn def_key(self, id: DefId) -> rustc_hir::definitions::DefKey {
@@ -2274,6 +2295,7 @@ impl<'tcx> TyCtxt<'tcx> {
         T::collect_and_apply(iter, |xs| self.mk_place_elems(xs))
     }
 
+    /// Create the substitutions for a trait and its generic params.
     pub fn mk_substs_trait(
         self,
         self_ty: Ty<'tcx>,
@@ -2282,6 +2304,7 @@ impl<'tcx> TyCtxt<'tcx> {
         self.mk_substs_from_iter(iter::once(self_ty.into()).chain(rest))
     }
 
+    #[track_caller]
     pub fn mk_trait_ref(
         self,
         trait_def_id: DefId,
@@ -2398,6 +2421,52 @@ impl<'tcx> TyCtxt<'tcx> {
                     bug!("No bound vars found for {}", self.hir().node_to_string(id))
                 }),
         )
+    }
+
+    pub fn effect_from_context(self, def_id: DefId, kind: Symbol) -> Result<ty::ParamConst, bool> {
+        match self.generics_of(def_id).effect_param(kind, self) {
+            Some(param) => Ok(ty::ParamConst::new(param.index, param.name)),
+            None => Err(match kind {
+                sym::host => match self.def_kind(def_id) {
+                    // These would have picked up the effect via generics.
+                    // We only need to do something here if we get always-const functions.
+                    DefKind::AssocFn | DefKind::Fn => true,
+                    // Host effects are always off in consts
+                    DefKind::Static(_)
+                    | DefKind::AnonConst
+                    | DefKind::Const
+                    | DefKind::AssocConst
+                    | DefKind::InlineConst
+                    | DefKind::ConstParam => false,
+
+                    DefKind::Mod
+                    | DefKind::Struct
+                    | DefKind::Union
+                    | DefKind::Enum
+                    | DefKind::Variant
+                    | DefKind::Trait
+                    | DefKind::TyAlias
+                    | DefKind::ForeignTy
+                    | DefKind::TraitAlias
+                    | DefKind::AssocTy
+                    | DefKind::TyParam
+                    | DefKind::Ctor(_, _)
+                    | DefKind::Macro(_)
+                    | DefKind::ExternCrate
+                    | DefKind::Use
+                    | DefKind::ForeignMod
+                    | DefKind::OpaqueTy
+                    | DefKind::ImplTraitPlaceholder
+                    | DefKind::Field
+                    | DefKind::LifetimeParam
+                    | DefKind::GlobalAsm
+                    | DefKind::Impl { .. }
+                    | DefKind::Closure
+                    | DefKind::Generator => unreachable!(),
+                },
+                _ => unreachable!(),
+            }),
+        }
     }
 
     /// Whether the `def_id` counts as const fn in the current crate, considering all active

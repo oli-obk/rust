@@ -344,7 +344,7 @@ where
     type Output = <[T] as Index<I>>::Output;
 
     #[inline]
-    fn index(&self, index: I) -> &Self::Output {
+    fn index(&self, index: I) -> &<[T] as Index<I>>::Output {
         Index::index(self as &[T], index)
     }
 }
@@ -356,7 +356,7 @@ where
     [T]: ~const IndexMut<I>,
 {
     #[inline]
-    fn index_mut(&mut self, index: I) -> &mut Self::Output {
+    fn index_mut(&mut self, index: I) -> &mut <[T] as Index<I>>::Output {
         IndexMut::index_mut(self as &mut [T], index)
     }
 }

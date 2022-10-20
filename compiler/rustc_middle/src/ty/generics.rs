@@ -215,6 +215,22 @@ impl<'tcx> Generics {
         }
         false
     }
+    /// Returns the `GenericParamDef` associated with the effect param (if any).
+    pub fn effect_param(
+        &'tcx self,
+        effect_kind: Symbol,
+        tcx: TyCtxt<'tcx>,
+    ) -> Option<&GenericParamDef> {
+        // FIXME: what if the param shows up twice? e.g. in the parent and the item itself
+        self.params
+            .iter()
+            .rev()
+            .find(|pred| match pred.kind {
+                GenericParamDefKind::Const { .. } => pred.name == effect_kind,
+                _ => false,
+            })
+            .or_else(|| tcx.generics_of(self.parent?).effect_param(effect_kind, tcx))
+    }
 
     /// Returns the `GenericParamDef` with the given index.
     pub fn param_at(&'tcx self, param_index: usize, tcx: TyCtxt<'tcx>) -> &'tcx GenericParamDef {
