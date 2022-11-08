@@ -1336,12 +1336,10 @@ impl<'a, 'tcx> TypeChecker<'a, 'tcx> {
             | StatementKind::StorageDead(..)
             | StatementKind::Retag { .. }
             | StatementKind::Coverage(..)
-            | StatementKind::Nop => {}
-            StatementKind::Finalize(..)
+            | StatementKind::Nop
+            | StatementKind::Finalize(..)
             | StatementKind::Deinit(..)
-            | StatementKind::SetDiscriminant { .. } => {
-                bug!("Statement not allowed in this MIR phase")
-            }
+            | StatementKind::SetDiscriminant { .. } => {}
         }
     }
 

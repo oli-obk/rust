@@ -591,13 +591,13 @@ struct MirBorrowckCtxt<'cx, 'tcx> {
 impl<'cx, 'tcx> rustc_mir_dataflow::ResultsVisitor<'cx, 'tcx> for MirBorrowckCtxt<'cx, 'tcx> {
     type FlowState = Flows<'cx, 'tcx>;
 
+    #[instrument(level = "debug", skip(self))]
     fn visit_statement_before_primary_effect(
         &mut self,
         flow_state: &Flows<'cx, 'tcx>,
         stmt: &'cx Statement<'tcx>,
         location: Location,
     ) {
-        debug!("MirBorrowckCtxt::process_statement({:?}, {:?}): {:?}", location, stmt, flow_state);
         let span = stmt.source_info.span;
 
         self.check_activations(location, span, flow_state);
@@ -651,21 +651,28 @@ impl<'cx, 'tcx> rustc_mir_dataflow::ResultsVisitor<'cx, 'tcx> for MirBorrowckCtx
                     flow_state,
                 );
             }
-            StatementKind::Finalize(..)
-            | StatementKind::Deinit(..)
-            | StatementKind::SetDiscriminant { .. } => {
-                bug!("Statement not allowed in this MIR phase")
+            StatementKind::Finalize(box place) => {
+                self.access_place(
+                    location,
+                    (*place, span),
+                    (Shallow(None), Write(WriteKind::Mutate)),
+                    LocalMutationIsAllowed::No,
+                    flow_state,
+                );
+            }
+            StatementKind::Deinit(..) | StatementKind::SetDiscriminant { .. } => {
+                // no borrowck relevant behaviour here
             }
         }
     }
 
+    #[instrument(level = "debug", skip(self))]
     fn visit_terminator_before_primary_effect(
         &mut self,
         flow_state: &Flows<'cx, 'tcx>,
         term: &'cx Terminator<'tcx>,
         loc: Location,
     ) {
-        debug!("MirBorrowckCtxt::process_terminator({:?}, {:?}): {:?}", loc, term, flow_state);
         let span = term.source_info.span;
 
         self.check_activations(loc, span, flow_state);
@@ -675,11 +682,7 @@ impl<'cx, 'tcx> rustc_mir_dataflow::ResultsVisitor<'cx, 'tcx> for MirBorrowckCtx
                 self.consume_operand(loc, (discr, span), flow_state);
             }
             TerminatorKind::Drop { place, target: _, unwind: _ } => {
-                debug!(
-                    "visit_terminator_drop \
-                     loc: {:?} term: {:?} place: {:?} span: {:?}",
-                    loc, term, place, span
-                );
+                debug!(?loc, ?term, ?place, ?span, "drop");
 
                 self.access_place(
                     loc,
@@ -1010,6 +1013,7 @@ impl<'cx, 'tcx> MirBorrowckCtxt<'cx, 'tcx> {
         }
     }
 
+    #[instrument(level = "debug", skip(self, flow_state))]
     fn check_access_for_conflict(
         &mut self,
         location: Location,
@@ -1018,11 +1022,6 @@ impl<'cx, 'tcx> MirBorrowckCtxt<'cx, 'tcx> {
         rw: ReadOrWrite,
         flow_state: &Flows<'cx, 'tcx>,
     ) -> bool {
-        debug!(
-            "check_access_for_conflict(location={:?}, place_span={:?}, sd={:?}, rw={:?})",
-            location, place_span, sd, rw,
-        );
-
         let mut error_reported = false;
         let tcx = self.infcx.tcx;
         let body = self.body;

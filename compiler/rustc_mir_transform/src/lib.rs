@@ -278,6 +278,7 @@ fn mir_promoted<'tcx>(
             &promote_pass,
             &simplify::SimplifyCfg::new("promote-consts"),
             &coverage::InstrumentCoverage,
+            &deaggregator::Deaggregator { skip_closures: true },
         ],
     );
 
@@ -394,7 +395,7 @@ fn mir_drops_elaborated_and_const_checked<'tcx>(
             &remove_false_edges::RemoveFalseEdges,
             // `Deaggregator` is conceptually part of MIR building, some backends rely on it happening
             // and it can help optimizations.
-            &deaggregator::Deaggregator,
+            &deaggregator::Deaggregator { skip_closures: false },
         ],
     );
     assert!(body.phase == MirPhase::Deaggregated);
@@ -567,7 +568,7 @@ fn promoted_mir<'tcx>(
         if let Some(error_reported) = tainted_by_errors {
             body.tainted_by_errors = Some(error_reported);
         }
-        pm::run_passes(tcx, body, &[&deaggregator::Deaggregator]);
+        pm::run_passes(tcx, body, &[&deaggregator::Deaggregator { skip_closures: false }]);
         run_post_borrowck_cleanup_passes(tcx, body);
     }
 

@@ -3,11 +3,17 @@ use crate::MirPass;
 use rustc_middle::mir::*;
 use rustc_middle::ty::TyCtxt;
 
-pub struct Deaggregator;
+pub struct Deaggregator {
+    pub skip_closures: bool,
+}
 
 impl<'tcx> MirPass<'tcx> for Deaggregator {
     fn phase_change(&self) -> Option<MirPhase> {
-        Some(MirPhase::Deaggregated)
+        if self.skip_closures {
+            Some(MirPhase::DeaggregatedNonClosures)
+        } else {
+            Some(MirPhase::Deaggregated)
+        }
     }
 
     fn run_pass(&self, tcx: TyCtxt<'tcx>, body: &mut Body<'tcx>) {
@@ -24,6 +30,13 @@ impl<'tcx> MirPass<'tcx> for Deaggregator {
                     )) => {
                         return None;
                     }
+                    // FIMXE: closures have lots of hacks in borrowck, maybe they will go away with deaggregation?
+                    // Either way, skip them for now, as the changes would be big and I want to do them cleanly in
+                    // a separate PR.
+                    StatementKind::Assign(box (
+                        _,
+                        Rvalue::Aggregate(box AggregateKind::Closure(..), _),
+                    )) if self.skip_closures => return None,
                     StatementKind::Assign(box (_, Rvalue::Aggregate(_, _))) => {}
                     _ => return None,
                 }

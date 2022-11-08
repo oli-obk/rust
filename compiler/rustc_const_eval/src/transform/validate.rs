@@ -265,8 +265,9 @@ impl<'a, 'tcx> Visitor<'tcx> for TypeChecker<'a, 'tcx> {
             Rvalue::Aggregate(agg_kind, _) => {
                 let disallowed = match **agg_kind {
                     AggregateKind::Array(..) => false,
+                    AggregateKind::Closure(..) => self.mir_phase >= MirPhase::Deaggregated,
                     AggregateKind::Generator(..) => self.mir_phase >= MirPhase::GeneratorsLowered,
-                    _ => self.mir_phase >= MirPhase::Deaggregated,
+                    _ => self.mir_phase >= MirPhase::DeaggregatedNonClosures,
                 };
                 if disallowed {
                     self.fail(

@@ -154,6 +154,12 @@ pub enum MirPhase {
     /// of the `mir_promoted` query), these promoted elements are available in the `promoted_mir`
     /// query.
     ConstsPromoted = 2,
+    /// Beginning with this phase, the following variant is disallowed:
+    /// * [`Rvalue::Aggregate`] for any `AggregateKind` except `Array`
+    ///
+    /// And the following variant is allowed:
+    /// * [`StatementKind::SetDiscriminant`]
+    DeaggregatedNonClosures = 3,
     /// Beginning with this phase, the following variants are disallowed:
     /// * [`TerminatorKind::DropAndReplace`](terminator::TerminatorKind::DropAndReplace)
     /// * [`TerminatorKind::FalseUnwind`](terminator::TerminatorKind::FalseUnwind)
@@ -168,13 +174,13 @@ pub enum MirPhase {
     /// Furthermore, `Drop` now uses explicit drop flags visible in the MIR and reaching a `Drop`
     /// terminator means that the auto-generated drop glue will be invoked. Also, `Copy` operands
     /// are allowed for non-`Copy` types.
-    DropsLowered = 4,
+    DropsLowered = 5,
     /// Beginning with this phase, the following variant is disallowed:
     /// * [`Rvalue::Aggregate`] for any `AggregateKind` except `Array`
     ///
     /// And the following variant is allowed:
     /// * [`StatementKind::SetDiscriminant`]
-    Deaggregated = 3,
+    Deaggregated = 4,
     /// Before this phase, generators are in the "source code" form, featuring `yield` statements
     /// and such. With this phase change, they are transformed into a proper state machine. Running
     /// optimizations before this change can be potentially dangerous because the source code is to
@@ -188,8 +194,8 @@ pub enum MirPhase {
     /// Beginning with this phase, the following variants are disallowed:
     /// * [`TerminatorKind::Yield`](terminator::TerminatorKind::Yield)
     /// * [`TerminatorKind::GeneratorDrop](terminator::TerminatorKind::GeneratorDrop)
-    GeneratorsLowered = 5,
-    Optimized = 6,
+    GeneratorsLowered = 6,
+    Optimized = 7,
 }
 
 impl MirPhase {
