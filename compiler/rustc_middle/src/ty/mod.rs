@@ -648,7 +648,9 @@ impl rustc_errors::IntoDiagnosticArg for Predicate<'_> {
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, TyEncodable, TyDecodable)]
 #[derive(HashStable, TypeFoldable, TypeVisitable, Lift)]
-pub enum PredicateKind<'tcx> {
+/// A clause is something that can appear in where bounds or be inferred
+/// by implied bounds.
+pub enum Clause<'tcx> {
     /// Corresponds to `where Foo: Bar<A, B, C>`. `Foo` here would be
     /// the `Self` type of the trait reference and `A`, `B`, and `C`
     /// would be the type parameters.
@@ -663,6 +665,13 @@ pub enum PredicateKind<'tcx> {
     /// `where <T as TraitRef>::Name == X`, approximately.
     /// See the `ProjectionPredicate` struct for details.
     Projection(ProjectionPredicate<'tcx>),
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, TyEncodable, TyDecodable)]
+#[derive(HashStable, TypeFoldable, TypeVisitable, Lift)]
+pub enum PredicateKind<'tcx> {
+    /// Prove a clause
+    Clause(Clause<'tcx>),
 
     /// No syntax: `T` well-formed.
     WellFormed(GenericArg<'tcx>),
