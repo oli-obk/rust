@@ -310,7 +310,7 @@ fn run_compiler(
             if let Some(ppm) = &sess.opts.pretty {
                 if ppm.needs_ast_map() {
                     let expanded_crate = queries.expansion()?.peek().0.clone();
-                    queries.global_ctxt()?.peek_mut().enter(|tcx| {
+                    queries.global_ctxt()?.enter(|tcx| {
                         pretty::print_after_hir_lowering(
                             tcx,
                             compiler.input(),
@@ -371,7 +371,7 @@ fn run_compiler(
                 return early_exit();
             }
 
-            queries.global_ctxt()?.peek_mut().enter(|tcx| {
+            queries.global_ctxt()?.enter(|tcx| {
                 let result = tcx.analysis(());
                 if sess.opts.unstable_opts.save_analysis {
                     let crate_name = tcx.crate_name(LOCAL_CRATE);
