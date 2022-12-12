@@ -318,10 +318,9 @@ impl<'tcx> Queries<'tcx> {
         let sess = self.session().clone();
         let codegen_backend = self.codegen_backend().clone();
 
-        let dep_graph = self.dep_graph()?.peek().clone();
-        let (crate_hash, prepare_outputs) = self
-            .global_ctxt()?
-            .enter(|tcx| (tcx.crate_hash(LOCAL_CRATE), tcx.output_filenames(()).clone()));
+        let (crate_hash, prepare_outputs, dep_graph) = self.global_ctxt()?.enter(|tcx| {
+            (tcx.crate_hash(LOCAL_CRATE), tcx.output_filenames(()).clone(), tcx.dep_graph.clone())
+        });
         let ongoing_codegen = self.ongoing_codegen()?.take();
 
         Ok(Linker {
