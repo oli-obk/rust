@@ -30,6 +30,9 @@ use std::sync::Arc;
 /// [`take`]: Self::take
 /// [`compute`]: Self::compute
 pub struct Query<T> {
+    // The outer option is `None` until the query is computed.
+    // Then the whole thing becomes `Some(Some(result))`.
+    // Once the value gets taken/stolen, it is `Some(None)`.
     result: RefCell<Option<Option<Result<T>>>>,
 }
 
