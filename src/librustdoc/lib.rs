@@ -800,7 +800,8 @@ fn main_args(at_args: &[String]) -> MainResult {
             // FIXME(#83761): Resolver cloning can lead to inconsistencies between data in the
             // two copies because one of the copies can be modified after `TyCtxt` construction.
             let (resolver, resolver_caches) = {
-                let (krate, resolver, _) = &*abort_on_err(queries.expansion(), sess).peek();
+                let expansion = abort_on_err(queries.expansion(), sess);
+                let (krate, resolver, _) = &*expansion.borrow();
                 let resolver_caches = resolver.borrow_mut().access(|resolver| {
                     collect_intra_doc_links::early_resolve_intra_doc_links(
                         resolver,
