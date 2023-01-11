@@ -305,12 +305,12 @@ fn run_compiler(
 
         let linker = compiler.enter(|queries| {
             let early_exit = || sess.compile_status().map(|_| None);
-            queries.parse()?;
+            queries.parse.compute(queries)?;
 
             if let Some(ppm) = &sess.opts.pretty {
                 if ppm.needs_ast_map() {
-                    let expanded_crate = queries.expansion()?.borrow().0.clone();
-                    queries.global_ctxt()?.enter(|tcx| {
+                    let expanded_crate = queries.expansion.compute(queries)?.borrow().0.clone();
+                    queries.global_ctxt.compute(queries)?.enter(|tcx| {
                         pretty::print_after_hir_lowering(
                             tcx,
                             compiler.input(),
@@ -321,7 +321,7 @@ fn run_compiler(
                         Ok(())
                     })?;
                 } else {
-                    let krate = queries.parse()?.steal();
+                    let krate = queries.parse.compute(queries)?.steal();
                     pretty::print_after_parsing(
                         sess,
                         compiler.input(),
@@ -343,7 +343,7 @@ fn run_compiler(
             }
 
             {
-                let plugins = queries.register_plugins()?;
+                let plugins = queries.register_plugins.compute(queries)?;
                 let (_, lint_store) = &*plugins.borrow();
 
                 // Lint plugins are registered; now we can process command line flags.
@@ -353,12 +353,12 @@ fn run_compiler(
                 }
             }
 
-            queries.expansion()?;
+            queries.expansion.compute(queries)?;
             if callbacks.after_expansion(compiler, queries) == Compilation::Stop {
                 return early_exit();
             }
 
-            queries.prepare_outputs()?;
+            queries.prepare_outputs.compute(queries)?;
 
             if sess.opts.output_types.contains_key(&OutputType::DepInfo)
                 && sess.opts.output_types.len() == 1
@@ -366,13 +366,13 @@ fn run_compiler(
                 return early_exit();
             }
 
-            queries.global_ctxt()?;
+            queries.global_ctxt.compute(queries)?;
 
             if sess.opts.unstable_opts.no_analysis {
                 return early_exit();
             }
 
-            queries.global_ctxt()?.enter(|tcx| {
+            queries.global_ctxt.compute(queries)?.enter(|tcx| {
                 let result = tcx.analysis(());
                 if sess.opts.unstable_opts.save_analysis {
                     let crate_name = tcx.crate_name(LOCAL_CRATE);
@@ -393,7 +393,7 @@ fn run_compiler(
                 return early_exit();
             }
 
-            queries.ongoing_codegen()?;
+            queries.ongoing_codegen.compute(queries)?;
 
             if sess.opts.unstable_opts.print_type_sizes {
                 sess.code_stats.print_type_sizes();

@@ -8,6 +8,7 @@ use rustc_codegen_ssa::CodegenResults;
 use rustc_data_structures::steal::Steal;
 use rustc_data_structures::svh::Svh;
 use rustc_data_structures::sync::{Lrc, OnceCell, WorkerLocal};
+use rustc_errors::ErrorGuaranteed;
 use rustc_hir::def_id::LOCAL_CRATE;
 use rustc_incremental::DepGraphFuture;
 use rustc_lint::LintStore;
@@ -30,20 +31,37 @@ use std::sync::Arc;
 ///
 /// [`steal`]: Steal::steal
 /// [`compute`]: Self::compute
-pub struct Query<T> {
-    /// `None` means no value has been computed yet.
-    result: RefCell<Option<Result<Steal<T>>>>,
+pub struct Query<'tcx, T> {
+    result: RefCell<State<'tcx, T>>,
 }
 
-impl<T> Query<T> {
-    fn compute<F: FnOnce() -> Result<T>>(&self, f: F) -> Result<QueryResult<'_, T>> {
+enum State<'tcx, T> {
+    NotComputedYet(fn(&'tcx Queries<'tcx>) -> Result<T>),
+    Computed(Result<Steal<T>>),
+}
+
+impl<'tcx, T> State<'tcx, T> {
+    fn expect_err(&self) -> ErrorGuaranteed {
+        match self {
+            &State::Computed(Err(e)) => e,
+            _ => panic!("only use this if you already know it errored"),
+        }
+    }
+}
+
+impl<'tcx, T> Query<'tcx, T> {
+    pub fn compute(&self, queries: &'tcx Queries<'tcx>) -> Result<QueryResult<'_, T>> {
         RefMut::filter_map(
             self.result.borrow_mut(),
-            |r: &mut Option<Result<Steal<T>>>| -> Option<&mut Steal<T>> {
-                r.get_or_insert_with(|| f().map(Steal::new)).as_mut().ok()
+            |r: &mut State<'tcx, T>| -> Option<&mut Steal<T>> {
+                if let State::NotComputedYet(f) = *r {
+                    *r = State::Computed(f(queries).map(Steal::new));
+                }
+                let State::Computed(r) = r else { unreachable!() };
+                r.as_mut().ok()
             },
         )
-        .map_err(|r| *r.as_ref().unwrap().as_ref().map(|_| ()).unwrap_err())
+        .map_err(|r| r.expect_err())
         .map(QueryResult)
     }
 }
@@ -70,9 +88,9 @@ impl<'a, 'tcx> QueryResult<'a, QueryContext<'tcx>> {
     }
 }
 
-impl<T> Default for Query<T> {
-    fn default() -> Self {
-        Query { result: RefCell::new(None) }
+impl<'tcx, T> Query<'tcx, T> {
+    fn new(f: fn(&'tcx Queries<'tcx>) -> Result<T>) -> Self {
+        Self { result: State::NotComputedYet(f).into() }
     }
 }
 
@@ -84,15 +102,15 @@ pub struct Queries<'tcx> {
     arena: WorkerLocal<Arena<'tcx>>,
     hir_arena: WorkerLocal<rustc_hir::Arena<'tcx>>,
 
-    dep_graph_future: Query<Option<DepGraphFuture>>,
-    parse: Query<ast::Crate>,
-    crate_name: Query<Symbol>,
-    register_plugins: Query<(ast::Crate, Lrc<LintStore>)>,
-    expansion: Query<(Lrc<ast::Crate>, Rc<RefCell<BoxedResolver>>, Lrc<LintStore>)>,
-    dep_graph: Query<DepGraph>,
-    prepare_outputs: Query<OutputFilenames>,
-    global_ctxt: Query<QueryContext<'tcx>>,
-    ongoing_codegen: Query<Box<dyn Any>>,
+    pub dep_graph_future: Query<'tcx, Option<DepGraphFuture>>,
+    pub parse: Query<'tcx, ast::Crate>,
+    pub crate_name: Query<'tcx, Symbol>,
+    pub register_plugins: Query<'tcx, (ast::Crate, Lrc<LintStore>)>,
+    pub expansion: Query<'tcx, (Lrc<ast::Crate>, Rc<RefCell<BoxedResolver>>, Lrc<LintStore>)>,
+    pub dep_graph: Query<'tcx, DepGraph>,
+    pub prepare_outputs: Query<'tcx, OutputFilenames>,
+    pub global_ctxt: Query<'tcx, QueryContext<'tcx>>,
+    pub ongoing_codegen: Query<'tcx, Box<dyn Any>>,
 }
 
 impl<'tcx> Queries<'tcx> {
@@ -103,15 +121,15 @@ impl<'tcx> Queries<'tcx> {
             queries: OnceCell::new(),
             arena: WorkerLocal::new(|_| Arena::default()),
             hir_arena: WorkerLocal::new(|_| rustc_hir::Arena::default()),
-            dep_graph_future: Default::default(),
-            parse: Default::default(),
-            crate_name: Default::default(),
-            register_plugins: Default::default(),
-            expansion: Default::default(),
-            dep_graph: Default::default(),
-            prepare_outputs: Default::default(),
-            global_ctxt: Default::default(),
-            ongoing_codegen: Default::default(),
+            dep_graph_future: Query::new(Self::dep_graph_future),
+            parse: Query::new(Self::parse),
+            crate_name: Query::new(Self::crate_name),
+            register_plugins: Query::new(Self::register_plugins),
+            expansion: Query::new(Self::expansion),
+            dep_graph: Query::new(Self::dep_graph),
+            prepare_outputs: Query::new(Self::prepare_outputs),
+            global_ctxt: Query::new(Self::global_ctxt),
+            ongoing_codegen: Query::new(Self::ongoing_codegen),
         }
     }
 
@@ -122,149 +140,123 @@ impl<'tcx> Queries<'tcx> {
         self.compiler.codegen_backend()
     }
 
-    fn dep_graph_future(&self) -> Result<QueryResult<'_, Option<DepGraphFuture>>> {
-        self.dep_graph_future.compute(|| {
-            let sess = self.session();
-            Ok(sess.opts.build_dep_graph().then(|| rustc_incremental::load_dep_graph(sess)))
+    fn dep_graph_future(&self) -> Result<Option<DepGraphFuture>> {
+        let sess = self.session();
+        Ok(sess.opts.build_dep_graph().then(|| rustc_incremental::load_dep_graph(sess)))
+    }
+
+    fn parse(&self) -> Result<ast::Crate> {
+        passes::parse(self.session(), &self.compiler.input)
+            .map_err(|mut parse_error| parse_error.emit())
+    }
+
+    fn register_plugins(&'tcx self) -> Result<(ast::Crate, Lrc<LintStore>)> {
+        let crate_name = self.crate_name.compute(self)?.borrow().clone();
+        let krate = self.parse.compute(self)?.steal();
+
+        let empty: &(dyn Fn(&Session, &mut LintStore) + Sync + Send) = &|_, _| {};
+        let (krate, lint_store) = passes::register_plugins(
+            self.session(),
+            &*self.codegen_backend().metadata_loader(),
+            self.compiler.register_lints.as_deref().unwrap_or_else(|| empty),
+            krate,
+            crate_name,
+        )?;
+
+        // Compute the dependency graph (in the background). We want to do
+        // this as early as possible, to give the DepGraph maximum time to
+        // load before dep_graph() is called, but it also can't happen
+        // until after rustc_incremental::prepare_session_directory() is
+        // called, which happens within passes::register_plugins().
+        self.dep_graph_future().ok();
+
+        Ok((krate, Lrc::new(lint_store)))
+    }
+
+    fn crate_name(&'tcx self) -> Result<Symbol> {
+        Ok({
+            let parse_result = self.parse.compute(self)?;
+            let krate = parse_result.borrow();
+            // parse `#[crate_name]` even if `--crate-name` was passed, to make sure it matches.
+            find_crate_name(self.session(), &krate.attrs, &self.compiler.input)
         })
     }
 
-    pub fn parse(&self) -> Result<QueryResult<'_, ast::Crate>> {
-        self.parse.compute(|| {
-            passes::parse(self.session(), &self.compiler.input)
-                .map_err(|mut parse_error| parse_error.emit())
-        })
+    fn expansion(
+        &'tcx self,
+    ) -> Result<(Lrc<ast::Crate>, Rc<RefCell<BoxedResolver>>, Lrc<LintStore>)> {
+        let crate_name = *self.crate_name.compute(self)?.borrow();
+        let (krate, lint_store) = self.register_plugins.compute(self)?.steal();
+        let _timer = self.session().timer("configure_and_expand");
+        let sess = self.session();
+        let mut resolver = passes::create_resolver(
+            sess.clone(),
+            self.codegen_backend().metadata_loader(),
+            &krate,
+            crate_name,
+        );
+        let krate = resolver.access(|resolver| {
+            passes::configure_and_expand(sess, &lint_store, krate, crate_name, resolver)
+        })?;
+        Ok((Lrc::new(krate), Rc::new(RefCell::new(resolver)), lint_store))
     }
 
-    pub fn register_plugins(&self) -> Result<QueryResult<'_, (ast::Crate, Lrc<LintStore>)>> {
-        self.register_plugins.compute(|| {
-            let crate_name = self.crate_name()?.borrow().clone();
-            let krate = self.parse()?.steal();
+    fn dep_graph(&'tcx self) -> Result<DepGraph> {
+        let sess = self.session();
+        let future_opt = self.dep_graph_future.compute(self)?.steal();
+        let dep_graph = future_opt
+            .and_then(|future| {
+                let (prev_graph, prev_work_products) =
+                    sess.time("blocked_on_dep_graph_loading", || future.open().open(sess));
 
-            let empty: &(dyn Fn(&Session, &mut LintStore) + Sync + Send) = &|_, _| {};
-            let (krate, lint_store) = passes::register_plugins(
-                self.session(),
-                &*self.codegen_backend().metadata_loader(),
-                self.compiler.register_lints.as_deref().unwrap_or_else(|| empty),
-                krate,
-                crate_name,
-            )?;
-
-            // Compute the dependency graph (in the background). We want to do
-            // this as early as possible, to give the DepGraph maximum time to
-            // load before dep_graph() is called, but it also can't happen
-            // until after rustc_incremental::prepare_session_directory() is
-            // called, which happens within passes::register_plugins().
-            self.dep_graph_future().ok();
-
-            Ok((krate, Lrc::new(lint_store)))
-        })
-    }
-
-    pub fn crate_name(&self) -> Result<QueryResult<'_, Symbol>> {
-        self.crate_name.compute(|| {
-            Ok({
-                let parse_result = self.parse()?;
-                let krate = parse_result.borrow();
-                // parse `#[crate_name]` even if `--crate-name` was passed, to make sure it matches.
-                find_crate_name(self.session(), &krate.attrs, &self.compiler.input)
+                rustc_incremental::build_dep_graph(sess, prev_graph, prev_work_products)
             })
-        })
+            .unwrap_or_else(DepGraph::new_disabled);
+        Ok(dep_graph)
     }
 
-    pub fn expansion(
-        &self,
-    ) -> Result<QueryResult<'_, (Lrc<ast::Crate>, Rc<RefCell<BoxedResolver>>, Lrc<LintStore>)>>
-    {
-        trace!("expansion");
-        self.expansion.compute(|| {
-            let crate_name = *self.crate_name()?.borrow();
-            let (krate, lint_store) = self.register_plugins()?.steal();
-            let _timer = self.session().timer("configure_and_expand");
-            let sess = self.session();
-            let mut resolver = passes::create_resolver(
-                sess.clone(),
-                self.codegen_backend().metadata_loader(),
-                &krate,
-                crate_name,
-            );
-            let krate = resolver.access(|resolver| {
-                passes::configure_and_expand(sess, &lint_store, krate, crate_name, resolver)
-            })?;
-            Ok((Lrc::new(krate), Rc::new(RefCell::new(resolver)), lint_store))
-        })
+    fn prepare_outputs(&'tcx self) -> Result<OutputFilenames> {
+        let expansion = self.expansion.compute(self)?;
+        let (krate, boxed_resolver, _) = &*expansion.borrow();
+        let crate_name = *self.crate_name.compute(self)?.borrow();
+        passes::prepare_outputs(self.session(), self.compiler, krate, &*boxed_resolver, crate_name)
     }
 
-    fn dep_graph(&self) -> Result<QueryResult<'_, DepGraph>> {
-        self.dep_graph.compute(|| {
-            let sess = self.session();
-            let future_opt = self.dep_graph_future()?.steal();
-            let dep_graph = future_opt
-                .and_then(|future| {
-                    let (prev_graph, prev_work_products) =
-                        sess.time("blocked_on_dep_graph_loading", || future.open().open(sess));
-
-                    rustc_incremental::build_dep_graph(sess, prev_graph, prev_work_products)
-                })
-                .unwrap_or_else(DepGraph::new_disabled);
-            Ok(dep_graph)
-        })
+    fn global_ctxt(&'tcx self) -> Result<QueryContext<'tcx>> {
+        let crate_name = *self.crate_name.compute(self)?.borrow();
+        let outputs = self.prepare_outputs.compute(self)?.steal();
+        let dep_graph = self.dep_graph.compute(self)?.borrow().clone();
+        let (krate, resolver, lint_store) = self.expansion.compute(self)?.steal();
+        Ok(passes::create_global_ctxt(
+            self.compiler,
+            lint_store,
+            krate,
+            dep_graph,
+            resolver,
+            outputs,
+            crate_name,
+            &self.queries,
+            &self.gcx,
+            &self.arena,
+            &self.hir_arena,
+        ))
     }
 
-    pub fn prepare_outputs(&self) -> Result<QueryResult<'_, OutputFilenames>> {
-        self.prepare_outputs.compute(|| {
-            let expansion = self.expansion()?;
-            let (krate, boxed_resolver, _) = &*expansion.borrow();
-            let crate_name = *self.crate_name()?.borrow();
-            passes::prepare_outputs(
-                self.session(),
-                self.compiler,
-                krate,
-                &*boxed_resolver,
-                crate_name,
-            )
-        })
-    }
+    fn ongoing_codegen(&'tcx self) -> Result<Box<dyn Any>> {
+        self.global_ctxt.compute(self)?.enter(|tcx| {
+            tcx.analysis(()).ok();
 
-    pub fn global_ctxt(&'tcx self) -> Result<QueryResult<'_, QueryContext<'tcx>>> {
-        self.global_ctxt.compute(|| {
-            let crate_name = *self.crate_name()?.borrow();
-            let outputs = self.prepare_outputs()?.steal();
-            let dep_graph = self.dep_graph()?.borrow().clone();
-            let (krate, resolver, lint_store) = self.expansion()?.steal();
-            Ok(passes::create_global_ctxt(
-                self.compiler,
-                lint_store,
-                krate,
-                dep_graph,
-                resolver,
-                outputs,
-                crate_name,
-                &self.queries,
-                &self.gcx,
-                &self.arena,
-                &self.hir_arena,
-            ))
-        })
-    }
+            // Don't do code generation if there were any errors
+            self.session().compile_status()?;
 
-    pub fn ongoing_codegen(&'tcx self) -> Result<QueryResult<'_, Box<dyn Any>>> {
-        self.ongoing_codegen.compute(|| {
-            self.global_ctxt()?.enter(|tcx| {
-                tcx.analysis(()).ok();
+            // If we have any delayed bugs, for example because we created TyKind::Error earlier,
+            // it's likely that codegen will only cause more ICEs, obscuring the original problem
+            self.session().diagnostic().flush_delayed();
 
-                // Don't do code generation if there were any errors
-                self.session().compile_status()?;
+            // Hook for UI tests.
+            Self::check_for_rustc_errors_attr(tcx);
 
-                // If we have any delayed bugs, for example because we created TyKind::Error earlier,
-                // it's likely that codegen will only cause more ICEs, obscuring the original problem
-                self.session().diagnostic().flush_delayed();
-
-                // Hook for UI tests.
-                Self::check_for_rustc_errors_attr(tcx);
-
-                Ok(passes::start_codegen(&***self.codegen_backend(), tcx))
-            })
+            Ok(passes::start_codegen(&***self.codegen_backend(), tcx))
         })
     }
 
@@ -306,10 +298,15 @@ impl<'tcx> Queries<'tcx> {
         let sess = self.session().clone();
         let codegen_backend = self.codegen_backend().clone();
 
-        let (crate_hash, prepare_outputs, dep_graph) = self.global_ctxt()?.enter(|tcx| {
-            (tcx.crate_hash(LOCAL_CRATE), tcx.output_filenames(()).clone(), tcx.dep_graph.clone())
-        });
-        let ongoing_codegen = self.ongoing_codegen()?.steal();
+        let (crate_hash, prepare_outputs, dep_graph) =
+            self.global_ctxt.compute(self)?.enter(|tcx| {
+                (
+                    tcx.crate_hash(LOCAL_CRATE),
+                    tcx.output_filenames(()).clone(),
+                    tcx.dep_graph.clone(),
+                )
+            });
+        let ongoing_codegen = self.ongoing_codegen.compute(self)?.steal();
 
         Ok(Linker {
             sess,
@@ -392,7 +389,7 @@ impl Compiler {
 
         // NOTE: intentionally does not compute the global context if it hasn't been built yet,
         // since that likely means there was a parse error.
-        if let Some(Ok(gcx)) = &mut *queries.global_ctxt.result.borrow_mut() {
+        if let State::Computed(Ok(gcx)) = &mut *queries.global_ctxt.result.borrow_mut() {
             let gcx = gcx.get_mut();
             // We assume that no queries are run past here. If there are new queries
             // after this point, they'll show up as "<unknown>" in self-profiling data.
