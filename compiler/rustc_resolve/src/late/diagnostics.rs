@@ -2065,7 +2065,11 @@ impl<'a: 'ast, 'ast> LateResolutionVisitor<'a, '_, 'ast> {
         path: &[Segment],
     ) -> Option<(Span, &'static str, String, Applicability)> {
         let (ident, span) = match path {
-            [segment] if !segment.has_generic_args && segment.ident.name != kw::SelfUpper => {
+            [segment]
+                if !segment.has_generic_args
+                    && segment.ident.name != kw::SelfUpper
+                    && segment.ident.name != kw::Dyn =>
+            {
                 (segment.ident.to_string(), segment.ident.span)
             }
             _ => return None,
@@ -2184,15 +2188,31 @@ impl<'a: 'ast, 'ast> LateResolutionVisitor<'a, '_, 'ast> {
             let deletion_span = || {
                 if params.len() == 1 {
                     // if sole lifetime, remove the entire `<>` brackets
-                    generics_span
+                    Some(generics_span)
                 } else if param_index == 0 {
                     // if removing within `<>` brackets, we also want to
                     // delete a leading or trailing comma as appropriate
-                    param.span().to(params[param_index + 1].span().shrink_to_lo())
+                    match (
+                        param.span().find_ancestor_inside(generics_span),
+                        params[param_index + 1].span().find_ancestor_inside(generics_span),
+                    ) {
+                        (Some(param_span), Some(next_param_span)) => {
+                            Some(param_span.to(next_param_span.shrink_to_lo()))
+                        }
+                        _ => None,
+                    }
                 } else {
                     // if removing within `<>` brackets, we also want to
                     // delete a leading or trailing comma as appropriate
-                    params[param_index - 1].span().shrink_to_hi().to(param.span())
+                    match (
+                        param.span().find_ancestor_inside(generics_span),
+                        params[param_index - 1].span().find_ancestor_inside(generics_span),
+                    ) {
+                        (Some(param_span), Some(prev_param_span)) => {
+                            Some(prev_param_span.shrink_to_hi().to(param_span))
+                        }
+                        _ => None,
+                    }
                 }
             };
             match use_set {
