@@ -242,6 +242,9 @@ josh-proxy --local=$HOME/.cache/josh --remote=https://github.com --no-background
 
 This uses a directory `$HOME/.cache/josh` as a cache, to speed up repeated pulling/pushing.
 
+At any point in time you can kill the `josh-proxy` process and restart it without losing your
+caches.
+
 ### Importing changes from the rustc repo
 
 Josh needs to be running, as described above.
@@ -282,3 +285,18 @@ up-to-date master branch:
 This will create a new branch called 'miri' in your fork, and the output should
 include a link to create a rustc PR that will integrate those changes into the
 main repository.
+
+#### Authentication issues during push
+
+Unfortunately `josh` does not support ssh authentication. Going via https may cause
+josh to fail to authenticate with github. In that case you can additionally pass
+`--require-auth` to your `josh-proxy` invocation.
+
+To authenticate with github, you'll need to enter your username and a Personal
+Access Token (PAT), *not* your password. You cannot authenticate with your password.
+
+To create a PAT, follow the instructions
+[here](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token#creating-a-fine-grained-personal-access-token).
+
+Make sure to enable the "Contents" read and *and* write permission for that PAT. If you forget,
+you need to create a new PAT, you cannot edit the permissions after it has been created.
