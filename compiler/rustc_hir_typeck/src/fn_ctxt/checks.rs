@@ -31,7 +31,7 @@ use rustc_middle::ty::visit::TypeVisitableExt;
 use rustc_middle::ty::{self, IsSuggestable, Ty};
 use rustc_session::Session;
 use rustc_span::symbol::{kw, Ident};
-use rustc_span::{self, sym, Span};
+use rustc_span::{self, sym, Span, SyntaxContext};
 use rustc_trait_selection::traits::{self, ObligationCauseCode, SelectionContext};
 
 use std::iter;
@@ -855,6 +855,14 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                 DiagnosticId::Error(err_code.to_owned()),
             )
         };
+
+        if error_span.ctxt() != SyntaxContext::root()
+            && error_span == full_call_span
+            && full_call_span == call_span
+        {
+            err.emit();
+            return;
+        }
 
         // As we encounter issues, keep track of what we want to provide for the suggestion
         let mut labels = vec![];
