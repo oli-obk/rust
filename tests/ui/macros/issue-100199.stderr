@@ -9,6 +9,10 @@ help: consider importing this trait
    |
 LL | use traits::MyTrait;
    |
+help: if you import `MyTrait`, refer to it directly
+   |
+LL | #[issue_100199::struct_with_bound]
+   |
 
 error: aborting due to previous error
 

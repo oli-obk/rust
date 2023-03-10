@@ -956,7 +956,14 @@ impl<'tcx> TypeErrCtxtExt<'tcx> for TypeErrCtxt<'_, 'tcx> {
             .join(", ");
 
         if matches!(obligation.cause.code(), ObligationCauseCode::FunctionArgumentObligation { .. })
-            && obligation.cause.span.can_be_used_for_suggestions()
+            && match obligation.cause.span.ctxt().outer_expn_data().kind {
+                ExpnKind::Root
+                | ExpnKind::AstPass(_)
+                | ExpnKind::Desugaring(_)
+                | ExpnKind::Inlined => true,
+                // When a macro is involved, we don't want to provide a structured suggestion.
+                ExpnKind::Macro(..) => false,
+            }
         {
             // When the obligation error has been ensured to have been caused by
             // an argument, the `obligation.cause.span` points at the expression
@@ -995,6 +1002,21 @@ impl<'tcx> TypeErrCtxtExt<'tcx> for TypeErrCtxt<'_, 'tcx> {
                 _ => return false,
             };
             err.help(&format!("{msg}: `{name}({args})`"));
+            // } else if matches!(
+            //     obligation.cause.code(),
+            //     ObligationCauseCode::FunctionArgumentObligation { .. }
+            // ) && obligation.cause.span.can_be_used_for_suggestions()
+            // {
+            //     // When the obligation error has been ensured to have been caused by
+            //     // an argument, the `obligation.cause.span` points at the expression
+            //     // of the argument, so we can provide a suggestion. Otherwise, we give
+            //     // a more general note.
+            //     err.span_suggestion_verbose(
+            //         obligation.cause.span.shrink_to_hi(),
+            //         &msg,
+            //         format!("({args})"),
+            //         Applicability::HasPlaceholders,
+            //     );
         }
         true
     }

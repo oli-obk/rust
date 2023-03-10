@@ -469,6 +469,17 @@ impl HygieneData {
         marks
     }
 
+    fn peel_ctxt(&self, mut span: Span) -> SyntaxContext {
+        let mut outer_expn = self.outer_expn(span.ctxt());
+        let mut expn_data = self.expn_data(outer_expn);
+        while let ExpnKind::Desugaring(DesugaringKind::Resize) = expn_data.kind {
+            span = expn_data.call_site;
+            outer_expn = self.outer_expn(span.ctxt());
+            expn_data = self.expn_data(outer_expn);
+        }
+        span.ctxt()
+    }
+
     fn walk_chain(&self, mut span: Span, to: SyntaxContext) -> Span {
         debug!("walk_chain({:?}, {:?})", span, to);
         debug!("walk_chain: span ctxt = {:?}", span.ctxt());
@@ -600,6 +611,10 @@ pub fn clear_syntax_context_map() {
 
 pub fn walk_chain(span: Span, to: SyntaxContext) -> Span {
     HygieneData::with(|data| data.walk_chain(span, to))
+}
+
+pub fn peel_ctxt(span: Span) -> SyntaxContext {
+    HygieneData::with(|data| data.peel_ctxt(span))
 }
 
 pub fn update_dollar_crate_names(mut get_name: impl FnMut(SyntaxContext) -> Symbol) {

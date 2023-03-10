@@ -2110,6 +2110,9 @@ impl<'a: 'ast, 'ast, 'tcx> LateResolutionVisitor<'a, '_, 'ast, 'tcx> {
             | (Some(Item { kind, .. }), false, _) => {
                 // Likely missing type parameter.
                 if let Some(generics) = kind.generics() {
+                    info!(?span, ?generics.span);
+                    info!("{:#?}", span.ctxt());
+                    // if span.overlaps(generics.span) || !generics.span.can_be_used_for_suggestions() {
                     if span.overlaps(generics.span) {
                         // Avoid the following:
                         // error[E0405]: cannot find trait `A` in this scope
