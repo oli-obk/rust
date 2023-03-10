@@ -599,12 +599,26 @@ impl Span {
 
     /// Gate suggestions that would not be appropriate in a context the user didn't write.
     pub fn can_be_used_for_suggestions(self) -> bool {
-        !self.from_expansion()
-        // FIXME: If this span comes from a `derive` macro but it points at code the user wrote,
-        // the callsite span and the span will be pointing at different places. It also means that
-        // we can safely provide suggestions on this span.
-            || (matches!(self.ctxt().outer_expn_data().kind, ExpnKind::Macro(MacroKind::Derive, _))
-                && self.parent_callsite().map(|p| (p.lo(), p.hi())) != Some((self.lo(), self.hi())))
+        match self.ctxt().outer_expn_data().kind {
+            ExpnKind::Root
+            | ExpnKind::AstPass(_)
+            | ExpnKind::Inlined
+            | ExpnKind::Macro(MacroKind::Bang, _) => true,
+            // FIXME: If this span comes from a `derive` macro but it points at code the user wrote,
+            // the callsite span and the span will be pointing at different places. It also means that
+            // we can safely provide suggestions on this span.
+            ExpnKind::Macro(MacroKind::Attr, _) | ExpnKind::Macro(MacroKind::Derive, _)
+                if self.parent_callsite().map(|p| (p.lo(), p.hi()))
+                    != Some((self.lo(), self.hi())) =>
+            {
+                true
+            }
+            ExpnKind::Macro(..) => false,
+            ExpnKind::Desugaring(DesugaringKind::Resize) => {
+                self.parent_callsite().unwrap().can_be_used_for_suggestions()
+            }
+            ExpnKind::Desugaring(_) => true,
+        }
     }
 
     #[inline]

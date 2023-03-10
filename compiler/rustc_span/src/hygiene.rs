@@ -1152,6 +1152,10 @@ pub enum DesugaringKind {
     ForLoop,
     WhileLoop,
     Replace,
+    /// Used to proactively mark `Span`s that have been modified from another `Span`. This allows
+    /// the diagnostics machinery to be able to detect spans coming from proc-macros that do not
+    /// point to user code.
+    Resize,
 }
 
 impl DesugaringKind {
@@ -1168,6 +1172,7 @@ impl DesugaringKind {
             DesugaringKind::ForLoop => "`for` loop",
             DesugaringKind::WhileLoop => "`while` loop",
             DesugaringKind::Replace => "drop and replace",
+            DesugaringKind::Resize => "a resized `Span`",
         }
     }
 }
