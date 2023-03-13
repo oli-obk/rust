@@ -60,7 +60,7 @@ pub mod fatal_error;
 pub mod profiling;
 
 use rustc_data_structures::stable_hasher::{HashStable, StableHasher};
-use rustc_data_structures::sync::{Lock, Lrc};
+use rustc_data_structures::sync::{Lock, Lrc, RwLock};
 
 use std::borrow::Cow;
 use std::cmp::{self, Ordering};
@@ -86,7 +86,7 @@ mod tests;
 pub struct SessionGlobals {
     symbol_interner: symbol::Interner,
     span_interner: Lock<span_encoding::SpanInterner>,
-    hygiene_data: Lock<hygiene::HygieneData>,
+    hygiene_data: RwLock<hygiene::HygieneData>,
     source_map: Lock<Option<Lrc<SourceMap>>>,
 }
 
@@ -95,7 +95,7 @@ impl SessionGlobals {
         SessionGlobals {
             symbol_interner: symbol::Interner::fresh(),
             span_interner: Lock::new(span_encoding::SpanInterner::default()),
-            hygiene_data: Lock::new(hygiene::HygieneData::new(edition)),
+            hygiene_data: RwLock::new(hygiene::HygieneData::new(edition)),
             source_map: Lock::new(None),
         }
     }

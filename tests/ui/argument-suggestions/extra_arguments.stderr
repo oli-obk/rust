@@ -268,42 +268,11 @@ LL | fn empty() {}
    = note: this error originates in the macro `foo` (in Nightly builds, run with -Z macro-backtrace for more info)
 help: remove the extra arguments
    |
-LL -         empty($x, 1);
-LL -     }
-LL - }
-LL - 
-LL - fn main() {
-LL -   empty("");
-LL -   empty(1, 1);
-LL - 
-LL -   one_arg(1, 1);
-LL -   one_arg(1, "");
-LL -   one_arg(1, "", 1.0);
-LL - 
-LL -   two_arg_same(1, 1, 1);
-LL -   two_arg_same(1, 1, 1.0);
-LL - 
-LL -   two_arg_diff(1, 1, "");
-LL -   two_arg_diff(1, "", "");
-LL -   two_arg_diff(1, 1, "", "");
-LL -   two_arg_diff(1, "", 1, "");
-LL - 
-LL -   // Check with weird spacing and newlines
-LL -   two_arg_same(1, 1,     "");
-LL -   two_arg_diff(1, 1,     "");
-LL -   two_arg_same(
-LL -     1,
-LL -     1,
-LL -     ""
-LL -   );
-LL - 
-LL -   two_arg_diff(
-LL -     1,
-LL -     1,
-LL -     ""
-LL -   );
-LL -   foo!(1);
-LL +         empty($x, );
+LL ~         empty($x, );
+LL |     }
+ ...
+LL |   );
+LL ~   foo!();
    |
 
 error: aborting due to 16 previous errors
