@@ -837,7 +837,11 @@ impl Span {
         Span::new(
             cmp::min(span_data.lo, end_data.lo),
             cmp::max(span_data.hi, end_data.hi),
-            if self.peel_ctxt().ctxt() == SyntaxContext::root() { end_data.ctxt } else { span_data.ctxt },
+            if self.peel_ctxt().ctxt() == SyntaxContext::root() {
+                end_data.ctxt
+            } else {
+                span_data.ctxt
+            },
             if span_data.parent == end_data.parent { span_data.parent } else { None },
         )
     }
@@ -855,7 +859,11 @@ impl Span {
         Span::new(
             span_data.hi,
             end_data.lo,
-            if end.peel_ctxt().ctxt() == SyntaxContext::root() { end_data.ctxt } else { span_data.ctxt },
+            if end.peel_ctxt().ctxt() == SyntaxContext::root() {
+                end_data.ctxt
+            } else {
+                span_data.ctxt
+            },
             if span_data.parent == end_data.parent { span_data.parent } else { None },
         )
     }
@@ -915,7 +923,11 @@ impl Span {
         Span::new(
             span_data.lo,
             end_data.lo,
-            if end.peel_ctxt().ctxt() == SyntaxContext::root() { end_data.ctxt } else { span_data.ctxt },
+            if end.peel_ctxt().ctxt() == SyntaxContext::root() {
+                end_data.ctxt
+            } else {
+                span_data.ctxt
+            },
             if span_data.parent == end_data.parent { span_data.parent } else { None },
         )
     }
