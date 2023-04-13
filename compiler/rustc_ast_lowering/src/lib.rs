@@ -128,8 +128,12 @@ struct LoweringContext<'a, 'hir> {
     item_local_id_counter: hir::ItemLocalId,
     trait_map: FxHashMap<ItemLocalId, Box<[TraitCandidate]>>,
 
+    /// Implicitly generated generic params for argument position impl trait
     impl_trait_defs: Vec<hir::GenericParam<'hir>>,
+    /// The trait bounds of argument position impl trait.
     impl_trait_bounds: Vec<hir::WherePredicate<'hir>>,
+    /// Return position impl trait
+    defines_opaque_types: Vec<&'hir hir::Ty<'hir>>,
 
     /// NodeIds that are lowered inside the current HIR owner.
     node_id_to_local_id: FxHashMap<NodeId, hir::ItemLocalId>,
@@ -1249,7 +1253,11 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
 
     #[instrument(level = "debug", skip(self))]
     fn lower_ty(&mut self, t: &Ty, itctx: &ImplTraitContext) -> &'hir hir::Ty<'hir> {
-        self.arena.alloc(self.lower_ty_direct(t, itctx))
+        let ty = &*self.arena.alloc(self.lower_ty_direct(t, itctx));
+        if let hir::TyKind::OpaqueDef(..) = ty.kind {
+            self.defines_opaque_types.push(ty);
+        }
+        ty
     }
 
     fn lower_path_ty(
@@ -1598,6 +1606,7 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
                         has_where_clause_predicates: false,
                         where_clause_span: lctx.lower_span(span),
                         span: lctx.lower_span(span),
+                        defines_opaque_types: &[],
                     }),
                     bounds: hir_bounds,
                     origin,
@@ -2051,6 +2060,7 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
                         has_where_clause_predicates: false,
                         where_clause_span: this.lower_span(span),
                         span: this.lower_span(span),
+                        defines_opaque_types: &[],
                     }),
                     bounds: arena_vec![this; future_bound],
                     origin: hir::OpaqueTyOrigin::AsyncFn(fn_def_id),

@@ -93,6 +93,7 @@ pub(super) fn generics_of(tcx: TyCtxt<'_>, def_id: LocalDefId) -> ty::Generics {
                         param_def_id_to_index,
                         has_self: generics.has_self,
                         has_late_bound_regions: generics.has_late_bound_regions,
+                        defines_opaque_types: vec![],
                     };
                 }
 
@@ -348,6 +349,18 @@ pub(super) fn generics_of(tcx: TyCtxt<'_>, def_id: LocalDefId) -> ty::Generics {
 
     let param_def_id_to_index = params.iter().map(|param| (param.def_id, param.index)).collect();
 
+    let defines_opaque_types = ast_generics
+        .defines_opaque_types
+        .iter()
+        .map(|ty| {
+            if let hir::TyKind::OpaqueDef(id, _arg, _in_trait) = ty.kind {
+                id.owner_id.def_id.to_def_id()
+            } else {
+                span_bug!(ty.span, "not an opaque type: {ty:#?}")
+            }
+        })
+        .collect();
+
     ty::Generics {
         parent: parent_def_id,
         parent_count,
@@ -355,6 +368,7 @@ pub(super) fn generics_of(tcx: TyCtxt<'_>, def_id: LocalDefId) -> ty::Generics {
         param_def_id_to_index,
         has_self: has_self || parent_has_self,
         has_late_bound_regions: has_late_bound_regions(tcx, node),
+        defines_opaque_types,
     }
 }
 

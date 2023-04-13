@@ -81,6 +81,7 @@ impl<'a, 'hir> ItemLowerer<'a, 'hir> {
             current_item: None,
             impl_trait_defs: Vec::new(),
             impl_trait_bounds: Vec::new(),
+            defines_opaque_types: Vec::new(),
             allow_try_trait: Some([sym::try_trait_v2, sym::yeet_desugar_details][..].into()),
             allow_gen_future: Some([sym::gen_future, sym::closure_track_caller][..].into()),
             allow_into_future: Some([sym::into_future][..].into()),
@@ -1368,12 +1369,15 @@ impl<'hir> LoweringContext<'_, 'hir> {
         let impl_trait_bounds = std::mem::take(&mut self.impl_trait_bounds);
         predicates.extend(impl_trait_bounds.into_iter());
 
+        let defines_opaque_types = self.arena.alloc_from_iter(self.defines_opaque_types.drain(..));
+
         let lowered_generics = self.arena.alloc(hir::Generics {
             params: self.arena.alloc_from_iter(params),
             predicates: self.arena.alloc_from_iter(predicates),
             has_where_clause_predicates,
             where_clause_span,
             span,
+            defines_opaque_types,
         });
 
         (lowered_generics, res)

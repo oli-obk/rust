@@ -564,6 +564,7 @@ pub struct Generics<'hir> {
     pub has_where_clause_predicates: bool,
     pub where_clause_span: Span,
     pub span: Span,
+    pub defines_opaque_types: &'hir [&'hir Ty<'hir>],
 }
 
 impl<'hir> Generics<'hir> {
@@ -574,6 +575,7 @@ impl<'hir> Generics<'hir> {
             has_where_clause_predicates: false,
             where_clause_span: DUMMY_SP,
             span: DUMMY_SP,
+            defines_opaque_types: &[],
         };
         &NOPE
     }
@@ -3990,7 +3992,7 @@ mod size_asserts {
     static_assert_size!(ForeignItemKind<'_>, 40);
     static_assert_size!(GenericArg<'_>, 32);
     static_assert_size!(GenericBound<'_>, 48);
-    static_assert_size!(Generics<'_>, 56);
+    static_assert_size!(Generics<'_>, 72);
     static_assert_size!(Impl<'_>, 80);
     static_assert_size!(ImplItem<'_>, 80);
     static_assert_size!(ImplItemKind<'_>, 32);
