@@ -229,7 +229,7 @@ impl<'ll> CodegenCx<'ll, '_> {
     ) -> &'ll Value {
         unsafe {
             let gv = match kind {
-                Some(kind) if !self.tcx.sess.fewer_names() => {
+                Some(kind) => {
                     let name = self.generate_local_symbol_name(kind);
                     let gv = self.define_global(&name, self.val_ty(cv)).unwrap_or_else(|| {
                         bug!("symbol `{}` is already defined", name);
@@ -244,6 +244,11 @@ impl<'ll> CodegenCx<'ll, '_> {
             llvm::SetUnnamedAddress(gv, llvm::UnnamedAddr::Global);
             gv
         }
+    }
+
+    pub(crate) fn get_static_name(&self, def_id: DefId) -> &str {
+        let instance = Instance::mono(self.tcx, def_id);
+        self.tcx.symbol_name(instance).name
     }
 
     pub(crate) fn get_static(&self, def_id: DefId) -> &'ll Value {
@@ -262,7 +267,7 @@ impl<'ll> CodegenCx<'ll, '_> {
         );
 
         let ty = instance.ty(self.tcx, ty::ParamEnv::reveal_all());
-        let sym = self.tcx.symbol_name(instance).name;
+        let sym = self.get_static_name(def_id);
         let fn_attrs = self.tcx.codegen_fn_attrs(def_id);
 
         debug!("get_static: sym={} instance={:?} fn_attrs={:?}", sym, instance, fn_attrs);
@@ -351,6 +356,10 @@ impl<'ll> CodegenCx<'ll, '_> {
 }
 
 impl<'ll> StaticMethods for CodegenCx<'ll, '_> {
+    fn set_value_name(&self, cv: Self::Value, name: &str) {
+        crate::llvm::set_value_name(cv, name.as_bytes())
+    }
+
     fn static_addr_of(&self, cv: &'ll Value, align: Align, kind: Option<&str>) -> &'ll Value {
         if let Some(&gv) = self.const_globals.borrow().get(&cv) {
             unsafe {

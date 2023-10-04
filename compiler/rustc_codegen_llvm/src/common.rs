@@ -12,7 +12,7 @@ use rustc_codegen_ssa::mir::place::PlaceRef;
 use rustc_codegen_ssa::traits::*;
 use rustc_hir::def_id::DefId;
 use rustc_middle::bug;
-use rustc_middle::mir::interpret::{ConstAllocation, GlobalAlloc, Scalar};
+use rustc_middle::mir::interpret::{ConstAllocation, GlobalAlloc, Scalar, StaticAllocation};
 use rustc_middle::ty::layout::{LayoutOf, TyAndLayout};
 use rustc_middle::ty::TyCtxt;
 use rustc_session::cstore::{DllCallingConvention, DllImport, PeImportNameType};
@@ -248,12 +248,17 @@ impl<'ll, 'tcx> ConstMethods<'tcx> for CodegenCx<'ll, 'tcx> {
                     GlobalAlloc::Memory(alloc) => {
                         let init = const_alloc_to_llvm(self, alloc);
                         let alloc = alloc.inner();
+                        let name = alloc.extra.map(|StaticAllocation { item, local_index }| {
+                            let item_name = self.get_static_name(item);
+                            format!("{item_name}[{local_index}]")
+                        });
+                        let name = name.as_deref();
                         let value = match alloc.mutability {
-                            Mutability::Mut => self.static_addr_of_mut(init, alloc.align, None),
-                            _ => self.static_addr_of(init, alloc.align, None),
+                            Mutability::Mut => self.static_addr_of_mut(init, alloc.align, name),
+                            _ => self.static_addr_of(init, alloc.align, name),
                         };
                         if !self.sess().fewer_names() {
-                            llvm::set_value_name(value, format!("{:?}", alloc_id).as_bytes());
+                            self.set_value_name(value, &format!("{:?}", alloc_id));
                         }
                         (value, AddressSpace::DATA)
                     }

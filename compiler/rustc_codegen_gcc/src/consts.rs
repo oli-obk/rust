@@ -32,7 +32,7 @@ impl<'gcc, 'tcx> CodegenCx<'gcc, 'tcx> {
 }
 
 impl<'gcc, 'tcx> StaticMethods for CodegenCx<'gcc, 'tcx> {
-    fn static_addr_of(&self, cv: RValue<'gcc>, align: Align, kind: Option<&str>) -> RValue<'gcc> {
+    fn static_addr_of(&self, cv: RValue<'gcc>, align: Align, needs_name: Option<(DefId, usize)>) -> RValue<'gcc> {
         // TODO(antoyo): implement a proper rvalue comparison in libgccjit instead of doing the
         // following:
         for (value, variable) in &*self.const_globals.borrow() {
@@ -46,7 +46,7 @@ impl<'gcc, 'tcx> StaticMethods for CodegenCx<'gcc, 'tcx> {
                 return *variable;
             }
         }
-        let global_value = self.static_addr_of_mut(cv, align, kind);
+        let global_value = self.static_addr_of_mut(cv, align, needs_name);
         #[cfg(feature = "master")]
         self.global_lvalues.borrow().get(&global_value)
             .expect("`static_addr_of_mut` did not add the global to `self.global_lvalues`")
@@ -165,10 +165,11 @@ impl<'gcc, 'tcx> StaticMethods for CodegenCx<'gcc, 'tcx> {
 }
 
 impl<'gcc, 'tcx> CodegenCx<'gcc, 'tcx> {
-    pub fn static_addr_of_mut(&self, cv: RValue<'gcc>, align: Align, kind: Option<&str>) -> RValue<'gcc> {
+    pub fn static_addr_of_mut(&self, cv: RValue<'gcc>, align: Align, needs_name: Option<(DefId, usize)>) -> RValue<'gcc> {
         let global =
             match kind {
-                Some(kind) if !self.tcx.sess.fewer_names() => {
+                Some((item, idx)) => {
+                    let kind = needs_name.map(|(item, idx)|)
                     let name = self.generate_local_symbol_name(kind);
                     // TODO(antoyo): check if it's okay that no link_section is set.
 
