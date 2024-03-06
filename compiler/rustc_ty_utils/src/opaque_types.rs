@@ -10,6 +10,7 @@ use rustc_span::Span;
 use rustc_trait_selection::traits::check_args_compatible;
 
 use crate::errors::{DuplicateArg, NotParam};
+use crate::sig_types::SpannedTypeVisitor;
 
 struct OpaqueTypeCollector<'tcx> {
     tcx: TyCtxt<'tcx>,
@@ -45,13 +46,6 @@ impl<'tcx> OpaqueTypeCollector<'tcx> {
         self.span.unwrap_or_else(|| {
             self.tcx.def_ident_span(self.item).unwrap_or_else(|| self.tcx.def_span(self.item))
         })
-    }
-
-    fn visit_spanned(&mut self, span: Span, value: impl TypeVisitable<TyCtxt<'tcx>>) {
-        let old = self.span;
-        self.span = Some(span);
-        value.visit_with(self);
-        self.span = old;
     }
 
     fn parent_trait_ref(&self) -> Option<ty::TraitRef<'tcx>> {
@@ -174,7 +168,7 @@ impl<'tcx> OpaqueTypeCollector<'tcx> {
                     .instantiate_identity_iter_copied()
                 {
                     trace!(?pred);
-                    self.visit_spanned(span, pred);
+                    self.visit(span, pred);
                 }
             }
             Err(NotUniqueParam::NotParam(arg)) => {
@@ -195,10 +189,13 @@ impl<'tcx> OpaqueTypeCollector<'tcx> {
     }
 }
 
-impl<'tcx> super::sig_types::SpannedTypeVisitor<'tcx> for OpaqueTypeCollector<'tcx> {
+impl<'tcx> SpannedTypeVisitor<'tcx> for OpaqueTypeCollector<'tcx> {
     #[instrument(skip(self), ret, level = "trace")]
     fn visit(&mut self, span: Span, value: impl TypeVisitable<TyCtxt<'tcx>>) {
-        self.visit_spanned(span, value);
+        let old = self.span;
+        self.span = Some(span);
+        value.visit_with(self);
+        self.span = old;
     }
 }
 
@@ -279,7 +276,7 @@ impl<'tcx> TypeVisitor<TyCtxt<'tcx>> for OpaqueTypeCollector<'tcx> {
                         // would have to walk all generic parameters of an Adt, which can quickly
                         // degenerate into looking at an exponential number of types.
                         let ty = self.tcx.type_of(field.did).instantiate_identity();
-                        self.visit_spanned(self.tcx.def_span(field.did), ty);
+                        self.visit(self.tcx.def_span(field.did), ty);
                     }
                 }
             }
