@@ -8,9 +8,13 @@ use rustc_middle::ty::{self, TyCtxt};
 use rustc_span::Span;
 use rustc_type_ir::visit::TypeVisitable;
 
-pub trait SpannedTypeVisitor<'tcx> {
+pub trait SpannedTypeVisitor<'tcx>: Sized {
     type Result: VisitorResult = ();
-    fn visit(&mut self, span: Span, value: impl TypeVisitable<TyCtxt<'tcx>>) -> Self::Result;
+    fn visit(
+        &mut self,
+        get_span: impl Fn() -> Span,
+        value: impl TypeVisitable<TyCtxt<'tcx>>,
+    ) -> Self::Result;
 }
 
 pub fn walk_types<'tcx, V: SpannedTypeVisitor<'tcx>>(
@@ -24,48 +28,61 @@ pub fn walk_types<'tcx, V: SpannedTypeVisitor<'tcx>>(
         // Walk over the signature of the function
         DefKind::AssocFn | DefKind::Fn => {
             let ty_sig = tcx.fn_sig(item).instantiate_identity();
-            let hir_sig = tcx.hir_node_by_def_id(item).fn_decl().unwrap();
+            let hir_sig = || tcx.hir_node_by_def_id(item).fn_decl().unwrap();
             // Walk over the inputs and outputs manually in order to get good spans for them.
-            try_visit!(visitor.visit(hir_sig.output.span(), ty_sig.output()));
-            for (hir, ty) in hir_sig.inputs.iter().zip(ty_sig.inputs().iter()) {
-                try_visit!(visitor.visit(hir.span, ty.map_bound(|x| *x)));
+            try_visit!(visitor.visit(|| hir_sig().output.span(), ty_sig.output()));
+            for (hir, ty) in ty_sig.inputs().iter().enumerate() {
+                try_visit!(visitor.visit(|| hir_sig().inputs[hir].span, ty.map_bound(|x| *x)));
             }
             for (pred, span) in tcx.predicates_of(item).instantiate_identity(tcx) {
-                try_visit!(visitor.visit(span, pred));
+                try_visit!(visitor.visit(||span, pred));
+            }
+        }
+        DefKind::AssocTy => {
+            if let Some(ty) = tcx.hir_node_by_def_id(item).ty() {
+                // Associated types in traits don't necessarily have a type that we can visit
+                try_visit!(visitor.visit(|| ty.span, tcx.type_of(item).instantiate_identity()));
+            }
+            for (pred, span) in tcx.predicates_of(item).instantiate_identity(tcx) {
+                try_visit!(visitor.visit(|| span, pred));
             }
         }
         // Walk over the type behind the alias
-        DefKind::TyAlias {..} | DefKind::AssocTy |
+        DefKind::TyAlias { .. } |
         // Walk over the type of the item
-        DefKind::Static(_) | DefKind::Const | DefKind::AssocConst | DefKind::AnonConst => {
-            if let Some(ty) = tcx.hir_node_by_def_id(item).ty() {
-                // Associated types in traits don't necessarily have a type that we can visit
-                try_visit!(visitor.visit(ty.span, tcx.type_of(item).instantiate_identity()));
-            }
+        DefKind::Static(_) | DefKind::Const | DefKind::AssocConst => {
+            let span = || tcx.hir_node_by_def_id(item).ty().unwrap().span;
+            try_visit!(visitor.visit(span, tcx.type_of(item).instantiate_identity()));
+
             for (pred, span) in tcx.predicates_of(item).instantiate_identity(tcx) {
-                try_visit!(visitor.visit(span, pred));
+                try_visit!(visitor.visit(|| span, pred));
+            }
+        }
+        DefKind::AnonConst => {
+            for (pred, span) in tcx.predicates_of(item).instantiate_identity(tcx) {
+                try_visit!(visitor.visit(|| span, pred));
             }
         }
         DefKind::OpaqueTy => {
             for (pred, span) in tcx.explicit_item_bounds(item).instantiate_identity_iter_copied() {
-                try_visit!(visitor.visit(span, pred));
+                try_visit!(visitor.visit(||span, pred));
             }
         }
         // Look at field types
         DefKind::Struct | DefKind::Union | DefKind::Enum => {
-            let span = tcx.def_ident_span(item).unwrap();
+            let span = || tcx.def_ident_span(item).unwrap();
             let ty = tcx.type_of(item).instantiate_identity();
             try_visit!(visitor.visit(span, ty));
             let ty::Adt(def, args) = ty.kind() else {
-                span_bug!(span, "invalid type for {kind:?}: {:#?}", ty.kind())
+                span_bug!(span(), "invalid type for {kind:?}: {:#?}", ty.kind())
             };
             for field in def.all_fields() {
-                let span = tcx.def_ident_span(field.did).unwrap();
+                let span = || tcx.def_ident_span(field.did).unwrap();
                 let ty = field.ty(tcx, args);
                 try_visit!(visitor.visit(span, ty));
             }
             for (pred, span) in tcx.predicates_of(item).instantiate_identity(tcx) {
-                try_visit!(visitor.visit(span, pred));
+                try_visit!(visitor.visit(|| span, pred));
             }
         }
         // These are not part of a public API, they can only appear as hidden types, and there
@@ -74,25 +91,33 @@ pub fn walk_types<'tcx, V: SpannedTypeVisitor<'tcx>>(
         DefKind::InlineConst | DefKind::Closure => {}
         DefKind::Impl { of_trait } => {
             if of_trait {
-                let span = tcx.hir_node_by_def_id(item).expect_item().expect_impl().of_trait.unwrap().path.span;
+                let span = || {
+                    tcx.hir_node_by_def_id(item)
+                        .expect_item()
+                        .expect_impl()
+                        .of_trait
+                        .unwrap()
+                        .path
+                        .span
+                };
                 let args = &tcx.impl_trait_ref(item).unwrap().instantiate_identity().args[1..];
                 try_visit!(visitor.visit(span, args));
             }
-            let span = match tcx.hir_node_by_def_id(item).ty() {
+            let span = || match tcx.hir_node_by_def_id(item).ty() {
                 Some(ty) => ty.span,
                 _ => tcx.def_span(item),
             };
             try_visit!(visitor.visit(span, tcx.type_of(item).instantiate_identity()));
             for (pred, span) in tcx.predicates_of(item).instantiate_identity(tcx) {
-                try_visit!(visitor.visit(span, pred));
+                try_visit!(visitor.visit(|| span, pred));
             }
         }
         DefKind::TraitAlias | DefKind::Trait => {
             for (pred, span) in tcx.predicates_of(item).instantiate_identity(tcx) {
-                try_visit!(visitor.visit(span, pred));
+                try_visit!(visitor.visit(|| span, pred));
             }
         }
-        | DefKind::Variant
+        DefKind::Variant
         | DefKind::TyParam
         | DefKind::ConstParam
         | DefKind::Ctor(_, _)
@@ -104,7 +129,7 @@ pub fn walk_types<'tcx, V: SpannedTypeVisitor<'tcx>>(
             )
         }
         // These don't have any types.
-        | DefKind::ExternCrate
+        DefKind::ExternCrate
         | DefKind::ForeignMod
         | DefKind::ForeignTy
         | DefKind::Macro(_)

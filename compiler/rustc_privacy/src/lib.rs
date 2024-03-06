@@ -1066,8 +1066,12 @@ impl<'tcx> TypePrivacyVisitor<'tcx> {
 
 impl<'tcx> rustc_ty_utils::sig_types::SpannedTypeVisitor<'tcx> for TypePrivacyVisitor<'tcx> {
     type Result = ControlFlow<()>;
-    fn visit(&mut self, span: Span, value: impl TypeVisitable<TyCtxt<'tcx>>) -> Self::Result {
-        self.span = span;
+    fn visit(
+        &mut self,
+        get_span: impl Fn() -> Span,
+        value: impl TypeVisitable<TyCtxt<'tcx>>,
+    ) -> Self::Result {
+        self.span = get_span();
         value.visit_with(&mut self.skeleton())
     }
 }

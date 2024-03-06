@@ -167,7 +167,7 @@ impl<'tcx, 'a> OpaqueTypeCollector<'tcx, 'a> {
                     .instantiate_identity_iter_copied()
                 {
                     trace!(?pred);
-                    self.visit(span, pred);
+                    self.visit(|| span, pred);
                 }
             }
             Err(NotUniqueParam::NotParam(arg)) => {
@@ -189,9 +189,12 @@ impl<'tcx, 'a> OpaqueTypeCollector<'tcx, 'a> {
 }
 
 impl<'tcx> SpannedTypeVisitor<'tcx> for OpaqueTypeCollector<'tcx, '_> {
-    #[instrument(skip(self), ret, level = "trace")]
-    fn visit(&mut self, span: Span, value: impl TypeVisitable<TyCtxt<'tcx>>) {
-        let get_span = || span;
+    #[instrument(skip(self, get_span), ret, level = "trace")]
+    fn visit(
+        &mut self,
+        get_span: impl Fn() -> Span,
+        value: impl TypeVisitable<TyCtxt<'tcx>>,
+    ) -> Self::Result {
         let mut nested = OpaqueTypeCollector {
             get_span: &get_span,
             tcx: self.tcx,
@@ -204,6 +207,8 @@ impl<'tcx> SpannedTypeVisitor<'tcx> for OpaqueTypeCollector<'tcx, '_> {
         self.opaques = nested.opaques;
         self.seen = nested.seen;
     }
+
+    type Result = ();
 }
 
 impl<'tcx> TypeVisitor<TyCtxt<'tcx>> for OpaqueTypeCollector<'tcx, '_> {
@@ -283,7 +288,8 @@ impl<'tcx> TypeVisitor<TyCtxt<'tcx>> for OpaqueTypeCollector<'tcx, '_> {
                         // would have to walk all generic parameters of an Adt, which can quickly
                         // degenerate into looking at an exponential number of types.
                         let ty = self.tcx.type_of(field.did).instantiate_identity();
-                        self.visit(self.tcx.def_span(field.did), ty);
+                        let tcx = self.tcx;
+                        self.visit(|| tcx.def_span(field.did), ty);
                     }
                 }
             }
