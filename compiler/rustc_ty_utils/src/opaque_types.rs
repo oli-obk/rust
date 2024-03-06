@@ -12,7 +12,7 @@ use rustc_trait_selection::traits::check_args_compatible;
 use crate::errors::{DuplicateArg, NotParam};
 use crate::sig_types::SpannedTypeVisitor;
 
-struct OpaqueTypeCollector<'tcx> {
+struct OpaqueTypeCollector<'tcx, 'a> {
     tcx: TyCtxt<'tcx>,
     opaques: Vec<LocalDefId>,
     /// The `DefId` of the item which we are collecting opaque types for.
@@ -21,11 +21,12 @@ struct OpaqueTypeCollector<'tcx> {
     /// Avoid infinite recursion due to recursive declarations.
     seen: FxHashSet<LocalDefId>,
 
-    span: Option<Span>,
+    get_span: &'a dyn Fn() -> Span,
 
     mode: CollectionMode,
 }
 
+#[derive(Copy, Clone)]
 enum CollectionMode {
     /// For impl trait in assoc types we only permit collecting them from
     /// associated types of the same impl block.
@@ -33,19 +34,17 @@ enum CollectionMode {
     TypeAliasImplTraitTransition,
 }
 
-impl<'tcx> OpaqueTypeCollector<'tcx> {
-    fn new(tcx: TyCtxt<'tcx>, item: LocalDefId) -> Self {
+impl<'tcx, 'a> OpaqueTypeCollector<'tcx, 'a> {
+    fn new(tcx: TyCtxt<'tcx>, item: LocalDefId, get_span: &'a dyn Fn() -> Span) -> Self {
         let mode = match tcx.def_kind(tcx.local_parent(item)) {
             DefKind::Impl { of_trait: true } => CollectionMode::ImplTraitInAssocTypes,
             _ => CollectionMode::TypeAliasImplTraitTransition,
         };
-        Self { tcx, opaques: Vec::new(), item, seen: Default::default(), span: None, mode }
+        Self { tcx, opaques: Vec::new(), item, seen: Default::default(), get_span, mode }
     }
 
     fn span(&self) -> Span {
-        self.span.unwrap_or_else(|| {
-            self.tcx.def_ident_span(self.item).unwrap_or_else(|| self.tcx.def_span(self.item))
-        })
+        (self.get_span)()
     }
 
     fn parent_trait_ref(&self) -> Option<ty::TraitRef<'tcx>> {
@@ -103,10 +102,10 @@ impl<'tcx> OpaqueTypeCollector<'tcx> {
     #[instrument(level = "trace", skip(self))]
     fn collect_taits_declared_in_body(&mut self) {
         let body = self.tcx.hir().body(self.tcx.hir().body_owned_by(self.item)).value;
-        struct TaitInBodyFinder<'a, 'tcx> {
-            collector: &'a mut OpaqueTypeCollector<'tcx>,
+        struct TaitInBodyFinder<'a, 'b, 'tcx> {
+            collector: &'a mut OpaqueTypeCollector<'tcx, 'b>,
         }
-        impl<'v> intravisit::Visitor<'v> for TaitInBodyFinder<'_, '_> {
+        impl<'v> intravisit::Visitor<'v> for TaitInBodyFinder<'_, '_, '_> {
             #[instrument(level = "trace", skip(self))]
             fn visit_nested_item(&mut self, id: rustc_hir::ItemId) {
                 let id = id.owner_id.def_id;
@@ -189,17 +188,25 @@ impl<'tcx> OpaqueTypeCollector<'tcx> {
     }
 }
 
-impl<'tcx> SpannedTypeVisitor<'tcx> for OpaqueTypeCollector<'tcx> {
+impl<'tcx> SpannedTypeVisitor<'tcx> for OpaqueTypeCollector<'tcx, '_> {
     #[instrument(skip(self), ret, level = "trace")]
     fn visit(&mut self, span: Span, value: impl TypeVisitable<TyCtxt<'tcx>>) {
-        let old = self.span;
-        self.span = Some(span);
-        value.visit_with(self);
-        self.span = old;
+        let get_span = || span;
+        let mut nested = OpaqueTypeCollector {
+            get_span: &get_span,
+            tcx: self.tcx,
+            opaques: std::mem::take(&mut self.opaques),
+            item: self.item,
+            seen: std::mem::take(&mut self.seen),
+            mode: self.mode,
+        };
+        value.visit_with(&mut nested);
+        self.opaques = nested.opaques;
+        self.seen = nested.seen;
     }
 }
 
-impl<'tcx> TypeVisitor<TyCtxt<'tcx>> for OpaqueTypeCollector<'tcx> {
+impl<'tcx> TypeVisitor<TyCtxt<'tcx>> for OpaqueTypeCollector<'tcx, '_> {
     #[instrument(skip(self), ret, level = "trace")]
     fn visit_ty(&mut self, t: Ty<'tcx>) {
         t.super_visit_with(self);
@@ -291,7 +298,8 @@ fn opaque_types_defined_by<'tcx>(
 ) -> &'tcx ty::List<LocalDefId> {
     let kind = tcx.def_kind(item);
     trace!(?kind);
-    let mut collector = OpaqueTypeCollector::new(tcx, item);
+    let default_span = || tcx.def_ident_span(item).unwrap_or_else(|| tcx.def_span(item));
+    let mut collector = OpaqueTypeCollector::new(tcx, item, &default_span);
     super::sig_types::walk_types(tcx, item, &mut collector);
     match kind {
         DefKind::AssocFn
