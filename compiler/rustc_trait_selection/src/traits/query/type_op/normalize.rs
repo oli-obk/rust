@@ -3,14 +3,14 @@ use crate::traits::ObligationCtxt;
 use rustc_middle::traits::query::NoSolution;
 use rustc_middle::traits::ObligationCause;
 use rustc_middle::ty::fold::TypeFoldable;
-use rustc_middle::ty::{self, Lift, ParamEnvAnd, Ty, TyCtxt, TypeVisitableExt};
+use rustc_middle::ty::{self, Lift, ParamEnvAnd, QueryInput, Ty, TyCtxt, TypeVisitableExt};
 use std::fmt;
 
 pub use rustc_middle::traits::query::type_op::Normalize;
 
 impl<'tcx, T> super::QueryTypeOp<'tcx> for Normalize<T>
 where
-    T: Normalizable<'tcx> + 'tcx,
+    T: Normalizable<'tcx> + QueryInput<TyCtxt<'tcx>> + 'tcx,
 {
     type QueryResponse = T;
 

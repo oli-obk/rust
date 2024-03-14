@@ -3,12 +3,14 @@ use crate::traits::query::NoSolution;
 use crate::traits::wf;
 use crate::traits::ObligationCtxt;
 
+use rustc_hir::def_id::LocalDefId;
 use rustc_infer::infer::canonical::Canonical;
 use rustc_infer::infer::outlives::components::{push_outlives_components, Component};
 use rustc_infer::infer::resolve::OpportunisticRegionResolver;
 use rustc_infer::traits::query::OutlivesBound;
 use rustc_middle::infer::canonical::CanonicalQueryResponse;
 use rustc_middle::traits::ObligationCause;
+use rustc_middle::ty::QueryInput;
 use rustc_middle::ty::{self, ParamEnvAnd, Ty, TyCtxt, TypeFolder, TypeVisitableExt};
 use rustc_span::def_id::CRATE_DEF_ID;
 use rustc_span::DUMMY_SP;
@@ -17,6 +19,13 @@ use smallvec::{smallvec, SmallVec};
 #[derive(Copy, Clone, Debug, HashStable, TypeFoldable, TypeVisitable)]
 pub struct ImpliedOutlivesBounds<'tcx> {
     pub ty: Ty<'tcx>,
+    pub defining_opaque_types: &'tcx ty::List<LocalDefId>,
+}
+
+impl<'tcx> QueryInput<TyCtxt<'tcx>> for ImpliedOutlivesBounds<'tcx> {
+    fn defining_opaque_types(&self) -> &'tcx ty::List<LocalDefId> {
+        self.defining_opaque_types
+    }
 }
 
 impl<'tcx> super::QueryTypeOp<'tcx> for ImpliedOutlivesBounds<'tcx> {

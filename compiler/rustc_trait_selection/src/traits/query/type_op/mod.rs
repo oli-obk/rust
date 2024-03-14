@@ -8,7 +8,7 @@ use rustc_infer::infer::canonical::Certainty;
 use rustc_infer::traits::PredicateObligations;
 use rustc_middle::traits::query::NoSolution;
 use rustc_middle::ty::fold::TypeFoldable;
-use rustc_middle::ty::{ParamEnvAnd, TyCtxt};
+use rustc_middle::ty::{ParamEnvAnd, QueryInput, TyCtxt};
 use rustc_span::Span;
 use std::fmt;
 
@@ -61,7 +61,7 @@ pub struct TypeOpOutput<'tcx, Op: TypeOp<'tcx>> {
 /// which produces the resulting query region constraints.
 ///
 /// [c]: https://rust-lang.github.io/chalk/book/canonical_queries/canonicalization.html
-pub trait QueryTypeOp<'tcx>: fmt::Debug + Copy + TypeFoldable<TyCtxt<'tcx>> + 'tcx {
+pub trait QueryTypeOp<'tcx>: fmt::Debug + Copy + QueryInput<TyCtxt<'tcx>> + 'tcx {
     type QueryResponse: TypeFoldable<TyCtxt<'tcx>>;
 
     /// Give query the option for a simple fast path that never
@@ -176,7 +176,10 @@ where
             for obligation in std::mem::take(&mut obligations) {
                 let obligation = infcx.resolve_vars_if_possible(obligation);
                 match ProvePredicate::fully_perform_into(
-                    obligation.param_env.and(ProvePredicate::new(obligation.predicate)),
+                    obligation.param_env.and(ProvePredicate::new(
+                        obligation.predicate,
+                        infcx.defining_opaque_types,
+                    )),
                     infcx,
                     &mut region_constraints,
                     span,

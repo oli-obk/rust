@@ -5,6 +5,7 @@ pub use relate::combine::CombineFields;
 pub use relate::combine::ObligationEmittingRelation;
 pub use relate::StructurallyRelateAliases;
 pub use rustc_middle::ty::IntVarValue;
+use rustc_middle::ty::QueryInput;
 pub use BoundRegionConversionTime::*;
 pub use RegionVariableOrigin::*;
 pub use SubregionOrigin::*;
@@ -677,9 +678,10 @@ impl<'tcx> InferCtxtBuilder<'tcx> {
         canonical: &Canonical<'tcx, T>,
     ) -> (InferCtxt<'tcx>, T, CanonicalVarValues<'tcx>)
     where
-        T: TypeFoldable<TyCtxt<'tcx>>,
+        T: QueryInput<TyCtxt<'tcx>>,
     {
-        let infcx = self.with_defining_opaque_types(canonical.defining_opaque_types).build();
+        let infcx =
+            self.with_defining_opaque_types(canonical.value.defining_opaque_types()).build();
         let (value, args) = infcx.instantiate_canonical_with_fresh_inference_vars(span, canonical);
         (infcx, value, args)
     }

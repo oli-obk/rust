@@ -2,6 +2,7 @@ use smallvec::SmallVec;
 use std::fmt::Debug;
 use std::hash::Hash;
 
+use crate::fold::TypeFoldable;
 use crate::visit::{Flags, TypeSuperVisitable, TypeVisitable};
 use crate::{
     new, BoundVar, BoundVars, CanonicalVarInfo, ConstKind, DebugWithInfcx, RegionKind, TyKind,
@@ -10,7 +11,7 @@ use crate::{
 
 pub trait Interner: Sized {
     type DefId: Copy + Debug + Hash + Ord;
-    type DefiningOpaqueTypes: Copy + Debug + Hash + Default;
+    type DefiningOpaqueTypes: Copy + Debug + Hash + Default + TypeFoldable<Self>;
     type AdtDef: Copy + Debug + Hash + Ord;
 
     type GenericArgs: Copy

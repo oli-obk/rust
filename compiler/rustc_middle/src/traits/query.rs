@@ -13,42 +13,79 @@ use crate::ty::{self, Ty, TyCtxt};
 use rustc_span::Span;
 
 pub mod type_op {
-    use crate::ty::fold::TypeFoldable;
-    use crate::ty::{Predicate, Ty, TyCtxt, UserType};
+    use rustc_hir::def_id::LocalDefId;
+    use rustc_type_ir::QueryInput;
+
+    use crate::ty::{self, Predicate, Ty, TyCtxt, UserType};
     use std::fmt;
 
     #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, HashStable, TypeFoldable, TypeVisitable)]
     pub struct AscribeUserType<'tcx> {
+        pub defining_opaque_types: &'tcx ty::List<LocalDefId>,
         pub mir_ty: Ty<'tcx>,
         pub user_ty: UserType<'tcx>,
     }
 
     impl<'tcx> AscribeUserType<'tcx> {
-        pub fn new(mir_ty: Ty<'tcx>, user_ty: UserType<'tcx>) -> Self {
-            Self { mir_ty, user_ty }
+        pub fn new(
+            mir_ty: Ty<'tcx>,
+            user_ty: UserType<'tcx>,
+            defining_opaque_types: &'tcx ty::List<LocalDefId>,
+        ) -> Self {
+            Self { mir_ty, user_ty, defining_opaque_types }
+        }
+    }
+
+    impl<'tcx> QueryInput<TyCtxt<'tcx>> for AscribeUserType<'tcx> {
+        fn defining_opaque_types(&self) -> &'tcx ty::List<LocalDefId> {
+            self.defining_opaque_types
         }
     }
 
     #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, HashStable, TypeFoldable, TypeVisitable)]
     pub struct Eq<'tcx> {
+        pub defining_opaque_types: &'tcx ty::List<LocalDefId>,
         pub a: Ty<'tcx>,
         pub b: Ty<'tcx>,
     }
 
+    impl<'tcx> QueryInput<TyCtxt<'tcx>> for Eq<'tcx> {
+        fn defining_opaque_types(&self) -> &'tcx ty::List<LocalDefId> {
+            self.defining_opaque_types
+        }
+    }
+
     #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, HashStable, TypeFoldable, TypeVisitable)]
     pub struct Subtype<'tcx> {
+        pub defining_opaque_types: &'tcx ty::List<LocalDefId>,
         pub sub: Ty<'tcx>,
         pub sup: Ty<'tcx>,
     }
 
+    impl<'tcx> QueryInput<TyCtxt<'tcx>> for Subtype<'tcx> {
+        fn defining_opaque_types(&self) -> &'tcx ty::List<LocalDefId> {
+            self.defining_opaque_types
+        }
+    }
+
     #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, HashStable, TypeFoldable, TypeVisitable)]
     pub struct ProvePredicate<'tcx> {
+        pub defining_opaque_types: &'tcx ty::List<LocalDefId>,
         pub predicate: Predicate<'tcx>,
     }
 
     impl<'tcx> ProvePredicate<'tcx> {
-        pub fn new(predicate: Predicate<'tcx>) -> Self {
-            ProvePredicate { predicate }
+        pub fn new(
+            predicate: Predicate<'tcx>,
+            defining_opaque_types: &'tcx ty::List<LocalDefId>,
+        ) -> Self {
+            ProvePredicate { predicate, defining_opaque_types }
+        }
+    }
+
+    impl<'tcx> QueryInput<TyCtxt<'tcx>> for ProvePredicate<'tcx> {
+        fn defining_opaque_types(&self) -> &'tcx ty::List<LocalDefId> {
+            self.defining_opaque_types
         }
     }
 
@@ -59,10 +96,15 @@ pub mod type_op {
 
     impl<'tcx, T> Normalize<T>
     where
-        T: fmt::Debug + TypeFoldable<TyCtxt<'tcx>>,
+        T: fmt::Debug + QueryInput<TyCtxt<'tcx>>,
     {
         pub fn new(value: T) -> Self {
             Self { value }
+        }
+    }
+    impl<'tcx, T: QueryInput<TyCtxt<'tcx>>> QueryInput<TyCtxt<'tcx>> for Normalize<T> {
+        fn defining_opaque_types(&self) -> &'tcx ty::List<LocalDefId> {
+            self.value.defining_opaque_types()
         }
     }
 }

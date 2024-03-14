@@ -1,5 +1,6 @@
 use rustc_ast_ir::try_visit;
 use rustc_data_structures::intern::Interned;
+use rustc_hir::def_id::LocalDefId;
 use rustc_span::def_id::DefId;
 
 use crate::infer::canonical::{CanonicalVarValues, QueryRegionConstraints};
@@ -114,7 +115,16 @@ impl MaybeCause {
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, HashStable, TypeFoldable, TypeVisitable)]
 pub struct QueryInput<'tcx, T> {
     pub goal: Goal<'tcx, T>,
+    pub defining_opaque_types: &'tcx ty::List<LocalDefId>,
     pub predefined_opaques_in_body: PredefinedOpaques<'tcx>,
+}
+
+impl<'tcx, T: TypeFoldable<TyCtxt<'tcx>>> crate::ty::QueryInput<TyCtxt<'tcx>>
+    for QueryInput<'tcx, T>
+{
+    fn defining_opaque_types(&self) -> &'tcx ty::List<LocalDefId> {
+        self.defining_opaque_types
+    }
 }
 
 /// Additional constraints returned on success.

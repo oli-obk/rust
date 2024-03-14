@@ -2205,7 +2205,7 @@ rustc_queries! {
     /// equal to eachother. This might return `Ok` even if the types are not equal, but will never return `Err` if
     /// the types might be equal.
     query check_tys_might_be_eq(
-        arg: Canonical<'tcx, ty::ParamEnvAnd<'tcx, (Ty<'tcx>, Ty<'tcx>)>>
+        arg: Canonical<'tcx, ty::ParamEnvAnd<'tcx, (&'tcx ty::List<LocalDefId>, Ty<'tcx>, Ty<'tcx>)>>
     ) -> Result<(), NoSolution> {
         desc { "check whether two const param are definitely not equal to eachother"}
     }

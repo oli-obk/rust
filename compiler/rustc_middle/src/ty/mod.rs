@@ -1130,6 +1130,12 @@ pub struct ParamEnvAnd<'tcx, T> {
     pub value: T,
 }
 
+impl<'tcx, T: QueryInput<TyCtxt<'tcx>>> QueryInput<TyCtxt<'tcx>> for ParamEnvAnd<'tcx, T> {
+    fn defining_opaque_types(&self) -> &'tcx ty::List<LocalDefId> {
+        self.value.defining_opaque_types()
+    }
+}
+
 impl<'tcx, T> ParamEnvAnd<'tcx, T> {
     pub fn into_parts(self) -> (ParamEnv<'tcx>, T) {
         (self.param_env, self.value)

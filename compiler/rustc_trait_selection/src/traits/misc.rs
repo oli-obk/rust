@@ -3,6 +3,7 @@
 use crate::regions::InferCtxtRegionExt;
 use crate::traits::{self, ObligationCause, ObligationCtxt};
 
+use hir::def_id::LocalDefId;
 use hir::LangItem;
 use rustc_data_structures::fx::FxIndexSet;
 use rustc_hir as hir;
@@ -210,10 +211,13 @@ pub fn all_fields_implement_trait<'tcx>(
 
 pub fn check_tys_might_be_eq<'tcx>(
     tcx: TyCtxt<'tcx>,
-    canonical: Canonical<'tcx, ty::ParamEnvAnd<'tcx, (Ty<'tcx>, Ty<'tcx>)>>,
+    canonical: Canonical<
+        'tcx,
+        ty::ParamEnvAnd<'tcx, (&'tcx ty::List<LocalDefId>, Ty<'tcx>, Ty<'tcx>)>,
+    >,
 ) -> Result<(), NoSolution> {
     let (infcx, key, _) = tcx.infer_ctxt().build_with_canonical(DUMMY_SP, &canonical);
-    let (param_env, (ty_a, ty_b)) = key.into_parts();
+    let (param_env, (_, ty_a, ty_b)) = key.into_parts();
     let ocx = ObligationCtxt::new(&infcx);
 
     let result = ocx.eq(&ObligationCause::dummy(), param_env, ty_a, ty_b);

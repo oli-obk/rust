@@ -41,6 +41,7 @@ mod flags;
 mod infcx;
 mod interner;
 mod predicate_kind;
+mod query_input;
 mod region_kind;
 
 pub use binder::*;
@@ -53,6 +54,7 @@ pub use flags::*;
 pub use infcx::InferCtxtLike;
 pub use interner::*;
 pub use predicate_kind::*;
+pub use query_input::*;
 pub use region_kind::*;
 pub use ty_info::*;
 pub use ty_kind::*;

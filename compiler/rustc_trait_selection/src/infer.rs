@@ -9,7 +9,7 @@ use rustc_middle::arena::ArenaAllocatable;
 use rustc_middle::infer::canonical::{Canonical, CanonicalQueryResponse, QueryResponse};
 use rustc_middle::traits::query::NoSolution;
 use rustc_middle::traits::ObligationCause;
-use rustc_middle::ty::{self, Ty, TyCtxt, TypeFoldable, TypeVisitableExt};
+use rustc_middle::ty::{self, QueryInput, Ty, TyCtxt, TypeFoldable, TypeVisitableExt};
 use rustc_middle::ty::{GenericArg, ToPredicate};
 use rustc_span::DUMMY_SP;
 
@@ -129,7 +129,7 @@ impl<'tcx> InferCtxtBuilder<'tcx> {
         operation: impl FnOnce(&ObligationCtxt<'_, 'tcx>, K) -> Result<R, NoSolution>,
     ) -> Result<CanonicalQueryResponse<'tcx, R>, NoSolution>
     where
-        K: TypeFoldable<TyCtxt<'tcx>>,
+        K: QueryInput<TyCtxt<'tcx>>,
         R: Debug + TypeFoldable<TyCtxt<'tcx>>,
         Canonical<'tcx, QueryResponse<'tcx, R>>: ArenaAllocatable<'tcx>,
     {
