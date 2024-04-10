@@ -874,6 +874,7 @@ pub trait PrintState<'a>: std::ops::Deref<Target = pp::Printer> + std::ops::Dere
             token::Lt => "<".into(),
             token::Le => "<=".into(),
             token::EqEq => "==".into(),
+            token::Implication => "==>".into(),
             token::Ne => "!=".into(),
             token::Ge => ">=".into(),
             token::Gt => ">".into(),

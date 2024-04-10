@@ -269,6 +269,8 @@ pub enum TokenKind {
     Not,
     /// `~`
     Tilde,
+    /// `==>`
+    Implication,
     BinOp(BinOpToken),
     BinOpEq(BinOpToken),
 
@@ -397,6 +399,7 @@ impl TokenKind {
             RArrow => (BinOp(Minus), Gt),
             LArrow => (Lt, BinOp(Minus)),
             FatArrow => (Eq, Gt),
+            Implication => (EqEq, Gt),
             _ => return None,
         })
     }
@@ -409,6 +412,7 @@ impl TokenKind {
             Semi => Some(vec![Colon, Comma]),
             Colon => Some(vec![Semi]),
             FatArrow => Some(vec![Eq, RArrow, Ge, Gt]),
+            Implication => Some(vec![FatArrow, EqEq]),
             _ => None,
         }
     }
@@ -454,7 +458,8 @@ impl Token {
         match self.kind {
             Eq | Lt | Le | EqEq | Ne | Ge | Gt | AndAnd | OrOr | Not | Tilde | BinOp(_)
             | BinOpEq(_) | At | Dot | DotDot | DotDotDot | DotDotEq | Comma | Semi | Colon
-            | ModSep | RArrow | LArrow | FatArrow | Pound | Dollar | Question | SingleQuote => true,
+            | Implication | ModSep | RArrow | LArrow | FatArrow | Pound | Dollar | Question
+            | SingleQuote => true,
 
             OpenDelim(..) | CloseDelim(..) | Literal(..) | DocComment(..) | Ident(..)
             | Lifetime(..) | Interpolated(..) | Eof => false,
@@ -828,8 +833,12 @@ impl Token {
                 Ident(name, IdentIsRaw::No) => Lifetime(Symbol::intern(&format!("'{name}"))),
                 _ => return None,
             },
+            EqEq => match joint.kind {
+                Gt => Implication,
+                _ => return None,
+            },
 
-            Le | EqEq | Ne | Ge | AndAnd | OrOr | Tilde | BinOpEq(..) | At | DotDotDot
+            Implication | Le | Ne | Ge | AndAnd | OrOr | Tilde | BinOpEq(..) | At | DotDotDot
             | DotDotEq | Comma | Semi | ModSep | RArrow | LArrow | FatArrow | Pound | Dollar
             | Question | OpenDelim(..) | CloseDelim(..) | Literal(..) | Ident(..)
             | Lifetime(..) | Interpolated(..) | DocComment(..) | Eof => return None,

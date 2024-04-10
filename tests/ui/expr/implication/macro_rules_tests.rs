@@ -3,7 +3,7 @@ macro_rules! implication {
         0
     };
     ($a:expr ==> $b:expr) => {
-        //~^ ERROR: is followed by `==`, which is not allowed for `expr` fragments
+        //~^ ERROR: is followed by `==>`, which is not allowed for `expr` fragments
         1
     };
     ($x:expr) => {

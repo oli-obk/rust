@@ -1,8 +1,8 @@
-error: `$a:expr` is followed by `==`, which is not allowed for `expr` fragments
+error: `$a:expr` is followed by `==>`, which is not allowed for `expr` fragments
   --> $DIR/macro_rules_tests.rs:5:14
    |
-LL |     ($a:expr == $b:expr) => {
-   |              ^^ not allowed after `expr` fragments
+LL |     ($a:expr ==> $b:expr) => {
+   |              ^^^ not allowed after `expr` fragments
    |
    = note: allowed there are: `=>`, `,` or `;`
 

@@ -1,0 +1,26 @@
+error: expected one of `,`, `.`, `?`, or an operator, found `==>`
+  --> $DIR/usage.rs:2:19
+   |
+LL |     assert!(false ==> false);
+   |                   ^^^ expected one of `,`, `.`, `?`, or an operator
+
+error: expected one of `,`, `.`, `?`, or an operator, found `==>`
+  --> $DIR/usage.rs:4:19
+   |
+LL |     assert!(false ==> true);
+   |                   ^^^ expected one of `,`, `.`, `?`, or an operator
+
+error: expected one of `)`, `,`, `.`, `?`, or an operator, found `==>`
+  --> $DIR/usage.rs:6:20
+   |
+LL |     assert!(!(true ==> false));
+   |                    ^^^ expected one of `)`, `,`, `.`, `?`, or an operator
+
+error: expected one of `,`, `.`, `?`, or an operator, found `==>`
+  --> $DIR/usage.rs:8:18
+   |
+LL |     assert!(true ==> true);
+   |                  ^^^ expected one of `,`, `.`, `?`, or an operator
+
+error: aborting due to 4 previous errors
+
