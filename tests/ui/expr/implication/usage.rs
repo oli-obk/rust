@@ -1,10 +1,16 @@
+#![feature(implication_op)]
+//@run-pass
+
 fn main() {
     assert!(false ==> false);
-    //~^ ERROR found `==>`
     assert!(false ==> true);
-    //~^ ERROR found `==>`
     assert!(!(true ==> false));
-    //~^ ERROR found `==>`
     assert!(true ==> true);
-    //~^ ERROR found `==>`
+
+    let mut check = true;
+
+    _ = false ==> (check = false, false).1;
+    assert!(check);
+    _ = true ==> (check = false, true).1;
+    assert!(!check);
 }

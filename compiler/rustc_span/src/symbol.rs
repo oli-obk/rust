@@ -973,6 +973,7 @@ symbols! {
         impl_trait_in_fn_trait_return,
         impl_trait_projections,
         implement_via_object,
+        implication_op,
         implied_by,
         import,
         import_name_type,

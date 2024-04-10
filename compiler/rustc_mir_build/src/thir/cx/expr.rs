@@ -437,6 +437,11 @@ impl<'tcx> Cx<'tcx> {
                             lhs: self.mirror_expr(lhs),
                             rhs: self.mirror_expr(rhs),
                         },
+                        hir::BinOpKind::Implication => ExprKind::LogicalOp {
+                            op: LogicalOp::Implication,
+                            lhs: self.mirror_expr(lhs),
+                            rhs: self.mirror_expr(rhs),
+                        },
                         _ => {
                             let op = bin_op(op.node);
                             ExprKind::Binary {

@@ -958,6 +958,7 @@ fn lang_item_for_op(
             | hir::BinOpKind::Eq
             | hir::BinOpKind::Ne
             | hir::BinOpKind::And
+            | hir::BinOpKind::Implication
             | hir::BinOpKind::Or => {
                 span_bug!(span, "impossible assignment operation: {}=", op.node.as_str())
             }
@@ -980,7 +981,7 @@ fn lang_item_for_op(
             hir::BinOpKind::Gt => (sym::gt, lang.partial_ord_trait()),
             hir::BinOpKind::Eq => (sym::eq, lang.eq_trait()),
             hir::BinOpKind::Ne => (sym::ne, lang.eq_trait()),
-            hir::BinOpKind::And | hir::BinOpKind::Or => {
+            hir::BinOpKind::Implication | hir::BinOpKind::And | hir::BinOpKind::Or => {
                 span_bug!(span, "&& and || are not overloadable")
             }
         }
@@ -996,7 +997,7 @@ fn lang_item_for_op(
 // Binary operator categories. These categories summarize the behavior
 // with respect to the builtin operations supported.
 enum BinOpCategory {
-    /// &&, || -- cannot be overridden
+    /// ==>, &&, || -- cannot be overridden
     Shortcircuit,
 
     /// <<, >> -- when shifting a single integer, rhs can be any
@@ -1038,7 +1039,9 @@ impl BinOpCategory {
             | hir::BinOpKind::Ge
             | hir::BinOpKind::Gt => BinOpCategory::Comparison,
 
-            hir::BinOpKind::And | hir::BinOpKind::Or => BinOpCategory::Shortcircuit,
+            hir::BinOpKind::Implication | hir::BinOpKind::And | hir::BinOpKind::Or => {
+                BinOpCategory::Shortcircuit
+            }
         }
     }
 }

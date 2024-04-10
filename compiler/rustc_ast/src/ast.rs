@@ -873,6 +873,8 @@ pub enum BinOpKind {
     BitAnd,
     /// The `|` operator (bitwise or)
     BitOr,
+    /// The `==>` operator (boolean implication)
+    Implication,
     /// The `<<` operator (shift left)
     Shl,
     /// The `>>` operator (shift right)
@@ -907,6 +909,7 @@ impl BinOpKind {
             BitOr => "|",
             Shl => "<<",
             Shr => ">>",
+            Implication => "==>",
             Eq => "==",
             Lt => "<",
             Le => "<=",
@@ -917,7 +920,7 @@ impl BinOpKind {
     }
 
     pub fn is_lazy(&self) -> bool {
-        matches!(self, BinOpKind::And | BinOpKind::Or)
+        matches!(self, BinOpKind::And | BinOpKind::Or | BinOpKind::Implication)
     }
 
     pub fn is_comparison(self) -> bool {

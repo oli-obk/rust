@@ -168,7 +168,9 @@ impl<'tcx> LateLintPass<'tcx> for UnusedResults {
                 | hir::BinOpKind::Div
                 | hir::BinOpKind::Mul
                 | hir::BinOpKind::Rem => Some("arithmetic operation"),
-                hir::BinOpKind::And | hir::BinOpKind::Or => Some("logical operation"),
+                hir::BinOpKind::Implication | hir::BinOpKind::And | hir::BinOpKind::Or => {
+                    Some("logical operation")
+                }
                 hir::BinOpKind::BitXor
                 | hir::BinOpKind::BitAnd
                 | hir::BinOpKind::BitOr

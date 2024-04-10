@@ -542,6 +542,8 @@ pub enum LogicalOp {
     And,
     /// The `||` operator.
     Or,
+    /// The `==>` operator
+    Implication,
 }
 
 #[derive(Clone, Debug, HashStable)]

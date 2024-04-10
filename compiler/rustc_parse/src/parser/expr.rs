@@ -346,7 +346,11 @@ impl<'a> Parser<'a> {
                 | AssocOp::LessEqual
                 | AssocOp::NotEqual
                 | AssocOp::Greater
+                | AssocOp::Implication
                 | AssocOp::GreaterEqual => {
+                    if let AssocOp::Implication = op {
+                        self.psess.gated_spans.gate(sym::implication_op, cur_op_span);
+                    }
                     let ast_op = op.to_ast_binop().unwrap();
                     let binary = self.mk_binary(source_map::respan(cur_op_span, ast_op), lhs, rhs);
                     self.mk_expr(span, binary)

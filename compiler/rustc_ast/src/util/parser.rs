@@ -47,6 +47,8 @@ pub enum AssocOp {
     Assign,
     /// `?=` where ? is one of the BinOpToken
     AssignOp(BinOpToken),
+    /// `==>`
+    Implication,
     /// `as`
     As,
     /// `..` range
@@ -87,6 +89,7 @@ impl AssocOp {
             token::Ge => Some(GreaterEqual),
             token::Gt => Some(Greater),
             token::EqEq => Some(Equal),
+            token::Implication => Some(Implication),
             token::Ne => Some(NotEqual),
             token::AndAnd => Some(LAnd),
             token::OrOr => Some(LOr),
@@ -123,6 +126,7 @@ impl AssocOp {
             BinOpKind::BitOr => BitOr,
             BinOpKind::And => LAnd,
             BinOpKind::Or => LOr,
+            BinOpKind::Implication => Implication,
         }
     }
 
@@ -138,9 +142,10 @@ impl AssocOp {
             BitXor => 9,
             BitOr => 8,
             Less | Greater | LessEqual | GreaterEqual | Equal | NotEqual => 7,
-            LAnd => 6,
-            LOr => 5,
-            DotDot | DotDotEq => 4,
+            Implication => 6,
+            LAnd => 5,
+            LOr => 4,
+            DotDot | DotDotEq => 3,
             Assign | AssignOp(_) => 2,
         }
     }
@@ -153,7 +158,7 @@ impl AssocOp {
             Assign | AssignOp(_) => Fixity::Right,
             As | Multiply | Divide | Modulus | Add | Subtract | ShiftLeft | ShiftRight | BitAnd
             | BitXor | BitOr | Less | Greater | LessEqual | GreaterEqual | Equal | NotEqual
-            | LAnd | LOr => Fixity::Left,
+            | Implication | LAnd | LOr => Fixity::Left,
             DotDot | DotDotEq => Fixity::None,
         }
     }
@@ -163,9 +168,8 @@ impl AssocOp {
         match *self {
             Less | Greater | LessEqual | GreaterEqual | Equal | NotEqual => true,
             Assign | AssignOp(_) | As | Multiply | Divide | Modulus | Add | Subtract
-            | ShiftLeft | ShiftRight | BitAnd | BitXor | BitOr | LAnd | LOr | DotDot | DotDotEq => {
-                false
-            }
+            | Implication | ShiftLeft | ShiftRight | BitAnd | BitXor | BitOr | LAnd | LOr
+            | DotDot | DotDotEq => false,
         }
     }
 
@@ -175,7 +179,7 @@ impl AssocOp {
             Assign | AssignOp(_) => true,
             Less | Greater | LessEqual | GreaterEqual | Equal | NotEqual | As | Multiply
             | Divide | Modulus | Add | Subtract | ShiftLeft | ShiftRight | BitAnd | BitXor
-            | BitOr | LAnd | LOr | DotDot | DotDotEq => false,
+            | Implication | BitOr | LAnd | LOr | DotDot | DotDotEq => false,
         }
     }
 
@@ -200,6 +204,7 @@ impl AssocOp {
             BitOr => Some(BinOpKind::BitOr),
             LAnd => Some(BinOpKind::And),
             LOr => Some(BinOpKind::Or),
+            Implication => Some(BinOpKind::Implication),
             Assign | AssignOp(_) | As | DotDot | DotDotEq => None,
         }
     }
