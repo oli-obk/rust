@@ -2919,3 +2919,10 @@ pub struct UnsafeAttrOutsideUnsafeSuggestion {
 pub struct OutOfScopeMacroCalls {
     pub path: String,
 }
+
+#[derive(LintDiagnostic)]
+#[diag(lint_reserved_string)]
+pub struct ReservedString {
+    #[suggestion(code = " ", applicability = "machine-applicable")]
+    pub suggestion: Option<Span>,
+}
