@@ -2,6 +2,7 @@ use super::ObjectSafetyViolation;
 
 use crate::infer::InferCtxt;
 use rustc_data_structures::fx::FxIndexSet;
+use rustc_data_structures::unord::UnordSet;
 use rustc_errors::{codes::*, struct_span_code_err, Applicability, Diag, MultiSpan};
 use rustc_hir as hir;
 use rustc_hir::def_id::{DefId, LocalDefId};
@@ -123,14 +124,13 @@ pub fn report_object_safety_error<'tcx>(
 
     // Only provide the help if its a local trait, otherwise it's not actionable.
     if trait_span.is_some() {
-        let mut reported_violations: Vec<_> = reported_violations.into_iter().collect();
-        reported_violations.sort();
+        let mut dedup = UnordSet::new();
 
-        let mut potential_solutions: Vec<_> =
-            reported_violations.into_iter().map(|violation| violation.solution()).collect();
-        potential_solutions.sort();
-        // Allows us to skip suggesting that the same item should be moved to another trait multiple times.
-        potential_solutions.dedup();
+        let potential_solutions: Vec<_> = reported_violations
+            .into_iter()
+            .map(|violation| violation.solution())
+            .filter(|v| dedup.insert(v.clone()))
+            .collect();
         for solution in potential_solutions {
             solution.add_to(&mut err);
         }

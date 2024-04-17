@@ -766,7 +766,7 @@ pub enum BuiltinImplSource {
 
 TrivialTypeTraversalImpls! { BuiltinImplSource }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, HashStable, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, HashStable)]
 pub enum ObjectSafetyViolation {
     /// `Self: Sized` declared on the trait.
     SizedSelf(SmallVec<[Span; 1]>),
@@ -898,7 +898,7 @@ impl ObjectSafetyViolation {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ObjectSafetyViolationSolution {
     None,
     AddSelfOrMakeSized {
@@ -953,7 +953,7 @@ impl ObjectSafetyViolationSolution {
 }
 
 /// Reasons a method might not be object-safe.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, HashStable, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, HashStable)]
 pub enum MethodViolationCode {
     /// e.g., `fn foo()`
     StaticMethod(Option<(/* add &self */ (String, Span), /* add Self: Sized */ (String, Span))>),

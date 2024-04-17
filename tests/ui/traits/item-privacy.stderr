@@ -164,8 +164,8 @@ LL |     pub trait C: A + B {
 LL |         const C: u8 = 0;
    |               ^ ...because it contains this associated `const`
    = help: consider moving `C` to another trait
-   = help: consider moving `A` to another trait
    = help: consider moving `B` to another trait
+   = help: consider moving `A` to another trait
    = help: only type `S` implements the trait, consider using it directly instead
 
 error[E0223]: ambiguous associated type
