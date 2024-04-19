@@ -1064,7 +1064,7 @@ pub struct Resolver<'a, 'tcx> {
     /// `use` injections are delayed for better placement and deduplication.
     use_injections: Vec<UseError<'tcx>>,
     /// Crate-local macro expanded `macro_export` referred to by a module-relative path.
-    macro_expanded_macro_export_errors: BTreeSet<(Span, Span)>,
+    macro_expanded_macro_export_errors: FxIndexSet<(Span, Span)>,
 
     arenas: &'a ResolverArenas<'a>,
     dummy_binding: NameBinding<'a>,
@@ -1431,7 +1431,7 @@ impl<'a, 'tcx> Resolver<'a, 'tcx> {
             privacy_errors: Vec::new(),
             ambiguity_errors: Vec::new(),
             use_injections: Vec::new(),
-            macro_expanded_macro_export_errors: BTreeSet::new(),
+            macro_expanded_macro_export_errors: FxIndexSet::default(),
 
             arenas,
             dummy_binding: (Res::Err, pub_vis, DUMMY_SP, LocalExpnId::ROOT).to_name_binding(arenas),
