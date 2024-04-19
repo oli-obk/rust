@@ -2,7 +2,7 @@ error: unreachable statement
   --> $DIR/expr_loop.rs:8:5
    |
 LL |     loop { return; }
-   |            ------ any code following this expression is unreachable
+   |     ---------------- any code following this expression is unreachable
 LL |     println!("I am dead.");
    |     ^^^^^^^^^^^^^^^^^^^^^^ unreachable statement
    |
@@ -17,7 +17,7 @@ error: unreachable statement
   --> $DIR/expr_loop.rs:21:5
    |
 LL |     loop { return; }
-   |            ------ any code following this expression is unreachable
+   |     ---------------- any code following this expression is unreachable
 LL |     println!("I am dead.");
    |     ^^^^^^^^^^^^^^^^^^^^^^ unreachable statement
    |

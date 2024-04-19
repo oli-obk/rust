@@ -6,7 +6,13 @@ use std::{cmp, ops};
 /// wake). Tracked semi-automatically (through type variables marked
 /// as diverging), with some manual adjustments for control-flow
 /// primitives (approximating a CFG).
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, derivative::Derivative)]
+#[derivative(
+    PartialOrd,
+    Ord,
+    PartialOrd = "feature_allow_slow_enum",
+    Ord = "feature_allow_slow_enum"
+)]
 pub enum Diverges {
     /// Potentially unknown, some cases converge,
     /// others require a CFG to determine them.
@@ -18,6 +24,10 @@ pub enum Diverges {
         /// The `Span` points to the expression
         /// that caused us to diverge
         /// (e.g. `return`, `break`, etc).
+        #[derivative(
+            PartialOrd(compare_with = "Span::partial_cmp_ignore_expansions"),
+            Ord(compare_with = "Span::cmp_ignore_expansions")
+        )]
         span: Span,
         /// In some cases (e.g. a `match` expression
         /// where all arms diverge), we may be

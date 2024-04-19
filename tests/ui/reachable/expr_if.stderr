@@ -18,11 +18,14 @@ LL | #![deny(unreachable_code)]
 error: unreachable statement
   --> $DIR/expr_if.rs:27:5
    |
-LL |         return;
-   |         ------ any code following this expression is unreachable
+LL |       if {true} {
+   |  _______________-
+LL | |         return;
+LL | |     } else {
+   | |_____- any code following this expression is unreachable
 ...
-LL |     println!("But I am.");
-   |     ^^^^^^^^^^^^^^^^^^^^^ unreachable statement
+LL |       println!("But I am.");
+   |       ^^^^^^^^^^^^^^^^^^^^^ unreachable statement
    |
    = note: this error originates in the macro `println` (in Nightly builds, run with -Z macro-backtrace for more info)
 

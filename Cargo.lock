@@ -4012,6 +4012,7 @@ dependencies = [
 name = "rustc_hir_typeck"
 version = "0.0.0"
 dependencies = [
+ "derivative",
  "itertools 0.12.1",
  "rustc_ast",
  "rustc_ast_ir",
