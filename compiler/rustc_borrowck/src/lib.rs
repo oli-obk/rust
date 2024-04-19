@@ -2391,6 +2391,7 @@ impl<'cx, 'tcx> MirBorrowckCtxt<'cx, 'tcx> {
 
 mod diags {
     use rustc_errors::ErrorGuaranteed;
+    use rustc_span::BytePos;
 
     use super::*;
 
@@ -2400,11 +2401,13 @@ mod diags {
     }
 
     impl<'tcx> BufferedDiag<'tcx> {
-        fn sort_span(&self) -> Span {
-            match self {
+        /// Sort by the `Span`'s position within files, ignoring all expansion information.
+        fn sort_span(&self) -> (BytePos, BytePos) {
+            let span = match self {
                 BufferedDiag::Error(diag) => diag.sort_span,
                 BufferedDiag::NonError(diag) => diag.sort_span,
-            }
+            };
+            (span.lo(), span.hi())
         }
     }
 
