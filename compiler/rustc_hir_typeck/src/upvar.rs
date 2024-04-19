@@ -86,7 +86,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
 /// Intermediate format to store the hir_id pointing to the use that resulted in the
 /// corresponding place being captured and a String which contains the captured value's
 /// name (i.e: a.b.c)
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 enum UpvarMigrationInfo {
     /// We previously captured all of `x`, but now we capture some sub-path.
     CapturingPrecise { source_expr: Option<HirId>, var_name: String },
@@ -1356,7 +1356,14 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             }
 
             let mut capture_diagnostic = capture_diagnostic.into_iter().collect::<Vec<_>>();
-            capture_diagnostic.sort();
+            capture_diagnostic.sort_by_key(|info| match info {
+                UpvarMigrationInfo::CapturingPrecise { source_expr, var_name } => {
+                    Ok((source_expr.is_some(), var_name.clone()))
+                }
+                UpvarMigrationInfo::CapturingNothing { use_span } => {
+                    Err((use_span.lo(), use_span.hi()))
+                }
+            });
             for captures_info in capture_diagnostic {
                 // Get the auto trait reasons of why migration is needed because of that capture, if there are any
                 let capture_trait_reasons =
