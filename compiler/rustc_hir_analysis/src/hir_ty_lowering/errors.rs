@@ -6,7 +6,6 @@ use crate::fluent_generated as fluent;
 use crate::hir_ty_lowering::HirTyLowerer;
 use crate::traits::error_reporting::report_object_safety_error;
 use rustc_data_structures::fx::{FxIndexMap, FxIndexSet};
-use rustc_data_structures::sorted_map::SortedMap;
 use rustc_data_structures::unord::UnordMap;
 use rustc_errors::MultiSpan;
 use rustc_errors::{
@@ -586,14 +585,14 @@ impl<'tcx> dyn HirTyLowerer<'tcx> + '_ {
             return err.emit();
         }
 
-        let mut bound_spans: SortedMap<Span, Vec<String>> = Default::default();
+        let mut bound_spans: FxIndexMap<Span, Vec<String>> = Default::default();
 
         let mut bound_span_label = |self_ty: Ty<'_>, obligation: &str, quiet: &str| {
             let msg = format!("`{}`", if obligation.len() > 50 { quiet } else { obligation });
             match &self_ty.kind() {
                 // Point at the type that couldn't satisfy the bound.
                 ty::Adt(def, _) => {
-                    bound_spans.get_mut_or_insert_default(tcx.def_span(def.did())).push(msg)
+                    bound_spans.entry(tcx.def_span(def.did())).or_default().push(msg)
                 }
                 // Point at the trait object that couldn't satisfy the bound.
                 ty::Dynamic(preds, _, _) => {
@@ -601,7 +600,8 @@ impl<'tcx> dyn HirTyLowerer<'tcx> + '_ {
                         match pred.skip_binder() {
                             ty::ExistentialPredicate::Trait(tr) => {
                                 bound_spans
-                                    .get_mut_or_insert_default(tcx.def_span(tr.def_id))
+                                    .entry(tcx.def_span(tr.def_id))
+                                    .or_default()
                                     .push(msg.clone());
                             }
                             ty::ExistentialPredicate::Projection(_)
@@ -612,7 +612,8 @@ impl<'tcx> dyn HirTyLowerer<'tcx> + '_ {
                 // Point at the closure that couldn't satisfy the bound.
                 ty::Closure(def_id, _) => {
                     bound_spans
-                        .get_mut_or_insert_default(tcx.def_span(*def_id))
+                        .entry(tcx.def_span(*def_id))
+                        .or_default()
                         .push(format!("`{quiet}`"));
                 }
                 _ => {}
@@ -682,6 +683,7 @@ impl<'tcx> dyn HirTyLowerer<'tcx> + '_ {
             format!("associated type cannot be referenced on `{self_ty}` due to unsatisfied trait bounds")
         );
 
+        bound_spans.sort_by_cached_key(|k, _| (k.lo(), k.hi()));
         for (span, mut bounds) in bound_spans {
             if !tcx.sess.source_map().is_span_accessible(span) {
                 continue;
@@ -832,7 +834,7 @@ impl<'tcx> dyn HirTyLowerer<'tcx> + '_ {
         names.sort();
         let names = names.join(", ");
 
-        trait_bound_spans.sort();
+        trait_bound_spans.sort_by_key(|s| (s.lo(), s.hi()));
         let mut err = struct_span_code_err!(
             tcx.dcx(),
             trait_bound_spans,
@@ -954,7 +956,7 @@ impl<'tcx> dyn HirTyLowerer<'tcx> + '_ {
                 }
             }
         }
-        suggestions.sort_by_key(|&(span, _)| span);
+        suggestions.sort_by_key(|&(span, _)| (span.lo(), span.hi()));
         // There are cases where one bound points to a span within another bound's span, like when
         // you have code like the following (#115019), so we skip providing a suggestion in those
         // cases to avoid having a malformed suggestion.

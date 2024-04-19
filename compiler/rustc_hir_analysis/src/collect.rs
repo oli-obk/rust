@@ -334,7 +334,7 @@ fn bad_placeholder<'tcx>(
 ) -> Diag<'tcx> {
     let kind = if kind.ends_with('s') { format!("{kind}es") } else { format!("{kind}s") };
 
-    spans.sort();
+    spans.sort_by_key(|s| (s.lo(), s.hi()));
     tcx.dcx().create_err(errors::PlaceholderNotAllowedItemSignatures { spans, kind })
 }
 

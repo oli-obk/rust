@@ -435,7 +435,7 @@ impl MultiSpan {
     }
 
     pub fn from_spans(mut vec: Vec<Span>) -> MultiSpan {
-        vec.sort();
+        vec.sort_by_key(|span| (span.lo(), span.hi()));
         MultiSpan { primary_spans: vec, span_labels: vec![] }
     }
 

@@ -275,7 +275,10 @@ pub fn recursive_type_error(
     let start_index = item_and_field_ids
         .iter()
         .enumerate()
-        .min_by_key(|&(_, &(id, _))| tcx.def_span(id))
+        .min_by_key(|&(_, &(id, _))| {
+            let span = tcx.def_span(id);
+            (span.lo(), span.hi())
+        })
         .unwrap()
         .0;
     item_and_field_ids.rotate_left(start_index);

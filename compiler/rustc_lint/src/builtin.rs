@@ -2178,7 +2178,7 @@ impl<'tcx> LateLintPass<'tcx> for ExplicitOutlivesRequirements {
 
                 // Due to macros, there might be several predicates with the same span
                 // and we only want to suggest removing them once.
-                lint_spans.sort_unstable();
+                lint_spans.sort_by_cached_key(|s| (s.lo(), s.hi()));
                 lint_spans.dedup();
 
                 cx.emit_span_lint(

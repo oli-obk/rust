@@ -581,7 +581,7 @@ impl<'cx, 'tcx> MirBorrowckCtxt<'cx, 'tcx> {
                 .errors
                 .iter()
                 .map(|(sp, _)| *sp)
-                .any(|sp| span < sp && !sp.contains(span))
+                .any(|sp| span.lo() < sp.lo() && !sp.contains(span))
         }) {
             show_assign_sugg = true;
             "isn't initialized"
@@ -610,7 +610,7 @@ impl<'cx, 'tcx> MirBorrowckCtxt<'cx, 'tcx> {
 
         let mut shown = false;
         for (sp, label) in visitor.errors {
-            if sp < span && !sp.overlaps(span) {
+            if sp.lo() < span.lo() && !sp.overlaps(span) {
                 // When we have a case like `match-cfg-fake-edges.rs`, we don't want to mention
                 // match arms coming after the primary span because they aren't relevant:
                 // ```
@@ -630,7 +630,7 @@ impl<'cx, 'tcx> MirBorrowckCtxt<'cx, 'tcx> {
         }
         if !shown {
             for sp in &spans {
-                if *sp < span && !sp.overlaps(span) {
+                if sp.lo() < span.lo() && !sp.overlaps(span) {
                     err.span_label(*sp, "binding initialized here in some conditions");
                 }
             }

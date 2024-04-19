@@ -63,7 +63,6 @@ use rustc_span::{Span, DUMMY_SP};
 
 use smallvec::{smallvec, SmallVec};
 use std::cell::{Cell, RefCell};
-use std::collections::BTreeSet;
 use std::fmt;
 
 use diagnostics::{ImportSuggestion, LabelSuggestion, Suggestion};
@@ -195,8 +194,8 @@ enum Used {
 #[derive(Debug)]
 struct BindingError {
     name: Symbol,
-    origin: BTreeSet<Span>,
-    target: BTreeSet<Span>,
+    origin: FxIndexSet<Span>,
+    target: FxIndexSet<Span>,
     could_be_path: bool,
 }
 

@@ -893,7 +893,7 @@ impl<'a, G: EmissionGuarantee> Diag<'a, G> {
         applicability: Applicability,
         style: SuggestionStyle,
     ) -> &mut Self {
-        suggestion.sort_unstable();
+        suggestion.sort_unstable_by_key(|(span, _)| (span.lo(), span.hi()));
         suggestion.dedup();
 
         let parts = suggestion
@@ -1090,7 +1090,7 @@ impl<'a, G: EmissionGuarantee> Diag<'a, G> {
                     .map(|(span, snippet)| SubstitutionPart { snippet, span })
                     .collect::<Vec<_>>();
 
-                parts.sort_unstable_by_key(|part| part.span);
+                parts.sort_unstable_by_key(|part| (part.span.lo(), part.span.hi()));
 
                 assert!(!parts.is_empty());
                 debug_assert_eq!(

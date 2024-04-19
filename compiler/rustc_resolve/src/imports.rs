@@ -1389,7 +1389,7 @@ impl<'a, 'tcx> Resolver<'a, 'tcx> {
 
         if is_redundant && !redundant_span.is_empty() {
             let mut redundant_spans: Vec<_> = redundant_span.present_items().collect();
-            redundant_spans.sort();
+            redundant_spans.sort_by_key(|&(span, b)| (span.lo(), span.hi(), b));
             redundant_spans.dedup();
             /* FIXME(unused_imports): Add this back as a new lint
             self.lint_buffer.buffer_lint_with_diagnostic(

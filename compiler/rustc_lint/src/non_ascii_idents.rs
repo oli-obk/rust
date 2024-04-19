@@ -153,7 +153,6 @@ impl EarlyLintPass for NonAsciiIdents {
     fn check_crate(&mut self, cx: &EarlyContext<'_>, _: &ast::Crate) {
         use rustc_session::lint::Level;
         use rustc_span::Span;
-        use std::collections::BTreeMap;
         use unicode_security::GeneralSecurityProfile;
 
         let check_non_ascii_idents = cx.builder.lint_level(NON_ASCII_IDENTS).0 != Level::Allow;
@@ -179,7 +178,7 @@ impl EarlyLintPass for NonAsciiIdents {
         // We will soon sort, so the initial order does not matter.
         #[allow(rustc::potential_query_instability)]
         let mut symbols: Vec<_> = symbols.iter().collect();
-        symbols.sort_by_key(|k| k.1);
+        symbols.sort_by_key(|k| (k.1.lo(), k.1.hi()));
         for (symbol, &sp) in symbols.iter() {
             let symbol_str = symbol.as_str();
             if symbol_str.is_ascii() {
@@ -341,8 +340,8 @@ impl EarlyLintPass for NonAsciiIdents {
                     .collect::<Vec<_>>();
 
                 // we're sorting the output here.
-                let mut lint_reports: BTreeMap<(Span, Vec<char>), AugmentedScriptSet> =
-                    BTreeMap::new();
+                let mut lint_reports: FxIndexMap<(Span, Vec<char>), AugmentedScriptSet> =
+                    FxIndexMap::default();
 
                 // The end result is put in `lint_reports` which is sorted.
                 #[allow(rustc::potential_query_instability)]

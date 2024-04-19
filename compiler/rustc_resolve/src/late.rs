@@ -32,7 +32,7 @@ use smallvec::{smallvec, SmallVec};
 
 use std::assert_matches::debug_assert_matches;
 use std::borrow::Cow;
-use std::collections::{hash_map::Entry, BTreeSet};
+use std::collections::hash_map::Entry;
 use std::mem::{replace, swap, take};
 
 mod diagnostics;
@@ -3418,8 +3418,8 @@ impl<'a: 'ast, 'b, 'ast, 'tcx> LateResolutionVisitor<'a, 'b, 'ast, 'tcx> {
                         let binding_error =
                             missing_vars.entry(name).or_insert_with(|| BindingError {
                                 name,
-                                origin: BTreeSet::new(),
-                                target: BTreeSet::new(),
+                                origin: Default::default(),
+                                target: Default::default(),
                                 could_be_path: name.as_str().starts_with(char::is_uppercase),
                             });
                         binding_error.origin.insert(binding_inner.span);

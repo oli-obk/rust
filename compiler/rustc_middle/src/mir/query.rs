@@ -262,7 +262,7 @@ pub enum ConstraintCategory<'tcx> {
     /// A constraint from a user-written predicate
     /// with the provided span, written on the item
     /// with the given `DefId`
-    Predicate(Span),
+    Predicate(#[derivative(PartialOrd = "ignore", Ord = "ignore")] Span),
 
     /// A "boring" constraint (caused by the given location) is one that
     /// the user probably doesn't want to see described in diagnostics,

@@ -77,7 +77,7 @@ use rustc_data_structures::stable_hasher::{Hash128, Hash64, HashStable, StableHa
 use rustc_data_structures::sync::{FreezeLock, FreezeWriteGuard, Lock, Lrc};
 
 use std::borrow::Cow;
-use std::cmp::{self, Ordering};
+use std::cmp;
 use std::hash::Hash;
 use std::ops::{Add, Range, Sub};
 use std::path::{Path, PathBuf};
@@ -479,35 +479,11 @@ pub struct SpanData {
     pub parent: Option<LocalDefId>,
 }
 
-// Order spans by position in the file.
-impl Ord for SpanData {
-    fn cmp(&self, other: &Self) -> Ordering {
-        let SpanData {
-            lo: s_lo,
-            hi: s_hi,
-            ctxt: _,
-            // `LocalDefId` does not implement `Ord`.
-            // The other fields are enough to determine in-file order.
-            parent: _,
-        } = self;
-        let SpanData {
-            lo: o_lo,
-            hi: o_hi,
-            ctxt: _,
-            // `LocalDefId` does not implement `Ord`.
-            // The other fields are enough to determine in-file order.
-            parent: _,
-        } = other;
-
-        (s_lo, s_hi).cmp(&(o_lo, o_hi))
-    }
-}
-
-impl PartialOrd for SpanData {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
+// To ensure correctness of incremental compilation,
+// `SyntaxContext` must not implement `Ord` or `PartialOrd`.
+// See https://github.com/rust-lang/rust/issues/90317.
+impl !Ord for SpanData {}
+impl !PartialOrd for SpanData {}
 
 impl SpanData {
     #[inline]
@@ -549,16 +525,11 @@ impl !Send for Span {}
 #[cfg(not(parallel_compiler))]
 impl !Sync for Span {}
 
-impl PartialOrd for Span {
-    fn partial_cmp(&self, rhs: &Self) -> Option<Ordering> {
-        PartialOrd::partial_cmp(&self.data(), &rhs.data())
-    }
-}
-impl Ord for Span {
-    fn cmp(&self, rhs: &Self) -> Ordering {
-        Ord::cmp(&self.data(), &rhs.data())
-    }
-}
+// To ensure correctness of incremental compilation,
+// `SyntaxContext` must not implement `Ord` or `PartialOrd`.
+// See https://github.com/rust-lang/rust/issues/90317.
+impl !Ord for Span {}
+impl !PartialOrd for Span {}
 
 impl Span {
     #[inline]

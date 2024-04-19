@@ -49,7 +49,7 @@ fn check_recursion<'tcx>(
             return;
         }
 
-        vis.reachable_recursive_calls.sort();
+        vis.reachable_recursive_calls.sort_by_key(|s| (s.lo(), s.hi()));
 
         let sp = tcx.def_span(def_id);
         let hir_id = tcx.local_def_id_to_hir_id(def_id);

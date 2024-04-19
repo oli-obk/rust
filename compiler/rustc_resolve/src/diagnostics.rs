@@ -2786,7 +2786,8 @@ fn show_candidates(
         path_strings.extend(core_path_strings);
         path_strings.dedup_by(|a, b| a.0 == b.0);
     }
-    accessible_path_strings.sort();
+    accessible_path_strings
+        .sort_by_key(|(a, b, span, c, d)| (a.clone(), *b, span.map(|s| (s.lo(), s.hi())), *c, *d));
 
     if !accessible_path_strings.is_empty() {
         let (determiner, kind, name, through) =
