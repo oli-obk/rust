@@ -46,31 +46,31 @@ fn main() {
     demo2!("foo"#);
     demo4!("foo"###);
 
-    demo2!(# "");
+    demo2!(#"");
     //~^ WARNING parsed as a guarded string in Rust 2024 [rust_2024_guarded_string_incompatible_syntax]
     //~| WARNING hard error in Rust 2024
-    demo3!(# ""#);
+    demo3!(#""#);
     //~^ WARNING parsed as a guarded string in Rust 2024 [rust_2024_guarded_string_incompatible_syntax]
     //~| WARNING hard error in Rust 2024
-    demo5!(#### "");
+    demo5!(####"");
     //~^ WARNING parsed as a guarded string in Rust 2024 [rust_2024_guarded_string_incompatible_syntax]
     //~| WARNING hard error in Rust 2024
-    demo2!(# "foo");
+    demo2!(#"foo");
     //~^ WARNING parsed as a guarded string in Rust 2024 [rust_2024_guarded_string_incompatible_syntax]
     //~| WARNING hard error in Rust 2024
-    demo4!(### "foo");
+    demo4!(###"foo");
     //~^ WARNING parsed as a guarded string in Rust 2024 [rust_2024_guarded_string_incompatible_syntax]
     //~| WARNING hard error in Rust 2024
-    demo3!(# "foo"#);
+    demo3!(#"foo"#);
     //~^ WARNING parsed as a guarded string in Rust 2024 [rust_2024_guarded_string_incompatible_syntax]
     //~| WARNING hard error in Rust 2024
-    demo5!(### "foo"#);
+    demo5!(###"foo"#);
     //~^ WARNING parsed as a guarded string in Rust 2024 [rust_2024_guarded_string_incompatible_syntax]
     //~| WARNING hard error in Rust 2024
-    demo6!(### "foo"##);
+    demo6!(###"foo"##);
     //~^ WARNING parsed as a guarded string in Rust 2024 [rust_2024_guarded_string_incompatible_syntax]
     //~| WARNING hard error in Rust 2024
-    demo7!(### "foo"###);
+    demo7!(###"foo"###);
     //~^ WARNING parsed as a guarded string in Rust 2024 [rust_2024_guarded_string_incompatible_syntax]
     //~| WARNING hard error in Rust 2024
 }

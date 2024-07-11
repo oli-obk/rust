@@ -39,29 +39,30 @@ fn main() {
     demo2!(# "");
     demo3!(# ""#);
     demo2!(# "foo");
-    demo3!(## "foo");
+    demo2!(## "foo"); //~ ERROR invalid string literal
     demo3!(# "foo"#);
-    demo4!(### "foo");
-    demo4!(## "foo"#);
-    demo7!(### "foo"###);
+    demo2!(### "foo"); //~ ERROR invalid string literal
+    demo3!(## "foo"#); //~ ERROR invalid string literal
+    demo3!(### "foo"###); //~ ERROR invalid string literal
+    //~^ ERROR invalid string literal
 
     demo2!("foo"#);
-    demo4!("foo"###);
+    demo2!("foo"###);
+    //~^ ERROR invalid string literal
 
     demo2!(blah"xx"); //~ ERROR prefix `blah` is unknown
     demo2!(blah#"xx"#);
     //~^ ERROR prefix `blah` is unknown
-    //~| ERROR invalid string literal
 
     demo1!(#""); //~ ERROR invalid string literal
-    demo1!(#""#); //~ ERROR invalid string literal
+    demo1!(#""#);
     demo1!(####""); //~ ERROR invalid string literal
     demo1!(#"foo"); //~ ERROR invalid string literal
     demo1!(###"foo"); //~ ERROR invalid string literal
-    demo1!(#"foo"#); //~ ERROR invalid string literal
+    demo1!(#"foo"#);
     demo1!(###"foo"#); //~ ERROR invalid string literal
     demo1!(###"foo"##); //~ ERROR invalid string literal
-    demo1!(###"foo"###); //~ ERROR invalid string literal
+    demo1!(###"foo"###);
 
     // More than 255 hashes
     demon!(####################################################################################################################################################################################################################################################################"foo");

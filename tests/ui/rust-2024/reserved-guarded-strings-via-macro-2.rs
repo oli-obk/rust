@@ -10,9 +10,7 @@ fn main() {
     m2021::number_of_tokens_in_a_guarded_string_literal!();
     m2021::number_of_tokens_in_a_guarded_unterminated_string_literal!();
 
-    // Error, even though *this* crate is 2021:
     m2024::number_of_tokens_in_a_guarded_string_literal!();
-    //~^ ERROR invalid string literal
     m2024::number_of_tokens_in_a_guarded_unterminated_string_literal!();
     //~^ ERROR invalid string literal
 }
