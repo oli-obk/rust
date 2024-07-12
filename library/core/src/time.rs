@@ -64,7 +64,9 @@ impl Default for Nanoseconds {
 /// the number of nanoseconds.
 ///
 /// [`Duration`]s implement many common traits, including [`Add`], [`Sub`], and other
-/// [`ops`] traits. It implements [`Default`] by returning a zero-length `Duration`.
+/// [`ops`] traits. These operations are checked even in release mode and will panic on
+/// overflow. Use [`Duration::saturating_add`] and similar functions if this is not the
+/// behaviour you need. It implements [`Default`] by returning a zero-length `Duration`.
 ///
 /// [`ops`]: crate::ops
 ///
@@ -1125,6 +1127,7 @@ impl Duration {
 }
 
 #[stable(feature = "duration", since = "1.3.0")]
+/// Panics on overflow. Use [`Duration::checked_add`] if you want to handle overflow yourself.
 impl Add for Duration {
     type Output = Duration;
 
@@ -1135,6 +1138,7 @@ impl Add for Duration {
 }
 
 #[stable(feature = "time_augmented_assignment", since = "1.9.0")]
+/// Panics on overflow. Use [`Duration::checked_add`] if you want to handle overflow yourself.
 impl AddAssign for Duration {
     #[inline]
     fn add_assign(&mut self, rhs: Duration) {
@@ -1143,6 +1147,7 @@ impl AddAssign for Duration {
 }
 
 #[stable(feature = "duration", since = "1.3.0")]
+/// Panics on overflow. Use [`Duration::checked_sub`] if you want to handle overflow yourself.
 impl Sub for Duration {
     type Output = Duration;
 
@@ -1153,6 +1158,7 @@ impl Sub for Duration {
 }
 
 #[stable(feature = "time_augmented_assignment", since = "1.9.0")]
+/// Panics on overflow. Use [`Duration::checked_sub`] if you want to handle overflow yourself.
 impl SubAssign for Duration {
     #[inline]
     fn sub_assign(&mut self, rhs: Duration) {
@@ -1161,6 +1167,7 @@ impl SubAssign for Duration {
 }
 
 #[stable(feature = "duration", since = "1.3.0")]
+/// Panics on overflow. Use [`Duration::checked_mul`] if you want to handle overflow yourself.
 impl Mul<u32> for Duration {
     type Output = Duration;
 
@@ -1171,6 +1178,7 @@ impl Mul<u32> for Duration {
 }
 
 #[stable(feature = "symmetric_u32_duration_mul", since = "1.31.0")]
+/// Panics on overflow. Use [`Duration::checked_mul`] if you want to handle overflow yourself.
 impl Mul<Duration> for u32 {
     type Output = Duration;
 
@@ -1181,6 +1189,7 @@ impl Mul<Duration> for u32 {
 }
 
 #[stable(feature = "time_augmented_assignment", since = "1.9.0")]
+/// Panics on overflow. Use [`Duration::checked_mul`] if you want to handle overflow yourself.
 impl MulAssign<u32> for Duration {
     #[inline]
     fn mul_assign(&mut self, rhs: u32) {
@@ -1189,6 +1198,7 @@ impl MulAssign<u32> for Duration {
 }
 
 #[stable(feature = "duration", since = "1.3.0")]
+/// Panics on division by zero. Use [`Duration::checked_div`] if you want to handle that case yourself.
 impl Div<u32> for Duration {
     type Output = Duration;
 
@@ -1199,6 +1209,7 @@ impl Div<u32> for Duration {
 }
 
 #[stable(feature = "time_augmented_assignment", since = "1.9.0")]
+/// Panics on division by zero. Use [`Duration::checked_div`] if you want to handle that case yourself.
 impl DivAssign<u32> for Duration {
     #[inline]
     fn div_assign(&mut self, rhs: u32) {
@@ -1233,6 +1244,7 @@ macro_rules! sum_durations {
 }
 
 #[stable(feature = "duration_sum", since = "1.16.0")]
+/// Panics on overflow. Use [`Duration::checked_add`] if you want to handle overflow yourself.
 impl Sum for Duration {
     fn sum<I: Iterator<Item = Duration>>(iter: I) -> Duration {
         sum_durations!(iter)
@@ -1240,6 +1252,7 @@ impl Sum for Duration {
 }
 
 #[stable(feature = "duration_sum", since = "1.16.0")]
+/// Panics on overflow. Use [`Duration::checked_add`] if you want to handle overflow yourself.
 impl<'a> Sum<&'a Duration> for Duration {
     fn sum<I: Iterator<Item = &'a Duration>>(iter: I) -> Duration {
         sum_durations!(iter)
