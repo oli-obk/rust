@@ -12,8 +12,8 @@ use hir::def_id::DefId;
 use hir::LangItem;
 use rustc_data_structures::fx::{FxHashSet, FxIndexSet};
 use rustc_hir as hir;
-use rustc_infer::traits::ObligationCause;
 use rustc_infer::traits::{Obligation, PolyTraitObligation, SelectionError};
+use rustc_infer::traits::{ObligationCause, PredicateObligation};
 use rustc_middle::ty::fast_reject::{DeepRejectCtxt, TreatParams};
 use rustc_middle::ty::{self, ToPolyTraitRef, Ty, TypeVisitableExt};
 use rustc_middle::{bug, span_bug};
@@ -33,12 +33,57 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
         stack: &TraitObligationStack<'o, 'tcx>,
     ) -> Result<SelectionCandidateSet<'tcx>, SelectionError<'tcx>> {
         let TraitObligationStack { obligation, .. } = *stack;
-        let obligation = &Obligation {
+        let mut obligation = Obligation {
             param_env: obligation.param_env,
             cause: obligation.cause.clone(),
             recursion_depth: obligation.recursion_depth,
             predicate: self.infcx.resolve_vars_if_possible(obligation.predicate),
         };
+
+        if let ty::Alias(ty::Opaque, alias) = obligation.predicate.skip_binder().self_ty().kind() {
+            if self.infcx.can_define_opaque_ty(alias.def_id)
+                && !alias.args.has_escaping_bound_vars()
+            {
+                let var = self.infcx.commit_if_ok(|_| {
+                    let ty_var = self.infcx.next_ty_var(obligation.cause.span);
+                    let _obligations: Vec<PredicateObligation<'_>> = self
+                        .infcx
+                        .handle_opaque_type(
+                            obligation.predicate.skip_binder().self_ty(),
+                            ty_var,
+                            obligation.cause.span,
+                            obligation.param_env,
+                        )
+                        .unwrap()
+                        .into_iter()
+                        .map(|goal| {
+                            Obligation::new(
+                                self.tcx(),
+                                obligation.cause.clone(),
+                                goal.param_env,
+                                goal.predicate,
+                            )
+                        })
+                        .collect();
+
+                    let ty_var = self.infcx.resolve_vars_if_possible(ty_var);
+                    trace!("{:#?}", ty_var.kind());
+
+                    if ty_var.is_ty_var() { Err(()) } else { Ok(ty_var) }
+                });
+                if let Ok(ty_var) = var {
+                    obligation.predicate = obligation.predicate.map_bound(|mut pred| {
+                        pred.trait_ref.args = self.tcx().mk_args_from_iter(
+                            [ty_var.into()].into_iter().chain(pred.trait_ref.args.iter().skip(1)),
+                        );
+                        pred
+                    });
+                } else {
+                    return Ok(SelectionCandidateSet { vec: vec![], ambiguous: true });
+                }
+            }
+        }
+        let obligation = &obligation;
 
         if obligation.predicate.skip_binder().self_ty().is_ty_var() {
             debug!(ty = ?obligation.predicate.skip_binder().self_ty(), "ambiguous inference var or opaque type");

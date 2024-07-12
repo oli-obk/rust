@@ -1381,6 +1381,12 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
             return;
         }
 
+        if matches!(trait_pred.self_ty().skip_binder().kind(), ty::Alias(ty::Opaque, alias) if self.infcx.can_define_opaque_ty(alias.def_id))
+        {
+            debug!(?trait_pred, "insert_evaluation_cache - is not cacheable");
+            return;
+        }
+
         if self.can_use_global_caches(param_env) {
             if !trait_pred.has_infer() {
                 debug!(?trait_pred, ?result, "insert_evaluation_cache global");
@@ -1616,6 +1622,12 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
     ) {
         let tcx = self.tcx();
         let pred = cache_fresh_trait_pred.skip_binder();
+
+        if matches!(pred.self_ty().kind(), ty::Alias(ty::Opaque, alias) if self.infcx.can_define_opaque_ty(alias.def_id))
+        {
+            debug!(?pred, ?candidate, "insert_candidate_cache - candidate is not cacheable");
+            return;
+        }
 
         if !self.can_cache_candidate(&candidate) {
             debug!(?pred, ?candidate, "insert_candidate_cache - candidate is not cacheable");

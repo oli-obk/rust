@@ -16,7 +16,7 @@ use rustc_infer::traits::ObligationCauseCode;
 use rustc_middle::traits::{BuiltinImplSource, SignatureMismatchData};
 use rustc_middle::ty::{
     self, GenericArgs, GenericArgsRef, GenericParamDefKind, ToPolyTraitRef, TraitPredicate, Ty,
-    TyCtxt, Upcast,
+    TyCtxt, TypeVisitableExt, Upcast,
 };
 use rustc_middle::{bug, span_bug};
 use rustc_span::def_id::DefId;
@@ -43,6 +43,52 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
         obligation: &PolyTraitObligation<'tcx>,
         candidate: SelectionCandidate<'tcx>,
     ) -> Result<Selection<'tcx>, SelectionError<'tcx>> {
+        if let ty::Alias(ty::Opaque, alias) = obligation.predicate.skip_binder().self_ty().kind() {
+            if self.infcx.can_define_opaque_ty(alias.def_id)
+                && !alias.args.has_escaping_bound_vars()
+            {
+                let ty_var = self.infcx.next_ty_var(obligation.cause.span);
+                let obligations: Vec<PredicateObligation<'_>> = self
+                    .infcx
+                    .handle_opaque_type(
+                        obligation.predicate.skip_binder().self_ty(),
+                        ty_var,
+                        obligation.cause.span,
+                        obligation.param_env,
+                    )
+                    .unwrap()
+                    .into_iter()
+                    .map(|goal| {
+                        Obligation::new(
+                            self.tcx(),
+                            obligation.cause.clone(),
+                            goal.param_env,
+                            goal.predicate,
+                        )
+                    })
+                    .collect();
+
+                let ty_var = self.infcx.resolve_vars_if_possible(ty_var);
+                if ty_var.is_ty_var() {
+                    let pred = &obligation.predicate;
+                    span_bug!(
+                        obligation.cause.span,
+                        "{pred:#?} found hidden type for opaque type, doesn't find it anymore"
+                    )
+                }
+                let mut obligation = obligation.clone();
+                obligation.predicate = obligation.predicate.map_bound(|mut pred| {
+                    pred.trait_ref.args = self.tcx().mk_args_from_iter(
+                        [ty_var.into()].into_iter().chain(pred.trait_ref.args.iter().skip(1)),
+                    );
+                    pred
+                });
+                let mut res = self.confirm_candidate(&obligation, candidate)?;
+                res.borrow_nested_obligations_mut().extend(obligations);
+                return Ok(res);
+            }
+        }
+
         let mut impl_src = match candidate {
             BuiltinCandidate { has_nested } => {
                 let data = self.confirm_builtin_candidate(obligation, has_nested);

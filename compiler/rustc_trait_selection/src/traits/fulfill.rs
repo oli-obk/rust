@@ -764,10 +764,13 @@ impl<'a, 'tcx> FulfillProcessor<'a, 'tcx> {
                 // trait selection is because we don't have enough
                 // information about the types in the trait.
                 stalled_on.clear();
-                stalled_on.extend(args_infer_vars(
-                    &self.selcx,
-                    trait_obligation.predicate.map_bound(|pred| pred.trait_ref.args),
-                ));
+                if !matches!(trait_obligation.predicate.skip_binder().self_ty().kind(), ty::Alias(ty::Opaque, alias) if self.selcx.infcx.can_define_opaque_ty(alias.def_id))
+                {
+                    stalled_on.extend(args_infer_vars(
+                        &self.selcx,
+                        trait_obligation.predicate.map_bound(|pred| pred.trait_ref.args),
+                    ));
+                }
 
                 debug!(
                     "process_predicate: pending obligation {:?} now stalled on {:?}",

@@ -648,7 +648,7 @@ impl<'tcx, N> ImplSource<'tcx, N> {
         }
     }
 
-    pub fn borrow_nested_obligations_mut(&mut self) -> &mut [N] {
+    pub fn borrow_nested_obligations_mut(&mut self) -> &mut Vec<N> {
         match self {
             ImplSource::UserDefined(i) => &mut i.nested,
             ImplSource::Param(n) | ImplSource::Builtin(_, n) => n,
