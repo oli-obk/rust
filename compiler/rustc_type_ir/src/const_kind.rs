@@ -13,6 +13,7 @@ use self::ConstKind::*;
 #[derive(derivative::Derivative)]
 #[derivative(Clone(bound = ""), Copy(bound = ""), Hash(bound = ""), Eq(bound = ""))]
 #[cfg_attr(feature = "nightly", derive(TyEncodable, TyDecodable, HashStable_NoContext))]
+#[derive(TypeFoldable_Generic, TypeVisitable_Generic)]
 pub enum ConstKind<I: Interner> {
     /// A const generic parameter.
     Param(I::ParamConst),

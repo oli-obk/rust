@@ -7,7 +7,7 @@ use crate::mir::interpret;
 use crate::ty::fold::{FallibleTypeFolder, TypeFoldable, TypeSuperFoldable};
 use crate::ty::print::{with_no_trimmed_paths, FmtPrinter, Printer};
 use crate::ty::visit::{TypeSuperVisitable, TypeVisitable, TypeVisitor};
-use crate::ty::{self, InferConst, Lift, Term, TermKind, Ty, TyCtxt};
+use crate::ty::{self, Lift, Term, TermKind, Ty, TyCtxt};
 use rustc_ast_ir::try_visit;
 use rustc_ast_ir::visit::VisitorResult;
 use rustc_hir::def::Namespace;
@@ -583,37 +583,7 @@ impl<'tcx> TypeSuperFoldable<TyCtxt<'tcx>> for ty::Const<'tcx> {
 
 impl<'tcx> TypeSuperVisitable<TyCtxt<'tcx>> for ty::Const<'tcx> {
     fn super_visit_with<V: TypeVisitor<TyCtxt<'tcx>>>(&self, visitor: &mut V) -> V::Result {
-        match self.kind() {
-            ConstKind::Param(p) => p.visit_with(visitor),
-            ConstKind::Infer(i) => i.visit_with(visitor),
-            ConstKind::Bound(d, b) => {
-                try_visit!(d.visit_with(visitor));
-                b.visit_with(visitor)
-            }
-            ConstKind::Placeholder(p) => p.visit_with(visitor),
-            ConstKind::Unevaluated(uv) => uv.visit_with(visitor),
-            ConstKind::Value(t, v) => {
-                try_visit!(t.visit_with(visitor));
-                v.visit_with(visitor)
-            }
-            ConstKind::Error(e) => e.visit_with(visitor),
-            ConstKind::Expr(e) => e.visit_with(visitor),
-        }
-    }
-}
-
-impl<'tcx> TypeFoldable<TyCtxt<'tcx>> for InferConst {
-    fn try_fold_with<F: FallibleTypeFolder<TyCtxt<'tcx>>>(
-        self,
-        _folder: &mut F,
-    ) -> Result<Self, F::Error> {
-        Ok(self)
-    }
-}
-
-impl<'tcx> TypeVisitable<TyCtxt<'tcx>> for InferConst {
-    fn visit_with<V: TypeVisitor<TyCtxt<'tcx>>>(&self, _visitor: &mut V) -> V::Result {
-        V::Result::output()
+        self.kind().visit_with(visitor)
     }
 }
 

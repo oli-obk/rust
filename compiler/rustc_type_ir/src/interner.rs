@@ -107,7 +107,7 @@ pub trait Interner:
     type PlaceholderTy: PlaceholderLike;
 
     // Things stored inside of tys
-    type ErrorGuaranteed: Copy + Debug + Hash + Eq;
+    type ErrorGuaranteed: Copy + Debug + Hash + Eq + TypeVisitable<Self>;
     type BoundExistentialPredicates: BoundExistentialPredicates<Self>;
     type AllocId: Copy + Debug + Hash + Eq;
     type Pat: Copy + Debug + Hash + Eq + Debug + Relate<Self>;
@@ -116,11 +116,11 @@ pub trait Interner:
 
     // Kinds of consts
     type Const: Const<Self>;
-    type PlaceholderConst: PlaceholderLike;
-    type ParamConst: Copy + Debug + Hash + Eq + ParamLike;
-    type BoundConst: Copy + Debug + Hash + Eq + BoundVarLike<Self>;
-    type ValueConst: Copy + Debug + Hash + Eq;
-    type ExprConst: ExprConst<Self>;
+    type PlaceholderConst: PlaceholderLike + TypeVisitable<Self>;
+    type ParamConst: Copy + Debug + Hash + Eq + ParamLike + TypeVisitable<Self>;
+    type BoundConst: Copy + Debug + Hash + Eq + BoundVarLike<Self> + TypeVisitable<Self>;
+    type ValueConst: Copy + Debug + Hash + Eq + TypeVisitable<Self>;
+    type ExprConst: ExprConst<Self> + TypeVisitable<Self>;
 
     // Kinds of regions
     type Region: Region<Self>;

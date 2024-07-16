@@ -57,6 +57,7 @@ TrivialTypeTraversalImpls! {
     crate::IntVarValue,
     crate::PredicatePolarity,
     crate::RegionVid,
+    crate::const_kind::InferConst,
     crate::solve::BuiltinImplSource,
     crate::solve::Certainty,
     crate::solve::GoalSource,
