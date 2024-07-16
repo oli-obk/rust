@@ -2,6 +2,7 @@
 use rustc_data_structures::stable_hasher::{HashStable, StableHasher};
 #[cfg(feature = "nightly")]
 use rustc_macros::{HashStable_NoContext, TyDecodable, TyEncodable};
+use rustc_type_ir_macros::{TypeFoldable_Generic, TypeVisitable_Generic};
 use std::fmt;
 
 use crate::{DebruijnIndex, Interner};
@@ -127,6 +128,7 @@ rustc_index::newtype_index! {
 #[derive(derivative::Derivative)]
 #[derivative(Clone(bound = ""), Copy(bound = ""), Hash(bound = ""), Eq(bound = ""))]
 #[cfg_attr(feature = "nightly", derive(TyEncodable, TyDecodable))]
+#[derive(TypeVisitable_Generic, TypeFoldable_Generic)]
 pub enum RegionKind<I: Interner> {
     /// A region parameter; for example `'a` in `impl<'a> Trait for &'a ()`.
     ///
