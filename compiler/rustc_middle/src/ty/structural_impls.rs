@@ -9,7 +9,6 @@ use crate::ty::print::{with_no_trimmed_paths, FmtPrinter, Printer};
 use crate::ty::visit::{TypeSuperVisitable, TypeVisitable, TypeVisitor};
 use crate::ty::{self, Lift, Term, TermKind, Ty, TyCtxt};
 use rustc_ast_ir::try_visit;
-use rustc_ast_ir::visit::VisitorResult;
 use rustc_hir::def::Namespace;
 use rustc_span::source_map::Spanned;
 use rustc_target::abi::TyAndLayout;
@@ -241,6 +240,7 @@ TrivialTypeTraversalImpls! {
     crate::mir::Promoted,
     crate::traits::Reveal,
     crate::ty::adjustment::AutoBorrowMutability,
+    crate::ty::AdtDef<'tcx>,
     crate::ty::AdtKind,
     crate::ty::BoundRegion,
     // Including `BoundRegionKind` is a *bit* dubious, but direct
@@ -250,6 +250,7 @@ TrivialTypeTraversalImpls! {
     crate::ty::BoundRegionKind,
     crate::ty::AssocItem,
     crate::ty::AssocKind,
+    crate::ty::BoundTy,
     crate::ty::Placeholder<crate::ty::BoundRegion>,
     crate::ty::Placeholder<crate::ty::BoundTy>,
     crate::ty::Placeholder<ty::BoundVar>,
@@ -305,12 +306,6 @@ impl<'a, 'tcx> Lift<TyCtxt<'tcx>> for Term<'a> {
 ///////////////////////////////////////////////////////////////////////////
 // Traversal implementations.
 
-impl<'tcx> TypeVisitable<TyCtxt<'tcx>> for ty::AdtDef<'tcx> {
-    fn visit_with<V: TypeVisitor<TyCtxt<'tcx>>>(&self, _visitor: &mut V) -> V::Result {
-        V::Result::output()
-    }
-}
-
 impl<'tcx> TypeFoldable<TyCtxt<'tcx>> for &'tcx ty::List<ty::PolyExistentialPredicate<'tcx>> {
     fn try_fold_with<F: FallibleTypeFolder<TyCtxt<'tcx>>>(
         self,
@@ -365,47 +360,7 @@ impl<'tcx> TypeSuperFoldable<TyCtxt<'tcx>> for Ty<'tcx> {
         self,
         folder: &mut F,
     ) -> Result<Self, F::Error> {
-        let kind = match *self.kind() {
-            ty::RawPtr(ty, mutbl) => ty::RawPtr(ty.try_fold_with(folder)?, mutbl),
-            ty::Array(typ, sz) => ty::Array(typ.try_fold_with(folder)?, sz.try_fold_with(folder)?),
-            ty::Slice(typ) => ty::Slice(typ.try_fold_with(folder)?),
-            ty::Adt(tid, args) => ty::Adt(tid, args.try_fold_with(folder)?),
-            ty::Dynamic(trait_ty, region, representation) => ty::Dynamic(
-                trait_ty.try_fold_with(folder)?,
-                region.try_fold_with(folder)?,
-                representation,
-            ),
-            ty::Tuple(ts) => ty::Tuple(ts.try_fold_with(folder)?),
-            ty::FnDef(def_id, args) => ty::FnDef(def_id, args.try_fold_with(folder)?),
-            ty::FnPtr(f) => ty::FnPtr(f.try_fold_with(folder)?),
-            ty::Ref(r, ty, mutbl) => {
-                ty::Ref(r.try_fold_with(folder)?, ty.try_fold_with(folder)?, mutbl)
-            }
-            ty::Coroutine(did, args) => ty::Coroutine(did, args.try_fold_with(folder)?),
-            ty::CoroutineWitness(did, args) => {
-                ty::CoroutineWitness(did, args.try_fold_with(folder)?)
-            }
-            ty::Closure(did, args) => ty::Closure(did, args.try_fold_with(folder)?),
-            ty::CoroutineClosure(did, args) => {
-                ty::CoroutineClosure(did, args.try_fold_with(folder)?)
-            }
-            ty::Alias(kind, data) => ty::Alias(kind, data.try_fold_with(folder)?),
-            ty::Pat(ty, pat) => ty::Pat(ty.try_fold_with(folder)?, pat.try_fold_with(folder)?),
-
-            ty::Bool
-            | ty::Char
-            | ty::Str
-            | ty::Int(_)
-            | ty::Uint(_)
-            | ty::Float(_)
-            | ty::Error(_)
-            | ty::Infer(_)
-            | ty::Param(..)
-            | ty::Bound(..)
-            | ty::Placeholder(..)
-            | ty::Never
-            | ty::Foreign(..) => return Ok(self),
-        };
+        let kind = (*self.kind()).try_fold_with(folder)?;
 
         Ok(if *self.kind() == kind { self } else { folder.cx().mk_ty_from_kind(kind) })
     }
@@ -413,50 +368,7 @@ impl<'tcx> TypeSuperFoldable<TyCtxt<'tcx>> for Ty<'tcx> {
 
 impl<'tcx> TypeSuperVisitable<TyCtxt<'tcx>> for Ty<'tcx> {
     fn super_visit_with<V: TypeVisitor<TyCtxt<'tcx>>>(&self, visitor: &mut V) -> V::Result {
-        match self.kind() {
-            ty::RawPtr(ty, _mutbl) => ty.visit_with(visitor),
-            ty::Array(typ, sz) => {
-                try_visit!(typ.visit_with(visitor));
-                sz.visit_with(visitor)
-            }
-            ty::Slice(typ) => typ.visit_with(visitor),
-            ty::Adt(_, args) => args.visit_with(visitor),
-            ty::Dynamic(ref trait_ty, ref reg, _) => {
-                try_visit!(trait_ty.visit_with(visitor));
-                reg.visit_with(visitor)
-            }
-            ty::Tuple(ts) => ts.visit_with(visitor),
-            ty::FnDef(_, args) => args.visit_with(visitor),
-            ty::FnPtr(ref f) => f.visit_with(visitor),
-            ty::Ref(r, ty, _) => {
-                try_visit!(r.visit_with(visitor));
-                ty.visit_with(visitor)
-            }
-            ty::Coroutine(_did, ref args) => args.visit_with(visitor),
-            ty::CoroutineWitness(_did, ref args) => args.visit_with(visitor),
-            ty::Closure(_did, ref args) => args.visit_with(visitor),
-            ty::CoroutineClosure(_did, ref args) => args.visit_with(visitor),
-            ty::Alias(_, ref data) => data.visit_with(visitor),
-
-            ty::Pat(ty, pat) => {
-                try_visit!(ty.visit_with(visitor));
-                pat.visit_with(visitor)
-            }
-
-            ty::Bool
-            | ty::Char
-            | ty::Str
-            | ty::Int(_)
-            | ty::Uint(_)
-            | ty::Float(_)
-            | ty::Error(_)
-            | ty::Infer(_)
-            | ty::Bound(..)
-            | ty::Placeholder(..)
-            | ty::Param(..)
-            | ty::Never
-            | ty::Foreign(..) => V::Result::output(),
-        }
+        self.kind().visit_with(visitor)
     }
 }
 

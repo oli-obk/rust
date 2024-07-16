@@ -67,6 +67,7 @@ impl AliasTyKind {
 #[derive(derivative::Derivative)]
 #[derivative(Clone(bound = ""), Copy(bound = ""), Hash(bound = ""), Eq(bound = ""))]
 #[cfg_attr(feature = "nightly", derive(TyEncodable, TyDecodable, HashStable_NoContext))]
+#[derive(TypeFoldable_Generic, TypeVisitable_Generic)]
 pub enum TyKind<I: Interner> {
     /// The primitive boolean type. Written as `bool`.
     Bool,

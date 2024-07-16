@@ -103,7 +103,7 @@ pub trait Interner:
     type Tys: Tys<Self>;
     type FnInputTys: Copy + Debug + Hash + Eq + SliceLike<Item = Self::Ty> + TypeVisitable<Self>;
     type ParamTy: Copy + Debug + Hash + Eq + ParamLike;
-    type BoundTy: Copy + Debug + Hash + Eq + BoundVarLike<Self>;
+    type BoundTy: Copy + Debug + Hash + Eq + BoundVarLike<Self> + TypeVisitable<Self>;
     type PlaceholderTy: PlaceholderLike;
 
     // Things stored inside of tys
@@ -151,7 +151,7 @@ pub trait Interner:
 
     fn type_of(self, def_id: Self::DefId) -> ty::EarlyBinder<Self, Self::Ty>;
 
-    type AdtDef: AdtDef<Self>;
+    type AdtDef: AdtDef<Self> + TypeVisitable<Self>;
     fn adt_def(self, adt_def_id: Self::DefId) -> Self::AdtDef;
 
     fn alias_ty_kind(self, alias: ty::AliasTy<Self>) -> ty::AliasTyKind;
