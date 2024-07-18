@@ -942,6 +942,7 @@ fn assemble_candidates_from_impls<'cx, 'tcx>(
     // If we are resolving `<T as TraitRef<...>>::Item == Type`,
     // start out by selecting the predicate `T as TraitRef<...>`:
     let trait_ref = obligation.predicate.trait_ref(selcx.tcx());
+    // TODO: normalize away opaques here, too.
     let trait_obligation = obligation.with(selcx.tcx(), trait_ref);
     let _ = selcx.infcx.commit_if_ok(|_| {
         let impl_source = match selcx.select(&trait_obligation) {

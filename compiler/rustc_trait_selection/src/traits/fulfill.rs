@@ -14,6 +14,7 @@ use rustc_middle::ty::abstract_const::NotConstEvaluatable;
 use rustc_middle::ty::error::{ExpectedFound, TypeError};
 use rustc_middle::ty::GenericArgsRef;
 use rustc_middle::ty::{self, Binder, Const, TypeVisitableExt};
+use rustc_type_ir::Upcast;
 use std::marker::PhantomData;
 
 use super::project::{self, ProjectAndUnifyResult};
@@ -324,7 +325,7 @@ impl<'a, 'tcx> ObligationProcessor for FulfillProcessor<'a, 'tcx> {
 
         if obligation.predicate.has_aliases() {
             let mut obligations = Vec::new();
-            let predicate = normalize_with_depth_to(
+            let mut predicate = normalize_with_depth_to(
                 &mut self.selcx,
                 obligation.param_env,
                 obligation.cause.clone(),
@@ -332,9 +333,55 @@ impl<'a, 'tcx> ObligationProcessor for FulfillProcessor<'a, 'tcx> {
                 obligation.predicate,
                 &mut obligations,
             );
+
+            if let Some(trait_pred) = predicate.as_trait_clause() {
+                if let ty::Alias(ty::Opaque, alias) = trait_pred.skip_binder().self_ty().kind() {
+                    if infcx.can_define_opaque_ty(alias.def_id)
+                        && !alias.args.has_escaping_bound_vars()
+                    {
+                        let ty_var = infcx.next_ty_var(obligation.cause.span);
+                        obligations.extend(
+                            infcx
+                                .handle_opaque_type(
+                                    trait_pred.skip_binder().self_ty(),
+                                    ty_var,
+                                    obligation.cause.span,
+                                    obligation.param_env,
+                                )
+                                .unwrap()
+                                .into_iter()
+                                .map(|goal| {
+                                    rustc_infer::traits::Obligation::new(
+                                        infcx.tcx,
+                                        obligation.cause.clone(),
+                                        goal.param_env,
+                                        goal.predicate,
+                                    )
+                                }),
+                        );
+
+                        let ty_var = infcx.resolve_vars_if_possible(ty_var);
+                        trace!("{:#?}", ty_var.kind());
+
+                        predicate = trait_pred
+                            .map_bound(|mut pred| {
+                                pred.trait_ref.args = infcx.tcx.mk_args_from_iter(
+                                    [ty_var.into()]
+                                        .into_iter()
+                                        .chain(pred.trait_ref.args.iter().skip(1)),
+                                );
+                                pred
+                            })
+                            .upcast(infcx.tcx);
+                    }
+                }
+            }
+
             if predicate != obligation.predicate {
                 obligations.push(obligation.with(infcx.tcx, predicate));
                 return ProcessResult::Changed(mk_pending(obligations));
+            } else {
+                assert_eq!(&obligations[..], &[]);
             }
         }
         let binder = obligation.predicate.kind();
