@@ -54,7 +54,6 @@ pub fn check_impl_wf(tcx: TyCtxt<'_>, impl_def_id: LocalDefId) -> Result<(), Err
     let min_specialization = tcx.features().min_specialization;
     let mut res = Ok(());
     debug_assert!(matches!(tcx.def_kind(impl_def_id), DefKind::Impl { .. }));
-    res = res.and(enforce_impl_params_are_constrained(tcx, impl_def_id));
     if min_specialization {
         res = res.and(check_min_specialization(tcx, impl_def_id));
     }
@@ -62,16 +61,16 @@ pub fn check_impl_wf(tcx: TyCtxt<'_>, impl_def_id: LocalDefId) -> Result<(), Err
     res
 }
 
-fn enforce_impl_params_are_constrained(
-    tcx: TyCtxt<'_>,
+pub(crate) fn enforce_impl_params_are_constrained<'tcx>(
+    tcx: TyCtxt<'tcx>,
     impl_def_id: LocalDefId,
+    impl_trait_ref: Option<ty::TraitRef<'tcx>>,
 ) -> Result<(), ErrorGuaranteed> {
     // Every lifetime used in an associated type must be constrained.
     let impl_self_ty = tcx.type_of(impl_def_id).instantiate_identity();
     impl_self_ty.error_reported()?;
     let impl_generics = tcx.generics_of(impl_def_id);
     let impl_predicates = tcx.predicates_of(impl_def_id);
-    let impl_trait_ref = tcx.impl_trait_ref(impl_def_id).map(ty::EarlyBinder::instantiate_identity);
 
     impl_trait_ref.error_reported()?;
 

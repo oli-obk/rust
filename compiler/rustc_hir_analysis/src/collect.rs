@@ -1689,7 +1689,15 @@ fn impl_trait_header(tcx: TyCtxt<'_>, def_id: LocalDefId) -> Option<ty::ImplTrai
 
         check_impl_constness(tcx, tcx.is_const_trait_impl_raw(def_id.to_def_id()), ast_trait_ref);
 
-        let trait_ref = icx.lowerer().lower_impl_trait_ref(ast_trait_ref, selfty);
+        let mut trait_ref = icx.lowerer().lower_impl_trait_ref(ast_trait_ref, selfty);
+
+        if let Err(guar) =
+            crate::impl_wf_check::enforce_impl_params_are_constrained(tcx, def_id, Some(trait_ref))
+        {
+            trait_ref.args = tcx.mk_args_from_iter(
+                [Ty::new_error(tcx, guar).into()].into_iter().chain(trait_ref.args.iter().skip(1)),
+            );
+        }
 
         ty::ImplTraitHeader {
             trait_ref: ty::EarlyBinder::bind(trait_ref),

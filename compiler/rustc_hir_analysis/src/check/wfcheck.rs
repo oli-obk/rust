@@ -248,10 +248,17 @@ fn check_item<'tcx>(tcx: TyCtxt<'tcx>, item: &'tcx hir::Item<'tcx>) -> Result<()
         // for `T`
         hir::ItemKind::Impl(impl_) => {
             let header = tcx.impl_trait_header(def_id);
+            if let Some(header) = header {
+                header.trait_ref.skip_binder().error_reported()?;
+            }
             let is_auto = header
                 .is_some_and(|header| tcx.trait_is_auto(header.trait_ref.skip_binder().def_id));
 
-            crate::impl_wf_check::check_impl_wf(tcx, def_id)?;
+            if header.is_some() {
+                crate::impl_wf_check::check_impl_wf(tcx, def_id)?;
+            } else {
+                crate::impl_wf_check::enforce_impl_params_are_constrained(tcx, def_id, None)?;
+            }
             let mut res = Ok(());
             if let (hir::Defaultness::Default { .. }, true) = (impl_.defaultness, is_auto) {
                 let sp = impl_.of_trait.as_ref().map_or(item.span, |t| t.path.span);
