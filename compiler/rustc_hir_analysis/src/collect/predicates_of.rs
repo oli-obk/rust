@@ -289,11 +289,10 @@ fn gather_explicit_predicates_of(tcx: TyCtxt<'_>, def_id: LocalDefId) -> ty::Gen
     // in trait checking. See `setup_constraining_predicates`
     // for details.
     if let Node::Item(&Item { kind: ItemKind::Impl { .. }, .. }) = node {
-        let trait_ref = tcx.impl_trait_ref(def_id).map(ty::EarlyBinder::instantiate_identity);
         cgp::setup_constraining_predicates(
             tcx,
             &mut predicates,
-            trait_ref,
+            None,
             &mut generics.own_params.iter().map(|p| cgp::Parameter(p.index)).collect(),
         );
     }
