@@ -8,8 +8,8 @@ trait MyFrom<A> {
 struct A;
 
 impl<'a, 'b> MyFrom<A> for &'a str {
+    //~^ ERROR: `'b` is not constrained by the impl trait, self type, or predicates
     fn from(self: &'a Self) -> &'b str {
-        //~^ ERROR: method `from` has a `&self` declaration in the impl, but not in the trait
         "asdf"
     }
 }
@@ -30,4 +30,4 @@ impl From<A> for &'static str {
     }
 }
 
-fn main(){}
+fn main() {}

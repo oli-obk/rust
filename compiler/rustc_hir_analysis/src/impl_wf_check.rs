@@ -91,13 +91,22 @@ fn enforce_impl_params_are_constrained(
             let item = tcx.associated_item(def_id);
             match item.kind {
                 ty::AssocKind::Type => {
-                    if item.defaultness(tcx).has_value() {
+                    // RPITITs are generated from the corresponding method signature, which is checked below
+                    if item.defaultness(tcx).has_value() && !item.is_impl_trait_in_trait() {
                         cgp::parameters_for(tcx, tcx.type_of(def_id).instantiate_identity(), true)
                     } else {
                         vec![]
                     }
                 }
-                ty::AssocKind::Fn | ty::AssocKind::Const => vec![],
+                // fn signatures in trait impls may contain RPITITs and thus need to be checked
+                ty::AssocKind::Fn => {
+                    if impl_trait_ref.is_some() {
+                        cgp::parameters_for(tcx, tcx.fn_sig(def_id).instantiate_identity(), true)
+                    } else {
+                        vec![]
+                    }
+                }
+                ty::AssocKind::Const => vec![],
             }
         })
         .collect();

@@ -1,11 +1,8 @@
-error[E0185]: method `from` has a `&self` declaration in the impl, but not in the trait
-  --> $DIR/issue-48276.rs:11:5
+error[E0207]: the lifetime parameter `'b` is not constrained by the impl trait, self type, or predicates
+  --> $DIR/issue-48276.rs:10:10
    |
-LL |     fn from(a: A) -> Self;
-   |     ---------------------- trait method declared without `&self`
-...
-LL |     fn from(self: &'a Self) -> &'b str {
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `&self` used in impl
+LL | impl<'a, 'b> MyFrom<A> for &'a str {
+   |          ^^ unconstrained lifetime parameter
 
 error[E0185]: method `from` has a `&self` declaration in the impl, but not in the trait
   --> $DIR/issue-48276.rs:20:5
@@ -25,4 +22,5 @@ LL |     fn from(&self) -> &'static str {
 
 error: aborting due to 3 previous errors
 
-For more information about this error, try `rustc --explain E0185`.
+Some errors have detailed explanations: E0185, E0207.
+For more information about an error, try `rustc --explain E0185`.
