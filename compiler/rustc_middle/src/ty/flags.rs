@@ -259,6 +259,7 @@ impl FlagComputation {
                 self.add_const(start);
                 self.add_const(end);
             }
+            ty::PatternKind::NotNull => {}
             ty::PatternKind::Or(patterns) => {
                 for pat in patterns {
                     self.add_pat(pat);

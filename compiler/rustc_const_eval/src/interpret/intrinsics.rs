@@ -69,7 +69,7 @@ pub(crate) fn eval_nullary_intrinsic<'tcx>(
             }
             ty::Pat(_, pat) => match **pat {
                 ty::PatternKind::Range { .. } => ConstValue::from_target_usize(0u64, &tcx),
-                // Future pattern kinds may have more variants
+                ty::PatternKind::NotNull => ConstValue::from_target_usize(0_u64, &tcx),
                 // FIXME(pattern_types): make this report the number of distinct variants used in the
                 // or pattern in case the base type is an enum.
                 ty::PatternKind::Or(_) => ConstValue::from_target_usize(0_u64, &tcx),

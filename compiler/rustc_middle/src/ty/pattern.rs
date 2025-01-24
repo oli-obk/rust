@@ -51,6 +51,7 @@ impl<'tcx> fmt::Debug for PatternKind<'tcx> {
 
                 write!(f, "..={end}")
             }
+            PatternKind::NotNull => write!(f, "!null"),
             PatternKind::Or(patterns) => {
                 write!(f, "(")?;
                 let mut first = true;
@@ -73,4 +74,5 @@ impl<'tcx> fmt::Debug for PatternKind<'tcx> {
 pub enum PatternKind<'tcx> {
     Range { start: ty::Const<'tcx>, end: ty::Const<'tcx> },
     Or(&'tcx ty::List<Pattern<'tcx>>),
+    NotNull,
 }
