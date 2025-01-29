@@ -3,7 +3,7 @@
 use core::fmt;
 use core::future::Future;
 use core::marker::Tuple;
-use core::ops::{Coroutine, CoroutineState};
+use core::ops::{Coroutine, CoroutineGatWorkaround, CoroutineState};
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
@@ -208,15 +208,34 @@ where
 }
 
 #[unstable(feature = "coroutine_trait", issue = "43122")] // also #98407
+impl<G> CoroutineGatWorkaround for Exclusive<G>
+where
+    G: CoroutineGatWorkaround + ?Sized,
+{
+    #[cfg(not(bootstrap))]
+    type Yield<'a> = G::Yield<'a>;
+}
+
+#[unstable(feature = "coroutine_trait", issue = "43122")] // also #98407
 impl<R, G> Coroutine<R> for Exclusive<G>
 where
     G: Coroutine<R> + ?Sized,
 {
+    #[cfg(bootstrap)]
     type Yield = G::Yield;
     type Return = G::Return;
 
     #[inline]
+    #[cfg(bootstrap)]
     fn resume(self: Pin<&mut Self>, arg: R) -> CoroutineState<Self::Yield, Self::Return> {
+        G::resume(self.get_pin_mut(), arg)
+    }
+    #[inline]
+    #[cfg(not(bootstrap))]
+    fn resume<'a>(
+        self: Pin<&'a mut Self>,
+        arg: R,
+    ) -> CoroutineState<Self::Yield<'a>, Self::Return> {
         G::resume(self.get_pin_mut(), arg)
     }
 }

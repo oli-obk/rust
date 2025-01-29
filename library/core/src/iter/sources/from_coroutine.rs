@@ -39,12 +39,29 @@ pub fn from_coroutine<G: Coroutine<Return = ()> + Unpin>(coroutine: G) -> FromCo
 pub struct FromCoroutine<G>(G);
 
 #[unstable(feature = "iter_from_coroutine", issue = "43122", reason = "coroutines are unstable")]
+#[cfg(bootstrap)]
 impl<G: Coroutine<Return = ()> + Unpin> Iterator for FromCoroutine<G> {
     type Item = G::Yield;
 
     fn next(&mut self) -> Option<Self::Item> {
         match Pin::new(&mut self.0).resume(()) {
             CoroutineState::Yielded(n) => Some(n),
+            CoroutineState::Complete(()) => None,
+        }
+    }
+}
+
+#[unstable(feature = "iter_from_coroutine", issue = "43122", reason = "coroutines are unstable")]
+#[cfg(not(bootstrap))]
+impl<I, G: Coroutine<Return = ()> + Unpin> Iterator for FromCoroutine<G>
+where
+    for<'a> G::Yield<'a>: Into<I>,
+{
+    type Item = I;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match Pin::new(&mut self.0).resume(()) {
+            CoroutineState::Yielded(n) => Some(n.into()),
             CoroutineState::Complete(()) => None,
         }
     }

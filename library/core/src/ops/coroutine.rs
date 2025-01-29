@@ -25,6 +25,21 @@ pub enum CoroutineState<Y, R> {
     Complete(R),
 }
 
+/// Workaround for GAT limitations
+#[unstable(feature = "coroutine_trait", issue = "43122")]
+#[cfg_attr(not(bootstrap), lang = "coroutine_yield_gat")]
+pub trait CoroutineGatWorkaround {
+    /// The type of value this coroutine yields.
+    ///
+    /// This associated type corresponds to the `yield` expression and the
+    /// values which are allowed to be returned each time a coroutine yields.
+    /// For example an iterator-as-a-coroutine would likely have this type as
+    /// `T`, the type being iterated over.
+    #[cfg(not(bootstrap))]
+    #[lang = "coroutine_yield"]
+    type Yield<'a>;
+}
+
 /// The trait implemented by builtin coroutine types.
 ///
 /// Coroutines are currently an
@@ -70,14 +85,10 @@ pub enum CoroutineState<Y, R> {
 #[unstable(feature = "coroutine_trait", issue = "43122")]
 #[fundamental]
 #[must_use = "coroutines are lazy and do nothing unless resumed"]
-pub trait Coroutine<R = ()> {
-    /// The type of value this coroutine yields.
-    ///
-    /// This associated type corresponds to the `yield` expression and the
-    /// values which are allowed to be returned each time a coroutine yields.
-    /// For example an iterator-as-a-coroutine would likely have this type as
-    /// `T`, the type being iterated over.
+pub trait Coroutine<R = ()>: CoroutineGatWorkaround {
+    #[cfg(bootstrap)]
     #[lang = "coroutine_yield"]
+    /// bootstrap
     type Yield;
 
     /// The type of value this coroutine returns.
@@ -115,26 +126,65 @@ pub trait Coroutine<R = ()> {
     /// been returned previously. While coroutine literals in the language are
     /// guaranteed to panic on resuming after `Complete`, this is not guaranteed
     /// for all implementations of the `Coroutine` trait.
+    #[cfg(not(bootstrap))]
     #[lang = "coroutine_resume"]
+    fn resume<'a>(self: Pin<&'a mut Self>, arg: R)
+    -> CoroutineState<Self::Yield<'a>, Self::Return>;
+
+    #[cfg(bootstrap)]
+    #[lang = "coroutine_resume"]
+    /// bootstrap
     fn resume(self: Pin<&mut Self>, arg: R) -> CoroutineState<Self::Yield, Self::Return>;
 }
 
 #[unstable(feature = "coroutine_trait", issue = "43122")]
+impl<G: ?Sized + CoroutineGatWorkaround> CoroutineGatWorkaround for Pin<&mut G> {
+    #[cfg(not(bootstrap))]
+    type Yield<'a> = G::Yield<'a>;
+}
+
+#[unstable(feature = "coroutine_trait", issue = "43122")]
 impl<G: ?Sized + Coroutine<R>, R> Coroutine<R> for Pin<&mut G> {
+    #[cfg(bootstrap)]
     type Yield = G::Yield;
     type Return = G::Return;
 
+    #[cfg(bootstrap)]
     fn resume(mut self: Pin<&mut Self>, arg: R) -> CoroutineState<Self::Yield, Self::Return> {
         G::resume((*self).as_mut(), arg)
+    }
+
+    #[cfg(not(bootstrap))]
+    fn resume<'a>(
+        self: Pin<&'a mut Self>,
+        arg: R,
+    ) -> CoroutineState<Self::Yield<'a>, Self::Return> {
+        G::resume(self.as_deref_mut(), arg)
     }
 }
 
 #[unstable(feature = "coroutine_trait", issue = "43122")]
+impl<G: ?Sized + Unpin + CoroutineGatWorkaround> CoroutineGatWorkaround for &mut G {
+    #[cfg(not(bootstrap))]
+    type Yield<'a> = G::Yield<'a>;
+}
+
+#[unstable(feature = "coroutine_trait", issue = "43122")]
 impl<G: ?Sized + Coroutine<R> + Unpin, R> Coroutine<R> for &mut G {
+    #[cfg(bootstrap)]
     type Yield = G::Yield;
+
     type Return = G::Return;
 
+    #[cfg(bootstrap)]
     fn resume(mut self: Pin<&mut Self>, arg: R) -> CoroutineState<Self::Yield, Self::Return> {
         G::resume(Pin::new(&mut *self), arg)
+    }
+    #[cfg(not(bootstrap))]
+    fn resume<'a>(
+        self: Pin<&'a mut Self>,
+        arg: R,
+    ) -> CoroutineState<Self::Yield<'a>, Self::Return> {
+        G::resume(Pin::new(self.get_mut()), arg)
     }
 }

@@ -269,6 +269,7 @@ language_item_table! {
     Coroutine,               sym::coroutine,           coroutine_trait,            Target::Trait,          GenericRequirement::Exact(1);
     CoroutineReturn,         sym::coroutine_return,    coroutine_return,           Target::AssocTy,        GenericRequirement::Exact(1);
     CoroutineYield,          sym::coroutine_yield,     coroutine_yield,            Target::AssocTy,        GenericRequirement::Exact(1);
+    CoroutineYieldGat,       sym::coroutine_yield_gat, coroutine_yield_gat,        Target::Trait,          GenericRequirement::None;
     CoroutineResume,         sym::coroutine_resume,    coroutine_resume,           Target::Method(MethodKind::Trait { body: false }), GenericRequirement::None;
 
     Unpin,                   sym::unpin,               unpin_trait,                Target::Trait,          GenericRequirement::None;

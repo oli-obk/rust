@@ -194,8 +194,8 @@ use core::hash::{Hash, Hasher};
 use core::marker::{PointerLike, Tuple, Unsize};
 use core::mem::{self, SizedTypeProperties};
 use core::ops::{
-    AsyncFn, AsyncFnMut, AsyncFnOnce, CoerceUnsized, Coroutine, CoroutineState, Deref, DerefMut,
-    DerefPure, DispatchFromDyn, LegacyReceiver,
+    AsyncFn, AsyncFnMut, AsyncFnOnce, CoerceUnsized, Coroutine, CoroutineGatWorkaround,
+    CoroutineState, Deref, DerefMut, DerefPure, DispatchFromDyn, LegacyReceiver,
 };
 use core::pin::{Pin, PinCoerceUnsized};
 use core::ptr::{self, NonNull, Unique};
@@ -2082,7 +2082,16 @@ impl<T: ?Sized, A: Allocator> AsMut<T> for Box<T, A> {
 impl<T: ?Sized, A: Allocator> Unpin for Box<T, A> {}
 
 #[unstable(feature = "coroutine_trait", issue = "43122")]
+impl<G: ?Sized + Unpin + CoroutineGatWorkaround, A: Allocator> CoroutineGatWorkaround
+    for Box<G, A>
+{
+    #[cfg(not(bootstrap))]
+    type Yield<'a> = G::Yield<'a>;
+}
+
+#[unstable(feature = "coroutine_trait", issue = "43122")]
 impl<G: ?Sized + Coroutine<R> + Unpin, R, A: Allocator> Coroutine<R> for Box<G, A> {
+    #[cfg(bootstrap)]
     type Yield = G::Yield;
     type Return = G::Return;
 
@@ -2092,10 +2101,20 @@ impl<G: ?Sized + Coroutine<R> + Unpin, R, A: Allocator> Coroutine<R> for Box<G, 
 }
 
 #[unstable(feature = "coroutine_trait", issue = "43122")]
+impl<G: ?Sized + CoroutineGatWorkaround, A: Allocator> CoroutineGatWorkaround for Pin<Box<G, A>>
+where
+    A: 'static,
+{
+    #[cfg(not(bootstrap))]
+    type Yield<'a> = G::Yield<'a>;
+}
+
+#[unstable(feature = "coroutine_trait", issue = "43122")]
 impl<G: ?Sized + Coroutine<R>, R, A: Allocator> Coroutine<R> for Pin<Box<G, A>>
 where
     A: 'static,
 {
+    #[cfg(bootstrap)]
     type Yield = G::Yield;
     type Return = G::Return;
 

@@ -165,7 +165,7 @@ pub use self::bit::{BitAndAssign, BitOrAssign, BitXorAssign, ShlAssign, ShrAssig
 #[stable(feature = "control_flow_enum_type", since = "1.55.0")]
 pub use self::control_flow::ControlFlow;
 #[unstable(feature = "coroutine_trait", issue = "43122")]
-pub use self::coroutine::{Coroutine, CoroutineState};
+pub use self::coroutine::{Coroutine, CoroutineGatWorkaround, CoroutineState};
 #[unstable(feature = "deref_pure_trait", issue = "87121")]
 pub use self::deref::DerefPure;
 #[unstable(feature = "legacy_receiver_trait", issue = "none")]

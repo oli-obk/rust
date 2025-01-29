@@ -721,6 +721,7 @@ symbols! {
         coroutine_return,
         coroutine_state,
         coroutine_yield,
+        coroutine_yield_gat,
         coroutines,
         cosf128,
         cosf16,
