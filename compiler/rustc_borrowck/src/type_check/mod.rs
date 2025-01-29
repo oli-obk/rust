@@ -1565,6 +1565,21 @@ impl<'a, 'tcx> Visitor<'tcx> for TypeChecker<'a, 'tcx> {
                             }
                         }
                     }
+                    CastKind::StripPat => {
+                        let ty_from = op.ty(body, tcx);
+                        match ty_from.kind() {
+                            ty::Pat(base, _) if base == ty => (),
+                            _ => {
+                                span_mirbug!(
+                                    self,
+                                    rvalue,
+                                    "Invalid StripPat cast {:?} -> {:?}",
+                                    ty_from,
+                                    ty
+                                )
+                            }
+                        }
+                    }
                     CastKind::Transmute => {
                         span_mirbug!(
                             self,
