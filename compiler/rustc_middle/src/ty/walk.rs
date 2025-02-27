@@ -217,5 +217,10 @@ fn push_pat<'tcx>(stack: &mut SmallVec<[GenericArg<'tcx>; 8]>, pat: ty::Pattern<
             stack.push(end.into());
             stack.push(start.into());
         }
+        ty::PatternKind::Or(patterns) => {
+            for pat in patterns {
+                push_pat(stack, pat)
+            }
+        }
     }
 }
