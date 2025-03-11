@@ -8,6 +8,10 @@ LL | #[derive_const(PartialEq)]
    = note: adding a non-const method body in the future would be a breaking change
 
 error: `~const` can only be applied to `#[const_trait]` traits
+  --> $DIR/derive-const-with-params.rs:7:16
+   |
+LL | #[derive_const(PartialEq)]
+   |                ^ can't be applied to `PartialEq`
    |
 note: `PartialEq` can't be used with `~const` because it isn't annotated with `#[const_trait]`
   --> $SRC_DIR/core/src/cmp.rs:LL:COL

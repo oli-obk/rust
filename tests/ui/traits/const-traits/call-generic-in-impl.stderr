@@ -2,7 +2,7 @@ error: `~const` can only be applied to `#[const_trait]` traits
   --> $DIR/call-generic-in-impl.rs:10:9
    |
 LL | impl<T: ~const PartialEq> const MyPartialEq for T {
-   |         ^^^^^^ can't be applied to `PartialEq`
+   |         ^^^^^^^ can't be applied to `PartialEq`
    |
 note: `PartialEq` can't be used with `~const` because it isn't annotated with `#[const_trait]`
   --> $SRC_DIR/core/src/cmp.rs:LL:COL
@@ -11,7 +11,7 @@ error: `~const` can only be applied to `#[const_trait]` traits
   --> $DIR/call-generic-in-impl.rs:10:9
    |
 LL | impl<T: ~const PartialEq> const MyPartialEq for T {
-   |         ^^^^^^ can't be applied to `PartialEq`
+   |         ^^^^^^^ can't be applied to `PartialEq`
    |
 note: `PartialEq` can't be used with `~const` because it isn't annotated with `#[const_trait]`
   --> $SRC_DIR/core/src/cmp.rs:LL:COL

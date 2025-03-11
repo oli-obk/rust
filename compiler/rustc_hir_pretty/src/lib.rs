@@ -779,11 +779,7 @@ impl<'a> State<'a> {
 
     fn print_poly_trait_ref(&mut self, t: &hir::PolyTraitRef<'_>) {
         let hir::TraitBoundModifiers { constness, polarity } = t.modifiers;
-        match constness {
-            hir::BoundConstness::Never => {}
-            hir::BoundConstness::Always(_) => self.word("const"),
-            hir::BoundConstness::Maybe(_) => self.word("~const"),
-        }
+        self.print_bound_constness(constness);
         match polarity {
             hir::BoundPolarity::Positive => {}
             hir::BoundPolarity::Negative(_) => self.word("!"),
@@ -2497,6 +2493,14 @@ impl<'a> State<'a> {
         match s {
             hir::Constness::NotConst => {}
             hir::Constness::Const => self.word_nbsp("const"),
+        }
+    }
+
+    fn print_bound_constness(&mut self, c: hir::BoundConstness) {
+        match c {
+            rustc_hir::BoundConstness::Never => {}
+            rustc_hir::BoundConstness::Always => self.word_nbsp("const"),
+            rustc_hir::BoundConstness::Maybe => self.word_nbsp("~const"),
         }
     }
 

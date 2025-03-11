@@ -10,9 +10,8 @@ use rustc_ast::{
     LitKind, TraitObjectSyntax, UintTy, UnsafeBinderCastKind,
 };
 pub use rustc_ast::{
-    AttrId, AttrStyle, BinOp, BinOpKind, BindingMode, BorrowKind, BoundConstness, BoundPolarity,
-    ByRef, CaptureBy, DelimArgs, ImplPolarity, IsAuto, MetaItemInner, MetaItemLit, Movability,
-    Mutability, UnOp,
+    AttrId, AttrStyle, BinOp, BinOpKind, BindingMode, BorrowKind, BoundPolarity, ByRef, CaptureBy,
+    DelimArgs, ImplPolarity, IsAuto, MetaItemInner, MetaItemLit, Movability, Mutability, UnOp,
 };
 use rustc_attr_data_structures::AttributeKind;
 use rustc_data_structures::fingerprint::Fingerprint;
@@ -4115,6 +4114,27 @@ pub struct FnHeader {
     pub abi: ExternAbi,
 }
 
+/// The constness of a trait bound.
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, HashStable_Generic)]
+pub enum BoundConstness {
+    /// `Type: Trait`
+    Never,
+    /// `Type: const Trait`
+    Always,
+    /// `Type: ~const Trait`
+    Maybe,
+}
+
+impl BoundConstness {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            BoundConstness::Never => "",
+            BoundConstness::Always => "const",
+            BoundConstness::Maybe => "~const",
+        }
+    }
+}
+
 impl FnHeader {
     pub fn is_async(&self) -> bool {
         matches!(self.asyncness, IsAsync::Async(_))
@@ -4843,7 +4863,7 @@ mod size_asserts {
     static_assert_size!(ForeignItem<'_>, 88);
     static_assert_size!(ForeignItemKind<'_>, 56);
     static_assert_size!(GenericArg<'_>, 16);
-    static_assert_size!(GenericBound<'_>, 64);
+    static_assert_size!(GenericBound<'_>, 56);
     static_assert_size!(Generics<'_>, 56);
     static_assert_size!(Impl<'_>, 80);
     static_assert_size!(ImplItem<'_>, 88);

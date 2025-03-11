@@ -35,7 +35,7 @@ pub enum UnstableKind {
     /// Enforcing regular stability of an item
     Regular,
     /// Enforcing const stability of an item
-    Const(Span),
+    Const,
 }
 
 /// An entry in the `depr_map`.
@@ -120,7 +120,7 @@ pub fn report_unstable(
 ) {
     let qual = match kind {
         UnstableKind::Regular => "",
-        UnstableKind::Const(_) => " const",
+        UnstableKind::Const => " const",
     };
 
     let msg = match reason {
@@ -135,8 +135,8 @@ pub fn report_unstable(
         if let Some((inner_types, msg, sugg, applicability)) = suggestion {
             err.span_suggestion(inner_types, msg, sugg, applicability);
         }
-        if let UnstableKind::Const(kw) = kind {
-            err.span_label(kw, "trait is not stable as const yet");
+        if let UnstableKind::Const = kind {
+            err.span_label(span, "trait is not stable as const yet");
         }
         err.emit();
     }
@@ -622,7 +622,7 @@ impl<'tcx> TyCtxt<'tcx> {
     /// This enforces *syntactical* const stability of const traits. In other words,
     /// it enforces the ability to name `~const`/`const` traits in trait bounds in various
     /// syntax positions in HIR (including in the trait of an impl header).
-    pub fn check_const_stability(self, def_id: DefId, span: Span, const_kw_span: Span) {
+    pub fn check_const_stability(self, def_id: DefId, span: Span) {
         let is_staged_api = self.lookup_stability(def_id.krate.as_def_id()).is_some();
         if !is_staged_api {
             return;
@@ -675,7 +675,7 @@ impl<'tcx> TyCtxt<'tcx> {
                     false,
                     span,
                     |_, _, _| {},
-                    UnstableKind::Const(const_kw_span),
+                    UnstableKind::Const,
                 );
             }
             Some(_) | None => {}

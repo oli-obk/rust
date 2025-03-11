@@ -875,7 +875,7 @@ impl<'tcx> Visitor<'tcx> for Checker<'tcx> {
                     && let Some(def_id) = t.trait_def_id()
                 {
                     // FIXME(const_trait_impl): Improve the span here.
-                    self.tcx.check_const_stability(def_id, t.path.span, t.path.span);
+                    self.tcx.check_const_stability(def_id, t.path.span);
                 }
 
                 for impl_item_ref in *items {
@@ -895,9 +895,9 @@ impl<'tcx> Visitor<'tcx> for Checker<'tcx> {
 
     fn visit_poly_trait_ref(&mut self, t: &'tcx hir::PolyTraitRef<'tcx>) {
         match t.modifiers.constness {
-            hir::BoundConstness::Always(span) | hir::BoundConstness::Maybe(span) => {
+            hir::BoundConstness::Always | hir::BoundConstness::Maybe => {
                 if let Some(def_id) = t.trait_ref.trait_def_id() {
-                    self.tcx.check_const_stability(def_id, t.trait_ref.path.span, span);
+                    self.tcx.check_const_stability(def_id, t.trait_ref.path.span);
                 }
             }
             hir::BoundConstness::Never => {}

@@ -199,6 +199,14 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
     pub(crate) fn dcx(&self) -> DiagCtxtHandle<'hir> {
         self.tcx.dcx()
     }
+
+    fn lower_bound_constness(&self, constness: BoundConstness) -> hir::BoundConstness {
+        match constness {
+            BoundConstness::Never => hir::BoundConstness::Never,
+            BoundConstness::Always(_) => hir::BoundConstness::Always,
+            BoundConstness::Maybe(_) => hir::BoundConstness::Maybe,
+        }
+    }
 }
 
 #[extension(trait ResolverAstLoweringExt)]
@@ -2196,7 +2204,10 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
         &mut self,
         modifiers: TraitBoundModifiers,
     ) -> hir::TraitBoundModifiers {
-        hir::TraitBoundModifiers { constness: modifiers.constness, polarity: modifiers.polarity }
+        hir::TraitBoundModifiers {
+            constness: self.lower_bound_constness(modifiers.constness),
+            polarity: modifiers.polarity,
+        }
     }
 
     // Helper methods for building HIR.

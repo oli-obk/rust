@@ -806,9 +806,10 @@ impl<'tcx> dyn HirTyLowerer<'tcx> + '_ {
             PredicateFilter::ConstIfConst | PredicateFilter::SelfConstIfConst => {}
         }
 
-        if let hir::BoundConstness::Always(span) | hir::BoundConstness::Maybe(span) = constness
+        if let hir::BoundConstness::Always | hir::BoundConstness::Maybe = constness
             && !self.tcx().is_const_trait(trait_def_id)
         {
+            let span = span.shrink_to_lo().to(trait_ref.path.span.shrink_to_lo());
             let (def_span, suggestion, suggestion_pre) =
                 match (trait_def_id.is_local(), self.tcx().sess.is_nightly_build()) {
                     (true, true) => (
@@ -838,7 +839,7 @@ impl<'tcx> dyn HirTyLowerer<'tcx> + '_ {
                 | PredicateFilter::SelfOnly
                 | PredicateFilter::SelfAndAssociatedTypeBounds => {
                     match constness {
-                        hir::BoundConstness::Always(span) => {
+                        hir::BoundConstness::Always => {
                             if polarity == ty::PredicatePolarity::Positive {
                                 bounds.push((
                                     poly_trait_ref
@@ -847,7 +848,7 @@ impl<'tcx> dyn HirTyLowerer<'tcx> + '_ {
                                 ));
                             }
                         }
-                        hir::BoundConstness::Maybe(_) => {
+                        hir::BoundConstness::Maybe => {
                             // We don't emit a const bound here, since that would mean that we
                             // unconditionally need to prove a `HostEffect` predicate, even when
                             // the predicates are being instantiated in a non-const context. This
@@ -864,7 +865,7 @@ impl<'tcx> dyn HirTyLowerer<'tcx> + '_ {
                 // in `lower_assoc_item_constraint`.
                 PredicateFilter::ConstIfConst | PredicateFilter::SelfConstIfConst => {
                     match constness {
-                        hir::BoundConstness::Maybe(span) => {
+                        hir::BoundConstness::Maybe => {
                             if polarity == ty::PredicatePolarity::Positive {
                                 bounds.push((
                                     poly_trait_ref
@@ -873,7 +874,7 @@ impl<'tcx> dyn HirTyLowerer<'tcx> + '_ {
                                 ));
                             }
                         }
-                        hir::BoundConstness::Always(_) | hir::BoundConstness::Never => {}
+                        hir::BoundConstness::Always | hir::BoundConstness::Never => {}
                     }
                 }
             }

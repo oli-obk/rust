@@ -28,7 +28,7 @@ error: `const` can only be applied to `#[const_trait]` traits
   --> $DIR/spec-effectvar-ice.rs:13:34
    |
 LL | impl<T> const Foo for T where T: const Specialize {}
-   |                                  ^^^^^ can't be applied to `Specialize`
+   |                                  ^^^^^^ can't be applied to `Specialize`
    |
 help: mark `Specialize` as `#[const_trait]` to allow it to have `const` implementations
    |
