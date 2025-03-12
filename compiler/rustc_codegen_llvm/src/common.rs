@@ -3,9 +3,8 @@
 use std::borrow::Borrow;
 
 use libc::{c_char, c_uint};
-use rustc_abi as abi;
 use rustc_abi::Primitive::Pointer;
-use rustc_abi::{AddressSpace, HasDataLayout};
+use rustc_abi::{self as abi, AddressSpace, Align, HasDataLayout, Size};
 use rustc_ast::Mutability;
 use rustc_codegen_ssa::common::TypeKind;
 use rustc_codegen_ssa::traits::*;
@@ -13,7 +12,9 @@ use rustc_data_structures::stable_hasher::{HashStable, StableHasher};
 use rustc_hashes::Hash128;
 use rustc_hir::def_id::DefId;
 use rustc_middle::bug;
-use rustc_middle::mir::interpret::{ConstAllocation, GlobalAlloc, Scalar};
+use rustc_middle::mir::interpret::{
+    AllocInit, Allocation, ConstAllocation, GlobalAlloc, Scalar, alloc_range,
+};
 use rustc_middle::ty::TyCtxt;
 use rustc_session::cstore::DllImport;
 use tracing::debug;
@@ -283,7 +284,8 @@ impl<'ll, 'tcx> ConstCodegenMethods for CodegenCx<'ll, 'tcx> {
                                 self.const_bitcast(llval, llty)
                             };
                         } else {
-                            let init = const_alloc_to_llvm(self, alloc, /*static*/ false);
+                            let init =
+                                const_alloc_to_llvm(self, alloc.inner(), /*static*/ false);
                             let alloc = alloc.inner();
                             let value = match alloc.mutability {
                                 Mutability::Mut => self.static_addr_of_mut(init, alloc.align, None),
@@ -317,7 +319,7 @@ impl<'ll, 'tcx> ConstCodegenMethods for CodegenCx<'ll, 'tcx> {
                                 }),
                             )))
                             .unwrap_memory();
-                        let init = const_alloc_to_llvm(self, alloc, /*static*/ false);
+                        let init = const_alloc_to_llvm(self, alloc.inner(), /*static*/ false);
                         let value = self.static_addr_of_impl(init, alloc.inner().align, None);
                         (value, AddressSpace::DATA)
                     }
@@ -325,6 +327,24 @@ impl<'ll, 'tcx> ConstCodegenMethods for CodegenCx<'ll, 'tcx> {
                         assert!(self.tcx.is_static(def_id));
                         assert!(!self.tcx.is_thread_local_static(def_id));
                         (self.get_static(def_id), AddressSpace::DATA)
+                    }
+                    GlobalAlloc::Type(ty) => {
+                        let type_id = self.tcx.type_id_hash(ty).as_u128();
+                        let mut alloc = Allocation::new(
+                            Size::from_bytes(16),
+                            Align::from_bytes(8).unwrap(),
+                            AllocInit::Uninit,
+                        );
+                        alloc
+                            .write_scalar(
+                                &self.tcx,
+                                alloc_range(Size::ZERO, Size::from_bytes(16)),
+                                Scalar::from_u128(type_id),
+                            )
+                            .unwrap();
+                        let init = const_alloc_to_llvm(self, &alloc, /*static*/ false);
+                        let value = self.static_addr_of_impl(init, alloc.align, None);
+                        (value, AddressSpace::DATA)
                     }
                 };
                 let llval = unsafe {
@@ -346,7 +366,7 @@ impl<'ll, 'tcx> ConstCodegenMethods for CodegenCx<'ll, 'tcx> {
     }
 
     fn const_data_from_alloc(&self, alloc: ConstAllocation<'_>) -> Self::Value {
-        const_alloc_to_llvm(self, alloc, /*static*/ false)
+        const_alloc_to_llvm(self, alloc.inner(), /*static*/ false)
     }
 
     fn const_ptr_byte_offset(&self, base_addr: Self::Value, offset: abi::Size) -> Self::Value {

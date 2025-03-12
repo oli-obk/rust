@@ -327,6 +327,7 @@ impl<'tcx> ReachableContext<'tcx> {
                         self.visit(args);
                     }
                 }
+                GlobalAlloc::Type(ty) => self.visit(ty),
                 GlobalAlloc::Memory(alloc) => self.propagate_from_alloc(alloc),
             }
         }
