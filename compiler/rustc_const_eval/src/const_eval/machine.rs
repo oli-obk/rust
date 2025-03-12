@@ -8,7 +8,7 @@ use rustc_data_structures::fx::{FxHashMap, FxIndexMap, IndexEntry};
 use rustc_hir::def_id::{DefId, LocalDefId};
 use rustc_hir::{self as hir, CRATE_HIR_ID, LangItem};
 use rustc_middle::mir::AssertMessage;
-use rustc_middle::mir::interpret::ReportedErrorInfo;
+use rustc_middle::mir::interpret::{Pointer, ReportedErrorInfo};
 use rustc_middle::query::TyCtxtAt;
 use rustc_middle::ty::layout::{HasTypingEnv, TyAndLayout};
 use rustc_middle::ty::{self, Ty, TyCtxt};
@@ -23,8 +23,8 @@ use crate::fluent_generated as fluent;
 use crate::interpret::{
     self, AllocId, AllocInit, AllocRange, ConstAllocation, CtfeProvenance, FnArg, Frame,
     GlobalAlloc, ImmTy, InterpCx, InterpResult, MPlaceTy, OpTy, RangeSet, Scalar,
-    compile_time_machine, interp_ok, throw_exhaust, throw_inval, throw_ub, throw_ub_custom,
-    throw_unsup, throw_unsup_format,
+    compile_time_machine, ensure_monomorphic_enough, interp_ok, throw_exhaust, throw_inval,
+    throw_ub, throw_ub_custom, throw_unsup, throw_unsup_format,
 };
 
 /// When hitting this many interpreted terminators we emit a deny by default lint
@@ -462,6 +462,27 @@ impl<'tcx> interpret::Machine<'tcx> for CompileTimeMachine<'tcx> {
             // (We know the value here in the machine of course, but this is the runtime of that code,
             // not the optimization stage.)
             sym::is_val_statically_known => ecx.write_scalar(Scalar::from_bool(false), dest)?,
+            sym::type_of => {
+                let id = ecx.read_scalar(&args[0])?.to_pointer(ecx)?;
+                assert_eq!(id.into_parts().1, Size::ZERO);
+                let id = id.provenance.unwrap().alloc_id();
+                let ty = ecx.tcx.global_alloc(id).unwrap_type_info();
+                let info = ecx.build_type_info(ty)?;
+                let info = info.map_provenance(CtfeProvenance::as_immutable);
+                let ptr = ecx.mplace_to_ref(&info)?;
+                ecx.write_immediate(*ptr, dest)?;
+            }
+            sym::type_id_of => {
+                let ty = instance.args[0].expect_ty();
+                ensure_monomorphic_enough(ecx.tcx.tcx, ty)?;
+                let id = ecx.tcx.reserve_and_set_type_id_alloc(ty);
+                let ptr = Self::adjust_alloc_root_pointer(
+                    ecx,
+                    Pointer::new(id.into(), Size::ZERO),
+                    None,
+                )?;
+                ecx.write_scalar(Scalar::from_pointer(ptr, &ecx.tcx), dest)?;
+            }
             _ => {
                 // We haven't handled the intrinsic, let's see if we can use a fallback body.
                 if ecx.tcx.intrinsic(instance.def_id()).unwrap().must_be_overridden {

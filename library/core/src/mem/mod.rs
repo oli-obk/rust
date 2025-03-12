@@ -25,6 +25,10 @@ pub use transmutability::{Assume, TransmuteFrom};
 #[doc(inline)]
 pub use crate::intrinsics::transmute;
 
+#[unstable(feature = "type_info", issue = "none")]
+#[cfg(not(bootstrap))]
+pub mod type_info;
+
 /// Takes ownership and "forgets" about the value **without running its destructor**.
 ///
 /// Any resources the value manages, such as heap memory or a file handle, will linger

@@ -296,6 +296,16 @@ impl<'tcx> GlobalAlloc<'tcx> {
         }
     }
 
+    /// Panics if the `GlobalAlloc` is not `GlobalAlloc::Type`
+    #[track_caller]
+    #[inline]
+    pub fn unwrap_type_info(&self) -> Ty<'tcx> {
+        match *self {
+            GlobalAlloc::Type(ty) => ty,
+            _ => bug!("expected type info, got {:?}", self),
+        }
+    }
+
     /// Panics if the `GlobalAlloc` is not `GlobalAlloc::VTable`
     #[track_caller]
     #[inline]

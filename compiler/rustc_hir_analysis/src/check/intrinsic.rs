@@ -3,7 +3,7 @@
 use rustc_abi::ExternAbi;
 use rustc_errors::codes::*;
 use rustc_errors::{DiagMessage, struct_span_code_err};
-use rustc_hir::{self as hir, Safety};
+use rustc_hir::{self as hir, LangItem, Safety};
 use rustc_middle::bug;
 use rustc_middle::traits::{ObligationCause, ObligationCauseCode};
 use rustc_middle::ty::{self, Ty, TyCtxt};
@@ -124,6 +124,8 @@ pub fn intrinsic_operation_unsafety(tcx: TyCtxt<'_>, intrinsic_id: LocalDefId) -
         | sym::maxnumf128
         | sym::rustc_peek
         | sym::type_name
+        | sym::type_of
+        | sym::type_id_of
         | sym::forget
         | sym::black_box
         | sym::variant_count
@@ -269,6 +271,27 @@ pub fn check_intrinsic_type(
             sym::needs_drop => (1, 0, vec![], tcx.types.bool),
 
             sym::type_name => (1, 0, vec![], Ty::new_static_str(tcx)),
+            sym::type_of => (
+                0,
+                0,
+                vec![
+                    tcx.type_of(tcx.require_lang_item(LangItem::TypeId, Some(span)))
+                        .instantiate_identity(),
+                ],
+                Ty::new_imm_ref(
+                    tcx,
+                    tcx.lifetimes.re_static,
+                    tcx.type_of(tcx.require_lang_item(LangItem::Type, Some(span)))
+                        .instantiate_identity(),
+                ),
+            ),
+            sym::type_id_of => (
+                1,
+                0,
+                vec![],
+                tcx.type_of(tcx.require_lang_item(LangItem::TypeId, Some(span)))
+                    .instantiate_identity(),
+            ),
             sym::type_id => (1, 0, vec![], tcx.types.u128),
             sym::offset => (2, 0, vec![param(0), param(1)], param(0)),
             sym::arith_offset => (

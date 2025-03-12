@@ -189,6 +189,9 @@ language_item_table! {
     Drop,                    sym::drop,                drop_trait,                 Target::Trait,          GenericRequirement::None;
     Destruct,                sym::destruct,            destruct_trait,             Target::Trait,          GenericRequirement::None;
 
+    Type,                    sym::type_info,           type_struct,                Target::Struct,         GenericRequirement::Exact(0);
+    TypeId,                  sym::type_info_id,        type_id,                    Target::Struct,         GenericRequirement::Exact(0);
+
     AsyncDrop,               sym::async_drop,          async_drop_trait,           Target::Trait,          GenericRequirement::Exact(0);
     AsyncDestruct,           sym::async_destruct,      async_destruct_trait,       Target::Trait,          GenericRequirement::Exact(0);
     AsyncDropInPlace,        sym::async_drop_in_place, async_drop_in_place_fn,     Target::Fn,             GenericRequirement::Exact(1);

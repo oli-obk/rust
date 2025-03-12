@@ -108,6 +108,7 @@
 //
 // Library features:
 // tidy-alphabetical-start
+#![cfg_attr(not(bootstrap), feature(type_info))]
 #![feature(array_ptr_get)]
 #![feature(asm_experimental_arch)]
 #![feature(bigint_helper_methods)]
