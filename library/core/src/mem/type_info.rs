@@ -9,6 +9,8 @@
 pub struct Type {
     /// Per-type information
     pub kind: TypeKind,
+    /// Size of the type
+    pub size: Option<usize>,
 }
 
 /// A reference to [crate::any::TypeId]. Cannot be inspected during CTFE,
