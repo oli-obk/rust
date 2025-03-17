@@ -65,7 +65,6 @@ fn main() {
     let z = coerce_fat_ptr_wrapper(PtrWrapper(2,3,(),&square_local));
     assert_eq!((z.3)(6), 36);
 
-    let z: PtrWrapper<dyn Fn(u32) -> u32> =
-        coerce_ptr_wrapper_poly(PtrWrapper(2,3,(),&square_local));
+    let z = coerce_ptr_wrapper_poly::<_, dyn Fn(u32) -> u32>(PtrWrapper(2,3,(),&square_local));
     assert_eq!((z.3)(6), 36);
 }

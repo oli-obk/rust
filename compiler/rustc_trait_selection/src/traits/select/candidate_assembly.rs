@@ -37,34 +37,52 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
             predicate: self.infcx.resolve_vars_if_possible(obligation.predicate),
         };
 
-        if obligation.predicate.skip_binder().self_ty().is_ty_var() {
-            debug!(ty = ?obligation.predicate.skip_binder().self_ty(), "ambiguous inference var or opaque type");
-            // Self is a type variable (e.g., `_: AsRef<str>`).
-            //
-            // This is somewhat problematic, as the current scheme can't really
-            // handle it turning to be a projection. This does end up as truly
-            // ambiguous in most cases anyway.
-            //
-            // Take the fast path out - this also improves
-            // performance by preventing assemble_candidates_from_impls from
-            // matching every impl for this trait.
-            return Ok(SelectionCandidateSet { vec: vec![], ambiguous: true });
-        }
-
         let mut candidates = SelectionCandidateSet { vec: Vec::new(), ambiguous: false };
 
         // Negative trait predicates have different rules than positive trait predicates.
         if obligation.polarity() == ty::PredicatePolarity::Negative {
+            if obligation.predicate.skip_binder().self_ty().is_ty_var() {
+                debug!(ty = ?obligation.predicate.skip_binder().self_ty(), "ambiguous inference var or opaque type");
+                // Self is a type variable (e.g., `_: AsRef<str>`).
+                //
+                // This is somewhat problematic, as the current scheme can't really
+                // handle it turning to be a projection. This does end up as truly
+                // ambiguous in most cases anyway.
+                //
+                // Take the fast path out - this also improves
+                // performance by preventing assemble_candidates_from_impls from
+                // matching every impl for this trait.
+                return Ok(SelectionCandidateSet { vec: vec![], ambiguous: true });
+            }
             self.assemble_candidates_for_trait_alias(obligation, &mut candidates);
             self.assemble_candidates_from_impls(obligation, &mut candidates);
             self.assemble_candidates_from_caller_bounds(stack, &mut candidates)?;
         } else {
-            self.assemble_candidates_for_trait_alias(obligation, &mut candidates);
-
             // Other bounds. Consider both in-scope bounds from fn decl
             // and applicable impls. There is a certain set of precedence rules here.
             let def_id = obligation.predicate.def_id();
             let tcx = self.tcx();
+
+            if tcx.is_lang_item(def_id, LangItem::Unsize) {
+                self.assemble_candidates_for_unsizing(obligation, &mut candidates);
+            }
+            if obligation.predicate.skip_binder().self_ty().is_ty_var() {
+                debug!(ty = ?obligation.predicate.skip_binder().self_ty(), "ambiguous inference var or opaque type");
+                // Self is a type variable (e.g., `_: AsRef<str>`).
+                //
+                // This is somewhat problematic, as the current scheme can't really
+                // handle it turning to be a projection. This does end up as truly
+                // ambiguous in most cases anyway.
+                //
+                // Take the fast path out - this also improves
+                // performance by preventing assemble_candidates_from_impls from
+                // matching every impl for this trait.
+                return Ok(SelectionCandidateSet {
+                    ambiguous: candidates.vec.is_empty(),
+                    vec: candidates.vec,
+                });
+            }
+            self.assemble_candidates_for_trait_alias(obligation, &mut candidates);
 
             if tcx.is_lang_item(def_id, LangItem::Copy) {
                 debug!(obligation_self_ty = ?obligation.predicate.skip_binder().self_ty());
@@ -90,8 +108,6 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
                 // always automatically computed.
                 let sized_conditions = self.sized_conditions(obligation);
                 self.assemble_builtin_bound_candidates(sized_conditions, &mut candidates);
-            } else if tcx.is_lang_item(def_id, LangItem::Unsize) {
-                self.assemble_candidates_for_unsizing(obligation, &mut candidates);
             } else if tcx.is_lang_item(def_id, LangItem::Destruct) {
                 self.assemble_const_destruct_candidates(obligation, &mut candidates);
             } else if tcx.is_lang_item(def_id, LangItem::TransmuteTrait) {
@@ -990,6 +1006,11 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
                         })
                     }
                 }
+            }
+
+            // infer -> `Trait`
+            (&ty::Infer(ty::TyVar(_)), &ty::Dynamic(_, _, ty::Dyn)) => {
+                candidates.vec.push(BuiltinUnsizeCandidate);
             }
 
             // `T` -> `Trait`

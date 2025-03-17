@@ -50,13 +50,13 @@ error[E0607]: cannot cast thin pointer `*const i32` to wide pointer `*const [i32
 LL |     q as *const [i32];
    |     ^^^^^^^^^^^^^^^^^
 
-error[E0606]: cannot cast `usize` to a pointer that is wide
+error[E0641]: cannot cast to a pointer of an unknown kind
   --> $DIR/fat-ptr-cast.rs:22:46
    |
 LL |     let t: *mut (dyn Trait + 'static) = 0 as *mut _;
-   |                                         -    ^^^^^^ creating a `*mut (dyn Trait + 'static)` requires both an address and a vtable
-   |                                         |
-   |                                         consider casting this expression to `*const ()`, then using `core::ptr::from_raw_parts`
+   |                                              ^^^^^^ needs more type information
+   |
+   = note: the type information given here is insufficient to check whether the pointer cast is valid
 
 error[E0606]: cannot cast `usize` to a pointer that is wide
   --> $DIR/fat-ptr-cast.rs:24:37
@@ -84,5 +84,5 @@ LL |     let s = 0 as *const T;
 
 error: aborting due to 11 previous errors
 
-Some errors have detailed explanations: E0605, E0606, E0607.
+Some errors have detailed explanations: E0605, E0606, E0607, E0641.
 For more information about an error, try `rustc --explain E0605`.

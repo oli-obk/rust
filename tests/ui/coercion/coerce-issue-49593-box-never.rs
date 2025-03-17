@@ -1,5 +1,4 @@
 //@ revisions: nofallback fallback
-//@[fallback] check-pass
 
 #![feature(never_type)]
 #![cfg_attr(fallback, feature(never_type_fallback))]
@@ -29,6 +28,7 @@ fn no_coercion(d: *mut dyn Error) -> *mut dyn Error {
     /* an unsize coercion won't compile here, and it is indeed not used
     because there is nothing requiring the _ to be Sized */
     d as *mut _
+    //~^ ERROR: cannot be known at compilation time
 }
 
 trait Xyz {}
