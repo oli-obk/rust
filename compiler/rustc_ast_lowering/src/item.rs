@@ -22,7 +22,7 @@ use super::errors::{InvalidAbi, InvalidAbiSuggestion, TupleStructWithDefault, Un
 use super::stability::{enabled_names, gate_unstable_abi};
 use super::{
     AstOwner, FnDeclKind, ImplTraitContext, ImplTraitPosition, LoweringContext, ParamMode,
-    RelaxedBoundForbiddenReason, RelaxedBoundPolicy, ResolverAstLoweringExt,
+    RelaxedBoundForbiddenReason, RelaxedBoundPolicy,
 };
 
 pub(super) struct ItemLowerer<'a, 'hir> {

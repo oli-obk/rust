@@ -3277,7 +3277,11 @@ impl<'a, 'ast, 'ra, 'tcx> LateResolutionVisitor<'a, 'ast, 'ra, 'tcx> {
         self.resolve_doc_links(&item.attrs, MaybeExported::Ok(item.id));
         match &item.kind {
             AssocItemKind::Const(box ast::ConstItem {
-                generics, ty, rhs_kind, define_opaque, ..
+                generics,
+                ty,
+                rhs_kind,
+                define_opaque,
+                ..
             }) => {
                 self.with_generic_param_rib(
                     &generics.params,
@@ -3293,34 +3297,34 @@ impl<'a, 'ast, 'ra, 'tcx> LateResolutionVisitor<'a, 'ast, 'ra, 'tcx> {
                             },
                             |this| {
                                 this.visit_generics(generics);
-                                    if rhs_kind.is_type_const()
-                                        && !this.r.tcx.features().generic_const_parameter_types()
-                                    {
-                                        this.with_rib(TypeNS, RibKind::ConstParamTy, |this| {
-                                            this.with_rib(ValueNS, RibKind::ConstParamTy, |this| {
-                                                this.with_lifetime_rib(
-                                                    LifetimeRibKind::ConstParamTy,
-                                                    |this| this.visit_ty(ty),
-                                                )
-                                            })
-                                        });
-                                    } else {
+                                if rhs_kind.is_type_const()
+                                    && !this.r.tcx.features().generic_const_parameter_types()
+                                {
+                                    this.with_rib(TypeNS, RibKind::ConstParamTy, |this| {
+                                        this.with_rib(ValueNS, RibKind::ConstParamTy, |this| {
+                                            this.with_lifetime_rib(
+                                                LifetimeRibKind::ConstParamTy,
+                                                |this| this.visit_ty(ty),
+                                            )
+                                        })
+                                    });
+                                } else {
                                     this.visit_ty(ty);
-                                    }
+                                }
 
-                                    // Only impose the restrictions of `ConstRibKind` for an
-                                    // actual constant expression in a provided default.
-                                    //
-                                    // We allow arbitrary const expressions inside of associated consts,
-                                    // even if they are potentially not const evaluatable.
-                                    //
-                                    // Type parameters can already be used and as associated consts are
-                                    // not used as part of the type system, this is far less surprising.
-                                    this.resolve_const_item_rhs(rhs_kind, None);
-                                },
-                            )
-                        },
-                    );
+                                // Only impose the restrictions of `ConstRibKind` for an
+                                // actual constant expression in a provided default.
+                                //
+                                // We allow arbitrary const expressions inside of associated consts,
+                                // even if they are potentially not const evaluatable.
+                                //
+                                // Type parameters can already be used and as associated consts are
+                                // not used as part of the type system, this is far less surprising.
+                                this.resolve_const_item_rhs(rhs_kind, None);
+                            },
+                        )
+                    },
+                );
 
                 self.resolve_define_opaques(define_opaque);
             }
