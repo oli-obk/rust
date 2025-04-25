@@ -4,14 +4,14 @@ note: external requirements
 LL |     with_signature(cell, t, |cell, t| require(cell, t));
    |                             ^^^^^^^^^
    |
-   = note: defining type: no_relationships_late::<'?1, '?2, T>::{closure#0} with closure args [
+   = note: defining type: no_relationships_late::<'?1, '?2, T>::{closure#4} with closure args [
                i32,
                extern "rust-call" fn((std::cell::Cell<&'?3 ()>, T)),
                (),
            ]
    = note: late-bound region is '?4
    = note: number of external vids: 5
-   = note: where <T as Anything<'?1, '?2>>::AssocType: '?3
+   = note: where <T as Anything#3<'?1, '?2>>::AssocType#2: '?3
 
 note: no external requirements
   --> $DIR/projection-two-region-trait-bound-closure.rs:34:1
@@ -23,19 +23,19 @@ LL | |     T: Anything<'b, 'c>,
    |
    = note: defining type: no_relationships_late::<'?1, '?2, T>
 
-error[E0309]: the associated type `<T as Anything<'b/#0, 'c/#1>>::AssocType` may not live long enough
+error[E0309]: the associated type `<T as Anything<'b/#0, 'c/#1>>::AssocType#2` may not live long enough
   --> $DIR/projection-two-region-trait-bound-closure.rs:38:39
    |
 LL | fn no_relationships_late<'a, 'b, 'c, T>(cell: Cell<&'a ()>, t: T)
-   |                          -- the associated type `<T as Anything<'b/#0, 'c/#1>>::AssocType` must be valid for the lifetime `'a` as defined here...
+   |                          -- the associated type `<T as Anything<'b/#0, 'c/#1>>::AssocType#2` must be valid for the lifetime `'a` as defined here...
 ...
 LL |     with_signature(cell, t, |cell, t| require(cell, t));
-   |                                       ^^^^^^^^^^^^^^^^ ...so that the type `<T as Anything<'b/#0, 'c/#1>>::AssocType` will meet its required lifetime bounds
+   |                                       ^^^^^^^^^^^^^^^^ ...so that the type `<T as Anything<'b/#0, 'c/#1>>::AssocType#2` will meet its required lifetime bounds
    |
 help: consider adding an explicit lifetime bound
    |
-LL |     T: Anything<'b, 'c>, <T as Anything<'b/#0, 'c/#1>>::AssocType: 'a
-   |                          ++++++++++++++++++++++++++++++++++++++++++++
+LL |     T: Anything<'b, 'c>, <T as Anything<'b/#0, 'c/#1>>::AssocType#2: 'a
+   |                          ++++++++++++++++++++++++++++++++++++++++++++++
 
 note: external requirements
   --> $DIR/projection-two-region-trait-bound-closure.rs:48:29
@@ -43,13 +43,13 @@ note: external requirements
 LL |     with_signature(cell, t, |cell, t| require(cell, t));
    |                             ^^^^^^^^^
    |
-   = note: defining type: no_relationships_early::<'?1, '?2, '?3, T>::{closure#0} with closure args [
+   = note: defining type: no_relationships_early::<'?1, '?2, '?3, T>::{closure#4} with closure args [
                i32,
                extern "rust-call" fn((std::cell::Cell<&'?4 ()>, T)),
                (),
            ]
    = note: number of external vids: 5
-   = note: where <T as Anything<'?2, '?3>>::AssocType: '?4
+   = note: where <T as Anything#3<'?2, '?3>>::AssocType#2: '?4
 
 note: no external requirements
   --> $DIR/projection-two-region-trait-bound-closure.rs:43:1
@@ -62,19 +62,19 @@ LL | |     'a: 'a,
    |
    = note: defining type: no_relationships_early::<'?1, '?2, '?3, T>
 
-error[E0309]: the associated type `<T as Anything<'b/#1, 'c/#2>>::AssocType` may not live long enough
+error[E0309]: the associated type `<T as Anything<'b/#1, 'c/#2>>::AssocType#2` may not live long enough
   --> $DIR/projection-two-region-trait-bound-closure.rs:48:39
    |
 LL | fn no_relationships_early<'a, 'b, 'c, T>(cell: Cell<&'a ()>, t: T)
-   |                           -- the associated type `<T as Anything<'b/#1, 'c/#2>>::AssocType` must be valid for the lifetime `'a` as defined here...
+   |                           -- the associated type `<T as Anything<'b/#1, 'c/#2>>::AssocType#2` must be valid for the lifetime `'a` as defined here...
 ...
 LL |     with_signature(cell, t, |cell, t| require(cell, t));
-   |                                       ^^^^^^^^^^^^^^^^ ...so that the type `<T as Anything<'b/#1, 'c/#2>>::AssocType` will meet its required lifetime bounds
+   |                                       ^^^^^^^^^^^^^^^^ ...so that the type `<T as Anything<'b/#1, 'c/#2>>::AssocType#2` will meet its required lifetime bounds
    |
 help: consider adding an explicit lifetime bound
    |
-LL |     'a: 'a, <T as Anything<'b/#1, 'c/#2>>::AssocType: 'a
-   |             ++++++++++++++++++++++++++++++++++++++++++++
+LL |     'a: 'a, <T as Anything<'b/#1, 'c/#2>>::AssocType#2: 'a
+   |             ++++++++++++++++++++++++++++++++++++++++++++++
 
 note: external requirements
   --> $DIR/projection-two-region-trait-bound-closure.rs:61:29
@@ -82,13 +82,13 @@ note: external requirements
 LL |     with_signature(cell, t, |cell, t| require(cell, t));
    |                             ^^^^^^^^^
    |
-   = note: defining type: projection_outlives::<'?1, '?2, '?3, T>::{closure#0} with closure args [
+   = note: defining type: projection_outlives::<'?1, '?2, '?3, T>::{closure#4} with closure args [
                i32,
                extern "rust-call" fn((std::cell::Cell<&'?4 ()>, T)),
                (),
            ]
    = note: number of external vids: 5
-   = note: where <T as Anything<'?2, '?3>>::AssocType: '?4
+   = note: where <T as Anything#3<'?2, '?3>>::AssocType#2: '?4
 
 note: no external requirements
   --> $DIR/projection-two-region-trait-bound-closure.rs:53:1
@@ -107,13 +107,13 @@ note: external requirements
 LL |     with_signature(cell, t, |cell, t| require(cell, t));
    |                             ^^^^^^^^^
    |
-   = note: defining type: elements_outlive1::<'?1, '?2, '?3, T>::{closure#0} with closure args [
+   = note: defining type: elements_outlive1::<'?1, '?2, '?3, T>::{closure#4} with closure args [
                i32,
                extern "rust-call" fn((std::cell::Cell<&'?4 ()>, T)),
                (),
            ]
    = note: number of external vids: 5
-   = note: where <T as Anything<'?2, '?3>>::AssocType: '?4
+   = note: where <T as Anything#3<'?2, '?3>>::AssocType#2: '?4
 
 note: no external requirements
   --> $DIR/projection-two-region-trait-bound-closure.rs:65:1
@@ -132,13 +132,13 @@ note: external requirements
 LL |     with_signature(cell, t, |cell, t| require(cell, t));
    |                             ^^^^^^^^^
    |
-   = note: defining type: elements_outlive2::<'?1, '?2, '?3, T>::{closure#0} with closure args [
+   = note: defining type: elements_outlive2::<'?1, '?2, '?3, T>::{closure#4} with closure args [
                i32,
                extern "rust-call" fn((std::cell::Cell<&'?4 ()>, T)),
                (),
            ]
    = note: number of external vids: 5
-   = note: where <T as Anything<'?2, '?3>>::AssocType: '?4
+   = note: where <T as Anything#3<'?2, '?3>>::AssocType#2: '?4
 
 note: no external requirements
   --> $DIR/projection-two-region-trait-bound-closure.rs:74:1
@@ -157,14 +157,14 @@ note: external requirements
 LL |     with_signature(cell, t, |cell, t| require(cell, t));
    |                             ^^^^^^^^^
    |
-   = note: defining type: two_regions::<'?1, T>::{closure#0} with closure args [
+   = note: defining type: two_regions::<'?1, T>::{closure#3} with closure args [
                i32,
                extern "rust-call" fn((std::cell::Cell<&'?2 ()>, T)),
                (),
            ]
    = note: late-bound region is '?3
    = note: number of external vids: 4
-   = note: where <T as Anything<'?1, '?1>>::AssocType: '?2
+   = note: where <T as Anything#3<'?1, '?1>>::AssocType#2: '?2
 
 note: no external requirements
   --> $DIR/projection-two-region-trait-bound-closure.rs:83:1
@@ -198,13 +198,13 @@ note: external requirements
 LL |     with_signature(cell, t, |cell, t| require(cell, t));
    |                             ^^^^^^^^^
    |
-   = note: defining type: two_regions_outlive::<'?1, '?2, T>::{closure#0} with closure args [
+   = note: defining type: two_regions_outlive::<'?1, '?2, T>::{closure#3} with closure args [
                i32,
                extern "rust-call" fn((std::cell::Cell<&'?3 ()>, T)),
                (),
            ]
    = note: number of external vids: 4
-   = note: where <T as Anything<'?2, '?2>>::AssocType: '?3
+   = note: where <T as Anything#3<'?2, '?2>>::AssocType#2: '?3
 
 note: no external requirements
   --> $DIR/projection-two-region-trait-bound-closure.rs:92:1
@@ -223,13 +223,13 @@ note: external requirements
 LL |     with_signature(cell, t, |cell, t| require(cell, t));
    |                             ^^^^^^^^^
    |
-   = note: defining type: one_region::<'?1, T>::{closure#0} with closure args [
+   = note: defining type: one_region::<'?1, T>::{closure#2} with closure args [
                i32,
                extern "rust-call" fn((std::cell::Cell<&'?2 ()>, T)),
                (),
            ]
    = note: number of external vids: 3
-   = note: where <T as Anything<'?1, '?1>>::AssocType: '?2
+   = note: where <T as Anything#3<'?1, '?1>>::AssocType#2: '?2
 
 note: no external requirements
   --> $DIR/projection-two-region-trait-bound-closure.rs:101:1

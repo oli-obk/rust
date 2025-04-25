@@ -1,4 +1,4 @@
-error[E0080]: evaluation of `POSITIVE::<0>::{constant#0}` failed
+error[E0080]: evaluation of `POSITIVE::<0>::{constant#1}` failed
   --> $DIR/unsatisfied-evaluatable-bounds.rs:8:10
    |
 LL |     [(); N - 1]:;

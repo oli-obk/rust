@@ -1,4 +1,4 @@
-DefId(0:3 ~ thir_flat[7b97]::main):
+DefId(0:3 ~ thir_flat[7b97]::main#2):
 Thir {
     body_type: Fn(
         fn(),
@@ -32,7 +32,7 @@ Thir {
             kind: Scope {
                 region_scope: Node(2),
                 lint_level: Explicit(
-                    HirId(DefId(0:3 ~ thir_flat[7b97]::main).2),
+                    HirId(DefId(0:3 ~ thir_flat[7b97]::main#2).2),
                 ),
                 value: e0,
             },

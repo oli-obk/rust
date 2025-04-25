@@ -40,6 +40,9 @@ impl<'a, 'ra, 'tcx> DefCollector<'a, 'ra, 'tcx> {
         span: Span,
     ) -> LocalDefId {
         let parent_def = self.invocation_parent.parent_def;
+        let d = self.resolver.disambiguators.entry(parent_def).or_default();
+        let disambiguator = *d;
+        *d += 1;
         debug!(
             "create_def(node_id={:?}, def_kind={:?}, parent_def={:?})",
             node_id, def_kind, parent_def
@@ -52,6 +55,7 @@ impl<'a, 'ra, 'tcx> DefCollector<'a, 'ra, 'tcx> {
                 def_kind,
                 self.expansion.to_expn_id(),
                 span.with_parent(None),
+                disambiguator,
             )
             .def_id()
     }

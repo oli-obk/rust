@@ -41,7 +41,7 @@ pub(crate) fn create_static_alloc<'tcx>(
     let alloc = Allocation::try_new(layout.size, layout.align.abi, AllocInit::Uninit)?;
     let alloc_id = ecx.tcx.reserve_and_set_static_alloc(static_def_id.into());
     assert_eq!(ecx.machine.static_root_ids, None);
-    ecx.machine.static_root_ids = Some((alloc_id, static_def_id));
+    ecx.machine.static_root_ids = Some((alloc_id, static_def_id, 0));
     assert!(ecx.memory.alloc_map.insert(alloc_id, (MemoryKind::Stack, alloc)).is_none());
     interp_ok(ecx.ptr_to_mplace(Pointer::from(alloc_id).into(), layout))
 }

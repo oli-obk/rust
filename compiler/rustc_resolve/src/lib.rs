@@ -1183,6 +1183,7 @@ pub struct Resolver<'ra, 'tcx> {
     next_node_id: NodeId,
 
     node_id_to_def_id: NodeMap<Feed<'tcx, LocalDefId>>,
+    disambiguators: UnordMap<LocalDefId, u32>,
 
     /// Indices of unnamed struct or variant fields with unresolved attributes.
     placeholder_field_indices: FxHashMap<NodeId, usize>,
@@ -1336,6 +1337,7 @@ impl<'tcx> Resolver<'_, 'tcx> {
         def_kind: DefKind,
         expn_id: ExpnId,
         span: Span,
+        disambiguator: u32,
     ) -> TyCtxtFeed<'tcx, LocalDefId> {
         assert!(
             !self.node_id_to_def_id.contains_key(&node_id),
@@ -1347,7 +1349,7 @@ impl<'tcx> Resolver<'_, 'tcx> {
         );
 
         // FIXME: remove `def_span` body, pass in the right spans here and call `tcx.at().create_def()`
-        let feed = self.tcx.create_def(parent, name, def_kind);
+        let feed = self.tcx.create_def(parent, name, def_kind, disambiguator);
         let def_id = feed.def_id();
 
         // Create the definition.
@@ -1561,6 +1563,7 @@ impl<'ra, 'tcx> Resolver<'ra, 'tcx> {
             lint_buffer: LintBuffer::default(),
             next_node_id: CRATE_NODE_ID,
             node_id_to_def_id,
+            disambiguators: Default::default(),
             placeholder_field_indices: Default::default(),
             invocation_parents,
             legacy_const_generic_args: Default::default(),

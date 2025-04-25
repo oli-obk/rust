@@ -124,6 +124,7 @@ struct LoweringContext<'a, 'hir> {
     is_in_dyn_type: bool,
 
     current_hir_id_owner: hir::OwnerId,
+    current_disambiguator: u32,
     item_local_id_counter: hir::ItemLocalId,
     trait_map: ItemLocalMap<Box<[TraitCandidate]>>,
 
@@ -162,6 +163,7 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
             children: Vec::default(),
             contract_ensures: None,
             current_hir_id_owner: hir::CRATE_OWNER_ID,
+            current_disambiguator: 0,
             item_local_id_counter: hir::ItemLocalId::ZERO,
             ident_and_label_to_local_id: Default::default(),
             #[cfg(debug_assertions)]
@@ -500,6 +502,8 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
         span: Span,
     ) -> LocalDefId {
         let parent = self.current_hir_id_owner.def_id;
+        let disambiguator = self.current_disambiguator;
+        self.current_disambiguator += 1;
         debug_assert_ne!(node_id, ast::DUMMY_NODE_ID);
         assert!(
             self.opt_local_def_id(node_id).is_none(),
@@ -509,7 +513,7 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
             self.tcx.hir_def_key(self.local_def_id(node_id)),
         );
 
-        let def_id = self.tcx.at(span).create_def(parent, name, def_kind).def_id();
+        let def_id = self.tcx.at(span).create_def(parent, name, def_kind, disambiguator).def_id();
 
         debug!("create_def: def_id_to_node_id[{:?}] <-> {:?}", def_id, node_id);
         self.resolver.node_id_to_def_id.insert(node_id, def_id);
@@ -564,6 +568,7 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
         let current_owner = std::mem::replace(&mut self.current_hir_id_owner, owner_id);
         let current_local_counter =
             std::mem::replace(&mut self.item_local_id_counter, hir::ItemLocalId::new(1));
+        let current_disambiguator = std::mem::take(&mut self.current_disambiguator);
         let current_impl_trait_defs = std::mem::take(&mut self.impl_trait_defs);
         let current_impl_trait_bounds = std::mem::take(&mut self.impl_trait_bounds);
 
@@ -597,6 +602,7 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
         self.trait_map = current_trait_map;
         self.current_hir_id_owner = current_owner;
         self.item_local_id_counter = current_local_counter;
+        self.current_disambiguator = current_disambiguator;
         self.impl_trait_defs = current_impl_trait_defs;
         self.impl_trait_bounds = current_impl_trait_bounds;
 

@@ -46,12 +46,15 @@ pub trait CompileTimeMachine<'tcx, T> = Machine<
 pub trait HasStaticRootDefId {
     /// Returns the `DefId` of the static item that is currently being evaluated.
     /// Used for interning to be able to handle nested allocations.
-    fn static_def_id(&self) -> Option<LocalDefId>;
+    fn static_parent_and_next_disambiguator(&mut self) -> Option<(LocalDefId, u32)>;
 }
 
 impl HasStaticRootDefId for const_eval::CompileTimeMachine<'_> {
-    fn static_def_id(&self) -> Option<LocalDefId> {
-        Some(self.static_root_ids?.1)
+    fn static_parent_and_next_disambiguator(&mut self) -> Option<(LocalDefId, u32)> {
+        let (_, static_id, d) = self.static_root_ids.as_mut()?;
+        let disambiguator = *d;
+        *d += 1;
+        Some((*static_id, disambiguator))
     }
 }
 
@@ -87,8 +90,8 @@ fn intern_shallow<'tcx, T, M: CompileTimeMachine<'tcx, T>>(
     }
     // link the alloc id to the actual allocation
     let alloc = ecx.tcx.mk_const_alloc(alloc);
-    if let Some(static_id) = ecx.machine.static_def_id() {
-        intern_as_new_static(ecx.tcx, static_id, alloc_id, alloc);
+    if let Some((static_id, disambiguator)) = ecx.machine.static_parent_and_next_disambiguator() {
+        intern_as_new_static(ecx.tcx, static_id, alloc_id, alloc, disambiguator);
     } else {
         ecx.tcx.set_alloc_id_memory(alloc_id, alloc);
     }
@@ -102,11 +105,13 @@ fn intern_as_new_static<'tcx>(
     static_id: LocalDefId,
     alloc_id: AllocId,
     alloc: ConstAllocation<'tcx>,
+    disambiguator: u32,
 ) {
     let feed = tcx.create_def(
         static_id,
         Some(sym::nested),
         DefKind::Static { safety: hir::Safety::Safe, mutability: alloc.0.mutability, nested: true },
+        disambiguator,
     );
     tcx.set_nested_alloc_id_static(alloc_id, feed.def_id());
 

@@ -4,13 +4,13 @@ error[E0284]: type annotations needed: cannot satisfy `impl Sized == _`
 LL |     let (x,) = (build(x),);
    |                 ^^^^^^^^ cannot satisfy `impl Sized == _`
 
-error[E0271]: type mismatch resolving `build2<(_,)>::{opaque#0} normalizes-to _`
+error[E0271]: type mismatch resolving `build2<(_,)>::{opaque#1} normalizes-to _`
   --> $DIR/recursive-in-exhaustiveness.rs:31:6
    |
 LL |     (build2(x),)
    |      ^^^^^^^^^ types differ
 
-error[E0271]: type mismatch resolving `build2<(_,)>::{opaque#0} normalizes-to _`
+error[E0271]: type mismatch resolving `build2<(_,)>::{opaque#1} normalizes-to _`
   --> $DIR/recursive-in-exhaustiveness.rs:31:5
    |
 LL |     (build2(x),)
@@ -25,7 +25,7 @@ LL |     (build2(x),)
    = help: the trait `Sized` is not implemented for `(impl Sized,)`
    = note: tuples must have a statically known size to be initialized
 
-error[E0271]: type mismatch resolving `build3<(T,)>::{opaque#0} normalizes-to _`
+error[E0271]: type mismatch resolving `build3<(T,)>::{opaque#1} normalizes-to _`
   --> $DIR/recursive-in-exhaustiveness.rs:42:17
    |
 LL |     let (x,) = (build3((x,)),);
@@ -52,7 +52,7 @@ LL |     let (x,) = (build3((x,)),);
    = note: expected type `_`
              found tuple `(impl Sized,)`
 
-error[E0271]: type mismatch resolving `build3<(T,)>::{opaque#0} normalizes-to _`
+error[E0271]: type mismatch resolving `build3<(T,)>::{opaque#1} normalizes-to _`
   --> $DIR/recursive-in-exhaustiveness.rs:42:17
    |
 LL |     let (x,) = (build3((x,)),);
@@ -60,13 +60,13 @@ LL |     let (x,) = (build3((x,)),);
    |
    = note: the return type of a function must have a statically known size
 
-error[E0271]: type mismatch resolving `build3<(T,)>::{opaque#0} normalizes-to _`
+error[E0271]: type mismatch resolving `build3<(T,)>::{opaque#1} normalizes-to _`
   --> $DIR/recursive-in-exhaustiveness.rs:42:16
    |
 LL |     let (x,) = (build3((x,)),);
    |                ^^^^^^^^^^^^^^^ types differ
 
-error[E0271]: type mismatch resolving `build3<(T,)>::{opaque#0} normalizes-to _`
+error[E0271]: type mismatch resolving `build3<(T,)>::{opaque#1} normalizes-to _`
   --> $DIR/recursive-in-exhaustiveness.rs:42:17
    |
 LL |     let (x,) = (build3((x,)),);

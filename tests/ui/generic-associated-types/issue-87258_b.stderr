@@ -1,4 +1,4 @@
-error: item does not constrain `Helper::{opaque#0}`
+error: item does not constrain `Helper::{opaque#3}`
   --> $DIR/issue-87258_b.rs:21:8
    |
 LL |     fn foo<'a>() -> Self::FooFuture<'a> {

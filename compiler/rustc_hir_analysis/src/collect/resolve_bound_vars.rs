@@ -6,7 +6,7 @@
 //! the types in HIR to identify late-bound lifetimes and assign their Debruijn indices. This file
 //! is also responsible for assigning their semantics to implicit lifetimes in trait objects.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::fmt;
 use std::ops::ControlFlow;
 
@@ -526,7 +526,7 @@ impl<'a, 'tcx> Visitor<'tcx> for BoundVarContext<'a, 'tcx> {
             // give, we will reverse the IndexMap after early captures.
             let mut late_depth = 0;
             let mut scope = self.scope;
-            let mut opaque_capture_scopes = vec![(opaque.def_id, &captures)];
+            let mut opaque_capture_scopes = vec![(opaque.def_id, &captures, Cell::new(0))];
             loop {
                 match *scope {
                     Scope::Binder { ref bound_vars, scope_type, s, .. } => {
@@ -560,7 +560,7 @@ impl<'a, 'tcx> Visitor<'tcx> for BoundVarContext<'a, 'tcx> {
                     }
 
                     Scope::Opaque { captures, def_id, s } => {
-                        opaque_capture_scopes.push((def_id, captures));
+                        opaque_capture_scopes.push((def_id, captures, Cell::new(0)));
                         late_depth = 0;
                         scope = s;
                     }
@@ -1287,7 +1287,7 @@ impl<'a, 'tcx> BoundVarContext<'a, 'tcx> {
                 }
 
                 Scope::Opaque { captures, def_id, s } => {
-                    opaque_capture_scopes.push((def_id, captures));
+                    opaque_capture_scopes.push((def_id, captures, Cell::new(0)));
                     late_depth = 0;
                     scope = s;
                 }
@@ -1447,11 +1447,15 @@ impl<'a, 'tcx> BoundVarContext<'a, 'tcx> {
     #[instrument(level = "trace", skip(self, opaque_capture_scopes), ret)]
     fn remap_opaque_captures(
         &self,
-        opaque_capture_scopes: &Vec<(LocalDefId, &RefCell<FxIndexMap<ResolvedArg, LocalDefId>>)>,
+        opaque_capture_scopes: &Vec<(
+            LocalDefId,
+            &RefCell<FxIndexMap<ResolvedArg, LocalDefId>>,
+            Cell<u32>,
+        )>,
         mut lifetime: ResolvedArg,
         ident: Ident,
     ) -> ResolvedArg {
-        if let Some(&(opaque_def_id, _)) = opaque_capture_scopes.last() {
+        if let Some(&(opaque_def_id, _, _)) = opaque_capture_scopes.last() {
             if let Err(guar) =
                 self.check_lifetime_is_capturable(opaque_def_id, lifetime, ident.span)
             {
@@ -1459,11 +1463,16 @@ impl<'a, 'tcx> BoundVarContext<'a, 'tcx> {
             }
         }
 
-        for &(opaque_def_id, captures) in opaque_capture_scopes.iter().rev() {
+        for (opaque_def_id, captures, current_disambiguator) in opaque_capture_scopes.iter().rev() {
             let mut captures = captures.borrow_mut();
             let remapped = *captures.entry(lifetime).or_insert_with(|| {
-                let feed =
-                    self.tcx.create_def(opaque_def_id, Some(ident.name), DefKind::LifetimeParam);
+                let feed = self.tcx.create_def(
+                    *opaque_def_id,
+                    Some(ident.name),
+                    DefKind::LifetimeParam,
+                    current_disambiguator.get(),
+                );
+                current_disambiguator.update(|i| i + 1);
                 feed.def_span(ident.span);
                 feed.def_ident_span(Some(ident.span));
                 feed.def_id()
@@ -1976,7 +1985,7 @@ impl<'a, 'tcx> BoundVarContext<'a, 'tcx> {
                 }
 
                 Scope::Opaque { captures, def_id, s } => {
-                    opaque_capture_scopes.push((def_id, captures));
+                    opaque_capture_scopes.push((def_id, captures, Cell::new(0)));
                     late_depth = 0;
                     scope = s;
                 }

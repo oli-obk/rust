@@ -1,4 +1,4 @@
-error[E0080]: evaluation of `foo::<i32>::{constant#0}` failed
+error[E0080]: evaluation of `foo::<i32>::{constant#1}` failed
   --> $DIR/required-const.rs:6:17
    |
 LL |         const { panic!() }

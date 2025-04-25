@@ -1,4 +1,4 @@
-error: item does not constrain `<&'c mut S as Trait2>::FooFuture::{opaque#0}`
+error: item does not constrain `<&'c mut S as Trait2>::FooFuture::{opaque#1}`
   --> $DIR/issue-87258_a.rs:18:8
    |
 LL |     fn foo<'a>() -> Self::FooFuture<'a> {

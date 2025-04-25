@@ -1,4 +1,4 @@
-error[E0080]: evaluation of `get_elem::<4>::{constant#0}` failed
+error[E0080]: evaluation of `get_elem::<4>::{constant#1}` failed
   --> $DIR/const-err-trumps-simd-err.rs:16:13
    |
 LL |     const { assert!(LANE < 4); } // the error should be here...

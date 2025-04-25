@@ -1,4 +1,4 @@
-error: item does not constrain `ReturnType::{opaque#0}`
+error: item does not constrain `ReturnType::{opaque#1}`
   --> $DIR/issue-109054.rs:14:8
    |
 LL |     fn deref(&self) -> &Self::Target {

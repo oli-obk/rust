@@ -25,7 +25,7 @@ LL |     type BadTraitRef = dyn Fn(Ty<'_>) -> &str;
    = note: lifetimes appearing in an associated or opaque type are not considered constrained
    = note: consider introducing a named lifetime parameter
 
-error: item does not constrain `lifetime_params::Ty::{opaque#0}`
+error: item does not constrain `lifetime_params::Ty::{opaque#1}`
   --> $DIR/constrain_inputs.rs:8:8
    |
 LL |     fn execute(ty: Ty<'_>) -> &str { todo!() }
@@ -47,7 +47,7 @@ LL |     fn execute(ty: Ty<'_>) -> &str { ty() }
    = note: lifetimes appearing in an associated or opaque type are not considered constrained
    = note: consider introducing a named lifetime parameter
 
-error: item does not constrain `lifetime_params_2::Ty::{opaque#0}`
+error: item does not constrain `lifetime_params_2::Ty::{opaque#1}`
   --> $DIR/constrain_inputs.rs:23:8
    |
 LL |     fn execute(ty: Ty<'_>) -> &str { ty() }

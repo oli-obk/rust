@@ -10,12 +10,12 @@ note: two types coming from two different crates are different types even if the
   --> $DIR/auxiliary/crate_a2.rs:1:1
    |
 LL | pub struct Foo;
-   | ^^^^^^^^^^^^^^ this is the found type `crate_a2::Foo`
+   | ^^^^^^^^^^^^^^ this is the found type `crate_a2::Foo#2`
    |
   ::: $DIR/auxiliary/crate_a1.rs:1:1
    |
 LL | pub struct Foo;
-   | ^^^^^^^^^^^^^^ this is the expected type `crate_a1::Foo`
+   | ^^^^^^^^^^^^^^ this is the expected type `crate_a1::Foo#2`
    |
   ::: $DIR/type-mismatch-same-crate-name.rs:13:17
    |
@@ -42,12 +42,12 @@ note: two types coming from two different crates are different types even if the
   --> $DIR/auxiliary/crate_a2.rs:3:1
    |
 LL | pub trait Bar {}
-   | ^^^^^^^^^^^^^ this is the found trait `crate_a2::Bar`
+   | ^^^^^^^^^^^^^ this is the found trait `crate_a2::Bar#3`
    |
   ::: $DIR/auxiliary/crate_a1.rs:3:1
    |
 LL | pub trait Bar {}
-   | ^^^^^^^^^^^^^ this is the expected trait `crate_a1::Bar`
+   | ^^^^^^^^^^^^^ this is the expected trait `crate_a1::Bar#3`
    |
   ::: $DIR/type-mismatch-same-crate-name.rs:13:17
    |

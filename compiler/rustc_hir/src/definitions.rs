@@ -8,7 +8,6 @@ use std::fmt::{self, Write};
 use std::hash::Hash;
 
 use rustc_data_structures::stable_hasher::StableHasher;
-use rustc_data_structures::unord::UnordMap;
 use rustc_hashes::Hash64;
 use rustc_index::IndexVec;
 use rustc_macros::{Decodable, Encodable};
@@ -68,7 +67,7 @@ impl DefPathTable {
             //
             // See the documentation for DefPathHash for more information.
             panic!(
-                "found DefPathHash collision between {def_path1:?} and {def_path2:?}. \
+                "found DefPathHash collision between {def_path1:#?} and {def_path2:#?}. \
                     Compilation cannot continue."
             );
         }
@@ -103,7 +102,6 @@ impl DefPathTable {
 #[derive(Debug)]
 pub struct Definitions {
     table: DefPathTable,
-    next_disambiguator: UnordMap<(LocalDefId, DefPathData), u32>,
 }
 
 /// A unique identifier that we can use to lookup a definition
@@ -342,11 +340,17 @@ impl Definitions {
         let root = LocalDefId { local_def_index: table.allocate(key, def_path_hash) };
         assert_eq!(root.local_def_index, CRATE_DEF_INDEX);
 
-        Definitions { table, next_disambiguator: Default::default() }
+        Definitions { table }
     }
 
-    /// Adds a definition with a parent definition.
-    pub fn create_def(&mut self, parent: LocalDefId, data: DefPathData) -> LocalDefId {
+    /// Creates a definition with a parent definition.
+    /// If there are multiple definitions with the same DefPathData and the same parent, use `disambiguator` to differentiate them.
+    pub fn create_def(
+        &mut self,
+        parent: LocalDefId,
+        data: DefPathData,
+        disambiguator: u32,
+    ) -> LocalDefId {
         // We can't use `Debug` implementation for `LocalDefId` here, since it tries to acquire a
         // reference to `Definitions` and we're already holding a mutable reference.
         debug!(
@@ -354,16 +358,9 @@ impl Definitions {
             self.def_path(parent).to_string_no_crate_verbose(),
         );
 
-        // The root node must be created with `create_root_def()`.
+        // The root node must be created in `new()`.
         assert!(data != DefPathData::CrateRoot);
 
-        // Find the next free disambiguator for this key.
-        let disambiguator = {
-            let next_disamb = self.next_disambiguator.entry((parent, data)).or_insert(0);
-            let disambiguator = *next_disamb;
-            *next_disamb = next_disamb.checked_add(1).expect("disambiguator overflow");
-            disambiguator
-        };
         let key = DefKey {
             parent: Some(parent.local_def_index),
             disambiguated_data: DisambiguatedDefPathData { data, disambiguator },

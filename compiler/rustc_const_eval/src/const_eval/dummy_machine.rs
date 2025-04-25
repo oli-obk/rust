@@ -42,7 +42,9 @@ pub macro throw_machine_stop_str($($tt:tt)*) {{
 pub struct DummyMachine;
 
 impl HasStaticRootDefId for DummyMachine {
-    fn static_def_id(&self) -> Option<rustc_hir::def_id::LocalDefId> {
+    fn static_parent_and_next_disambiguator(
+        &mut self,
+    ) -> Option<(rustc_hir::def_id::LocalDefId, u32)> {
         None
     }
 }

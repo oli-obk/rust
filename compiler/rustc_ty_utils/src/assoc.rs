@@ -248,7 +248,12 @@ fn associated_type_for_impl_trait_in_trait(
 
     let span = tcx.def_span(opaque_ty_def_id);
     // No name because this is an anonymous associated type.
-    let trait_assoc_ty = tcx.at(span).create_def(trait_def_id, None, DefKind::AssocTy);
+    let trait_assoc_ty = tcx.at(span).create_def(
+        trait_def_id,
+        None,
+        DefKind::AssocTy,
+        opaque_ty_def_id.local_def_index.as_u32(),
+    );
 
     let local_def_id = trait_assoc_ty.def_id();
     let def_id = local_def_id.to_def_id();
@@ -300,7 +305,12 @@ fn associated_type_for_impl_trait_in_impl(
         hir::FnRetTy::Return(ty) => ty.span,
     };
     // No name because this is an anonymous associated type.
-    let impl_assoc_ty = tcx.at(span).create_def(impl_local_def_id, None, DefKind::AssocTy);
+    let impl_assoc_ty = tcx.at(span).create_def(
+        impl_local_def_id,
+        None,
+        DefKind::AssocTy,
+        trait_assoc_def_id.index.as_u32(),
+    );
 
     let local_def_id = impl_assoc_ty.def_id();
     let def_id = local_def_id.to_def_id();

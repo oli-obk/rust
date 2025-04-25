@@ -1,4 +1,4 @@
-error: item does not constrain `FutNothing::{opaque#0}`
+error: item does not constrain `FutNothing::{opaque#1}`
   --> $DIR/hkl_forbidden4.rs:18:10
    |
 LL | async fn call<F>(_f: F)
