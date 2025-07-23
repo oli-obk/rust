@@ -9,7 +9,7 @@ use crate::num::NonZero;
 /// be lifetime-dependent.
 #[unstable(issue = "none", feature = "trusted_fused")]
 #[doc(hidden)]
-#[rustc_specialization_trait]
+#[marker]
 pub unsafe trait TrustedFused {}
 
 /// An iterator that always continues to yield `None` when exhausted.
@@ -25,13 +25,15 @@ pub unsafe trait TrustedFused {}
 ///
 /// [`Fuse`]: crate::iter::Fuse
 #[stable(feature = "fused", since = "1.26.0")]
-// FIXME: this should be a #[marker] and have another blanket impl for T: TrustedFused
-// but that ICEs iter::Fuse specializations.
 #[lang = "fused_iterator"]
+#[marker]
 pub trait FusedIterator: Iterator {}
 
 #[stable(feature = "fused", since = "1.26.0")]
 impl<I: FusedIterator + ?Sized> FusedIterator for &mut I {}
+
+#[stable(feature = "fused", since = "1.26.0")]
+impl<I: TrustedFused + Iterator + ?Sized> FusedIterator for I {}
 
 /// An iterator that reports an accurate length using size_hint.
 ///
