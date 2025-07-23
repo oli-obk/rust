@@ -28,6 +28,8 @@ impl<I> Fuse<I> {
     pub(crate) fn into_inner(self) -> Option<I> {
         self.iter
     }
+
+    const IS_FUSED: bool = crate::intrinsics::vtable_for::<I, dyn FusedIterator>().is_some();
 }
 
 #[stable(feature = "fused", since = "1.26.0")]
@@ -47,12 +49,12 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        FuseImpl::next(self)
+        and_then_or_clear(&mut self.iter, Iterator::next)
     }
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<I::Item> {
-        FuseImpl::nth(self, n)
+        and_then_or_clear(&mut self.iter, |iter| iter.nth(n))
     }
 
     #[inline]
@@ -80,13 +82,19 @@ where
     }
 
     #[inline]
-    fn try_fold<Acc, Fold, R>(&mut self, acc: Acc, fold: Fold) -> R
+    fn try_fold<Acc, Fold, R>(&mut self, mut acc: Acc, fold: Fold) -> R
     where
         Self: Sized,
         Fold: FnMut(Acc, Self::Item) -> R,
         R: Try<Output = Acc>,
     {
-        FuseImpl::try_fold(self, acc, fold)
+        if let Some(ref mut iter) = self.iter {
+            acc = iter.try_fold(acc, fold)?;
+            if !Self::IS_FUSED {
+                self.iter = None;
+            }
+        }
+        try { acc }
     }
 
     #[inline]
@@ -105,7 +113,7 @@ where
     where
         P: FnMut(&Self::Item) -> bool,
     {
-        FuseImpl::find(self, predicate)
+        and_then_or_clear(&mut self.iter, |iter| iter.find(predicate))
     }
 
     #[inline]
@@ -130,22 +138,28 @@ where
 {
     #[inline]
     fn next_back(&mut self) -> Option<<I as Iterator>::Item> {
-        FuseImpl::next_back(self)
+        and_then_or_clear(&mut self.iter, |iter| iter.next_back())
     }
 
     #[inline]
     fn nth_back(&mut self, n: usize) -> Option<<I as Iterator>::Item> {
-        FuseImpl::nth_back(self, n)
+        and_then_or_clear(&mut self.iter, |iter| iter.nth_back(n))
     }
 
     #[inline]
-    fn try_rfold<Acc, Fold, R>(&mut self, acc: Acc, fold: Fold) -> R
+    fn try_rfold<Acc, Fold, R>(&mut self, mut acc: Acc, fold: Fold) -> R
     where
         Self: Sized,
         Fold: FnMut(Acc, Self::Item) -> R,
         R: Try<Output = Acc>,
     {
-        FuseImpl::try_rfold(self, acc, fold)
+        if let Some(ref mut iter) = self.iter {
+            acc = iter.try_rfold(acc, fold)?;
+            if !Self::IS_FUSED {
+                self.iter = None;
+            }
+        }
+        try { acc }
     }
 
     #[inline]
@@ -164,7 +178,7 @@ where
     where
         P: FnMut(&Self::Item) -> bool,
     {
-        FuseImpl::rfind(self, predicate)
+        and_then_or_clear(&mut self.iter, |iter| iter.rfind(predicate))
     }
 }
 
@@ -249,204 +263,6 @@ where
     const MAY_HAVE_SIDE_EFFECT: bool = I::MAY_HAVE_SIDE_EFFECT;
 }
 
-/// Fuse specialization trait
-///
-/// We only need to worry about `&mut self` methods, which
-/// may exhaust the iterator without consuming it.
-#[doc(hidden)]
-trait FuseImpl<I> {
-    type Item;
-
-    // Functions specific to any normal Iterators
-    fn next(&mut self) -> Option<Self::Item>;
-    fn nth(&mut self, n: usize) -> Option<Self::Item>;
-    fn try_fold<Acc, Fold, R>(&mut self, acc: Acc, fold: Fold) -> R
-    where
-        Self: Sized,
-        Fold: FnMut(Acc, Self::Item) -> R,
-        R: Try<Output = Acc>;
-    fn find<P>(&mut self, predicate: P) -> Option<Self::Item>
-    where
-        P: FnMut(&Self::Item) -> bool;
-
-    // Functions specific to DoubleEndedIterators
-    fn next_back(&mut self) -> Option<Self::Item>
-    where
-        I: DoubleEndedIterator;
-    fn nth_back(&mut self, n: usize) -> Option<Self::Item>
-    where
-        I: DoubleEndedIterator;
-    fn try_rfold<Acc, Fold, R>(&mut self, acc: Acc, fold: Fold) -> R
-    where
-        Self: Sized,
-        Fold: FnMut(Acc, Self::Item) -> R,
-        R: Try<Output = Acc>,
-        I: DoubleEndedIterator;
-    fn rfind<P>(&mut self, predicate: P) -> Option<Self::Item>
-    where
-        P: FnMut(&Self::Item) -> bool,
-        I: DoubleEndedIterator;
-}
-
-/// General `Fuse` impl which sets `iter = None` when exhausted.
-#[doc(hidden)]
-impl<I> FuseImpl<I> for Fuse<I>
-where
-    I: Iterator,
-{
-    type Item = <I as Iterator>::Item;
-
-    #[inline]
-    default fn next(&mut self) -> Option<<I as Iterator>::Item> {
-        and_then_or_clear(&mut self.iter, Iterator::next)
-    }
-
-    #[inline]
-    default fn nth(&mut self, n: usize) -> Option<I::Item> {
-        and_then_or_clear(&mut self.iter, |iter| iter.nth(n))
-    }
-
-    #[inline]
-    default fn try_fold<Acc, Fold, R>(&mut self, mut acc: Acc, fold: Fold) -> R
-    where
-        Self: Sized,
-        Fold: FnMut(Acc, Self::Item) -> R,
-        R: Try<Output = Acc>,
-    {
-        if let Some(ref mut iter) = self.iter {
-            acc = iter.try_fold(acc, fold)?;
-            self.iter = None;
-        }
-        try { acc }
-    }
-
-    #[inline]
-    default fn find<P>(&mut self, predicate: P) -> Option<Self::Item>
-    where
-        P: FnMut(&Self::Item) -> bool,
-    {
-        and_then_or_clear(&mut self.iter, |iter| iter.find(predicate))
-    }
-
-    #[inline]
-    default fn next_back(&mut self) -> Option<<I as Iterator>::Item>
-    where
-        I: DoubleEndedIterator,
-    {
-        and_then_or_clear(&mut self.iter, |iter| iter.next_back())
-    }
-
-    #[inline]
-    default fn nth_back(&mut self, n: usize) -> Option<<I as Iterator>::Item>
-    where
-        I: DoubleEndedIterator,
-    {
-        and_then_or_clear(&mut self.iter, |iter| iter.nth_back(n))
-    }
-
-    #[inline]
-    default fn try_rfold<Acc, Fold, R>(&mut self, mut acc: Acc, fold: Fold) -> R
-    where
-        Self: Sized,
-        Fold: FnMut(Acc, Self::Item) -> R,
-        R: Try<Output = Acc>,
-        I: DoubleEndedIterator,
-    {
-        if let Some(ref mut iter) = self.iter {
-            acc = iter.try_rfold(acc, fold)?;
-            self.iter = None;
-        }
-        try { acc }
-    }
-
-    #[inline]
-    default fn rfind<P>(&mut self, predicate: P) -> Option<Self::Item>
-    where
-        P: FnMut(&Self::Item) -> bool,
-        I: DoubleEndedIterator,
-    {
-        and_then_or_clear(&mut self.iter, |iter| iter.rfind(predicate))
-    }
-}
-
-/// Specialized `Fuse` impl which doesn't bother clearing `iter` when exhausted.
-/// However, we must still be prepared for the possibility that it was already cleared!
-#[doc(hidden)]
-impl<I> FuseImpl<I> for Fuse<I>
-where
-    I: FusedIterator,
-{
-    #[inline]
-    fn next(&mut self) -> Option<<I as Iterator>::Item> {
-        self.iter.as_mut()?.next()
-    }
-
-    #[inline]
-    fn nth(&mut self, n: usize) -> Option<I::Item> {
-        self.iter.as_mut()?.nth(n)
-    }
-
-    #[inline]
-    fn try_fold<Acc, Fold, R>(&mut self, mut acc: Acc, fold: Fold) -> R
-    where
-        Self: Sized,
-        Fold: FnMut(Acc, Self::Item) -> R,
-        R: Try<Output = Acc>,
-    {
-        if let Some(ref mut iter) = self.iter {
-            acc = iter.try_fold(acc, fold)?;
-        }
-        try { acc }
-    }
-
-    #[inline]
-    fn find<P>(&mut self, predicate: P) -> Option<Self::Item>
-    where
-        P: FnMut(&Self::Item) -> bool,
-    {
-        self.iter.as_mut()?.find(predicate)
-    }
-
-    #[inline]
-    fn next_back(&mut self) -> Option<<I as Iterator>::Item>
-    where
-        I: DoubleEndedIterator,
-    {
-        self.iter.as_mut()?.next_back()
-    }
-
-    #[inline]
-    fn nth_back(&mut self, n: usize) -> Option<<I as Iterator>::Item>
-    where
-        I: DoubleEndedIterator,
-    {
-        self.iter.as_mut()?.nth_back(n)
-    }
-
-    #[inline]
-    fn try_rfold<Acc, Fold, R>(&mut self, mut acc: Acc, fold: Fold) -> R
-    where
-        Self: Sized,
-        Fold: FnMut(Acc, Self::Item) -> R,
-        R: Try<Output = Acc>,
-        I: DoubleEndedIterator,
-    {
-        if let Some(ref mut iter) = self.iter {
-            acc = iter.try_rfold(acc, fold)?;
-        }
-        try { acc }
-    }
-
-    #[inline]
-    fn rfind<P>(&mut self, predicate: P) -> Option<Self::Item>
-    where
-        P: FnMut(&Self::Item) -> bool,
-        I: DoubleEndedIterator,
-    {
-        self.iter.as_mut()?.rfind(predicate)
-    }
-}
-
 // This is used by Flatten's SourceIter impl
 #[unstable(issue = "none", feature = "inplace_iteration")]
 unsafe impl<I> SourceIter for Fuse<I>
@@ -467,7 +283,8 @@ where
 #[inline]
 fn and_then_or_clear<T, U>(opt: &mut Option<T>, f: impl FnOnce(&mut T) -> Option<U>) -> Option<U> {
     let x = f(opt.as_mut()?);
-    if x.is_none() {
+    // If the type implements FusedIterator, we don't need to fuse at runtime
+    if const { crate::intrinsics::vtable_for::<T, dyn FusedIterator>().is_none() } && x.is_none() {
         *opt = None;
     }
     x
