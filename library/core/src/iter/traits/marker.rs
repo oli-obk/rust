@@ -25,7 +25,6 @@ pub unsafe trait TrustedFused {}
 ///
 /// [`Fuse`]: crate::iter::Fuse
 #[stable(feature = "fused", since = "1.26.0")]
-#[rustc_unsafe_specialization_marker]
 // FIXME: this should be a #[marker] and have another blanket impl for T: TrustedFused
 // but that ICEs iter::Fuse specializations.
 #[lang = "fused_iterator"]
