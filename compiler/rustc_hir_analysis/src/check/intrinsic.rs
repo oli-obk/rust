@@ -175,6 +175,7 @@ fn intrinsic_operation_unsafety(tcx: TyCtxt<'_>, intrinsic_id: LocalDefId) -> hi
         | sym::prefetch_read_instruction
         | sym::prefetch_write_data
         | sym::prefetch_write_instruction
+        | sym::ptr_alignment_bits
         | sym::ptr_guaranteed_cmp
         | sym::ptr_mask
         | sym::ptr_metadata

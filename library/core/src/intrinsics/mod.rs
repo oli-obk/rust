@@ -2257,6 +2257,19 @@ pub const fn ptr_guaranteed_cmp<T>(ptr: *const T, other: *const T) -> u8 {
     (ptr == other) as u8
 }
 
+/// Returns the bits that would be zero for a reference,
+/// as a reference's pointer representation must have zeroes
+/// for the N lowest bits where N is the pointee type's
+/// aligment's power of 2.
+#[rustc_intrinsic]
+#[rustc_nounwind]
+#[rustc_do_not_const_check]
+#[inline]
+#[miri::intrinsic_fallback_is_spec]
+pub const fn ptr_alignment_bits<T>(ptr: *const T) -> usize {
+    ptr as usize & const { !(usize::MAX << align_of::<T>().trailing_zeros()) }
+}
+
 /// Determines whether the raw bytes of the two values are equal.
 ///
 /// This is particularly handy for arrays, since it allows things like just

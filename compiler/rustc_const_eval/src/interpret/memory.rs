@@ -581,6 +581,38 @@ impl<'tcx, M: Machine<'tcx>> InterpCx<'tcx, M> {
         interp_ok(())
     }
 
+    pub(crate) fn ptr_misalignment(
+        &self,
+        ptr: Pointer<Option<M::Provenance>>,
+        align: Align,
+    ) -> InterpResult<'tcx, u64> {
+        interp_ok(if align.bytes() == 0 {
+            0
+        } else {
+            fn int_align_extract(align: Align, bits: u64) -> u64 {
+                let mask = u64::MAX << align.bytes().trailing_zeros();
+                let bits = bits & mask;
+                u64::try_from(bits).unwrap()
+            }
+            match self.ptr_try_get_alloc_id(ptr, 0) {
+                Err(bits) => int_align_extract(align, bits),
+                Ok((alloc_id, _offset, _prov)) => {
+                    if !M::Provenance::OFFSET_IS_ADDR {
+                        let alloc_info = self.get_alloc_info(alloc_id);
+                        // Check allocation alignment and offset alignment.
+                        if alloc_info.align.bytes() < align.bytes() {
+                            throw_ub!(AlignmentCheckFailed(
+                                Misalignment { has: alloc_info.align, required: align },
+                                CheckAlignMsg::AccessedPtr
+                            ))
+                        }
+                    }
+                    int_align_extract(align, ptr.addr().bytes())
+                }
+            }
+        })
+    }
+
     pub(super) fn is_ptr_misaligned(
         &self,
         ptr: Pointer<Option<M::Provenance>>,

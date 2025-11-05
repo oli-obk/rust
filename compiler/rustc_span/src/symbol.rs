@@ -1745,6 +1745,7 @@ symbols! {
         profiler_builtins,
         profiler_runtime,
         ptr,
+        ptr_alignment_bits,
         ptr_cast,
         ptr_cast_const,
         ptr_cast_mut,

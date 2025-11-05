@@ -487,6 +487,14 @@ impl<'tcx> interpret::Machine<'tcx> for CompileTimeMachine<'tcx> {
                 let cmp = ecx.guaranteed_cmp(a, b)?;
                 ecx.write_scalar(Scalar::from_u8(cmp), dest)?;
             }
+            sym::ptr_alignment_bits => {
+                let ptr = ecx.read_pointer(&args[0])?;
+                let pointee = instance.args.type_at(0).builtin_deref(true).unwrap();
+                let align = ecx.layout_of(pointee)?.align.abi;
+
+                let bits = ecx.ptr_misalignment(ptr, align)?;
+                ecx.write_scalar(Scalar::from_target_usize(bits, ecx), dest)?;
+            }
             sym::const_allocate => {
                 let size = ecx.read_scalar(&args[0])?.to_target_usize(ecx)?;
                 let align = ecx.read_scalar(&args[1])?.to_target_usize(ecx)?;
