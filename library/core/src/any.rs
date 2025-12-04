@@ -864,7 +864,10 @@ impl fmt::Debug for TypeId {
 #[stable(feature = "type_name", since = "1.38.0")]
 #[rustc_const_unstable(feature = "const_type_name", issue = "63084")]
 pub const fn type_name<T: ?Sized>() -> &'static str {
-    const { intrinsics::type_name::<T>() }
+    #[rustc_const_unstable(feature = "const_type_name", issue = "63084")]
+    const {
+        intrinsics::type_name::<T>()
+    }
 }
 
 /// Returns the type name of the pointed-to value as a string slice.
@@ -942,13 +945,18 @@ pub const fn type_name_of_val<T: ?Sized>(_val: &T) -> &'static str {
 /// ```
 #[must_use]
 #[unstable(feature = "try_as_dyn", issue = "144361")]
+#[rustc_const_unstable(feature = "try_as_dyn", issue = "144361")]
 pub const fn try_as_dyn<
     T: Any + 'static,
     U: ptr::Pointee<Metadata = ptr::DynMetadata<U>> + ?Sized + 'static,
 >(
     t: &T,
 ) -> Option<&U> {
-    let vtable: Option<ptr::DynMetadata<U>> = const { intrinsics::vtable_for::<T, U>() };
+    let vtable: Option<ptr::DynMetadata<U>> =
+        #[rustc_const_unstable(feature = "try_as_dyn", issue = "144361")]
+        const {
+            intrinsics::vtable_for::<T, U>()
+        };
     match vtable {
         Some(dyn_metadata) => {
             let pointer = ptr::from_raw_parts(t, dyn_metadata);
@@ -995,13 +1003,18 @@ pub const fn try_as_dyn<
 /// ```
 #[must_use]
 #[unstable(feature = "try_as_dyn", issue = "144361")]
+#[rustc_const_unstable(feature = "try_as_dyn", issue = "144361")]
 pub const fn try_as_dyn_mut<
     T: Any + 'static,
     U: ptr::Pointee<Metadata = ptr::DynMetadata<U>> + ?Sized + 'static,
 >(
     t: &mut T,
 ) -> Option<&mut U> {
-    let vtable: Option<ptr::DynMetadata<U>> = const { intrinsics::vtable_for::<T, U>() };
+    let vtable: Option<ptr::DynMetadata<U>> =
+        #[rustc_const_unstable(feature = "try_as_dyn", issue = "144361")]
+        const {
+            intrinsics::vtable_for::<T, U>()
+        };
     match vtable {
         Some(dyn_metadata) => {
             let pointer = ptr::from_raw_parts_mut(t, dyn_metadata);

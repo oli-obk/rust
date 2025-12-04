@@ -1059,6 +1059,18 @@ pub(crate) struct MissingConstErr {
 
 #[derive(Diagnostic)]
 #[diag(
+    "const stability of inline consts must match const stability of containing item"
+)]
+pub(crate) struct UnstableInlineConstInConst {
+    #[primary_span]
+    #[help("did you mean to use `rustc_allow_const_fn_unstable`?")]
+    pub span: Span,
+    #[note("stability marker of containing item defined here")]
+    pub parent_span: Option<Span>,
+}
+
+#[derive(Diagnostic)]
+#[diag(
     "attribute `#[rustc_const_stable]` can only be applied to functions that are declared `#[stable]`"
 )]
 pub(crate) struct ConstStableNotStable {
