@@ -930,6 +930,7 @@ where
             TypingMode::Coherence => return,
             TypingMode::Analysis { .. }
             | TypingMode::Borrowck { .. }
+            | TypingMode::Reflection
             | TypingMode::PostBorrowckAnalysis { .. }
             | TypingMode::PostAnalysis => {}
         }
@@ -993,6 +994,7 @@ where
             TypingMode::Analysis { .. } => self.opaques_with_sub_unified_hidden_type(self_ty),
             TypingMode::Coherence
             | TypingMode::Borrowck { .. }
+            | TypingMode::Reflection
             | TypingMode::PostBorrowckAnalysis { .. }
             | TypingMode::PostAnalysis => vec![],
         };
