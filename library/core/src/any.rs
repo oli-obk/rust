@@ -969,6 +969,22 @@ pub const fn type_name_of_val<T: ?Sized>(_val: &T) -> &'static str {
     type_name::<T>()
 }
 
+/// Trait that is automatically implemented for all `dyn Trait<'b, C> + 'a`
+/// * without assoc type bounds,
+/// * adds `T: 'a + 'b` requirements, and
+/// * `C: 'static` requirements.
+///
+/// This is required for `try_as_dyn` to be able to soundly convert non-static
+/// types to `dyn Trait`.
+///
+/// Note: these requirements are sufficient for soundness, but it is unclear
+/// if they are all necessary. We may be able to lift some requirements in favor
+/// of more precise ones.
+///
+#[unstable(feature = "try_as_dyn", issue = "144361")]
+#[lang = "try_as_dyn"]
+pub trait TryAsDynCompatible<T>: ptr::Pointee<Metadata = ptr::DynMetadata<Self>> {}
+
 /// Returns `Some(&U)` if `T` can be coerced to the trait object type `U`. Otherwise, it returns `None`.
 ///
 /// # Compile-time failures
@@ -1004,9 +1020,7 @@ pub const fn type_name_of_val<T: ?Sized>(_val: &T) -> &'static str {
 /// ```
 #[must_use]
 #[unstable(feature = "try_as_dyn", issue = "144361")]
-pub const fn try_as_dyn<T, U: ptr::Pointee<Metadata = ptr::DynMetadata<U>> + ?Sized>(
-    t: &T,
-) -> Option<&U> {
+pub const fn try_as_dyn<T, U: TryAsDynCompatible<T> + ?Sized>(t: &T) -> Option<&U> {
     let vtable: Option<ptr::DynMetadata<U>> =
         const { type_id::<T>().trait_info_of::<U>().as_ref().map(TraitImpl::get_vtable) };
     match vtable {
@@ -1055,9 +1069,7 @@ pub const fn try_as_dyn<T, U: ptr::Pointee<Metadata = ptr::DynMetadata<U>> + ?Si
 /// ```
 #[must_use]
 #[unstable(feature = "try_as_dyn", issue = "144361")]
-pub const fn try_as_dyn_mut<T, U: ptr::Pointee<Metadata = ptr::DynMetadata<U>> + ?Sized>(
-    t: &mut T,
-) -> Option<&mut U> {
+pub const fn try_as_dyn_mut<T, U: TryAsDynCompatible<T> + ?Sized>(t: &mut T) -> Option<&mut U> {
     let vtable: Option<ptr::DynMetadata<U>> =
         const { type_id::<T>().trait_info_of::<U>().as_ref().map(TraitImpl::get_vtable) };
     match vtable {
