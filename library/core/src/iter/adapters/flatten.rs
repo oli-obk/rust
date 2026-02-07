@@ -3,6 +3,7 @@ use crate::iter::{
     Cloned, Copied, Empty, Filter, FilterMap, Fuse, FusedIterator, Map, Once, OnceWith,
     TrustedFused, TrustedLen,
 };
+use crate::mem::type_info;
 use crate::num::NonZero;
 use crate::ops::{ControlFlow, Try};
 use crate::{array, fmt, option, result};
@@ -564,7 +565,7 @@ where
     fn size_hint(&self) -> (usize, Option<usize>) {
         if is_oneshot::<U>() {
             let (lower, upper) = self.iter.size_hint();
-            return match <I::Item as ConstSizeIntoIterator>::size() {
+            return match ARRAY_SIZE::<I::Item> {
                 Some(0) => (0, Some(0)),
                 Some(1) => (lower, upper),
                 _ => (0, upper),
@@ -574,7 +575,7 @@ where
         let (blo, bhi) = self.backiter.as_ref().map_or((0, Some(0)), U::size_hint);
         let lo = flo.saturating_add(blo);
 
-        if let Some(fixed_size) = <<I as Iterator>::Item as ConstSizeIntoIterator>::size() {
+        if let Some(fixed_size) = ARRAY_SIZE::<I::Item> {
             let (lower, upper) = self.iter.size_hint();
 
             let lower = lower.saturating_mul(fixed_size).saturating_add(lo);
@@ -801,41 +802,17 @@ where
 {
 }
 
-trait ConstSizeIntoIterator: IntoIterator {
-    // FIXME(#31844): convert to an associated const once specialization supports that
-    fn size() -> Option<usize>;
-}
-
-impl<T> ConstSizeIntoIterator for T
-where
-    T: IntoIterator,
-{
-    #[inline]
-    default fn size() -> Option<usize> {
-        None
+const ARRAY_SIZE<T>: Option<usize> = {
+    let ty = type_info::Type::of::<T>();
+    match ty.kind {
+        type_info::TypeKind::Array(a) => Some(a.len),
+        type_info::TypeKind::Reference(r) => match r.pointee.info().kind {
+            type_info::TypeKind::Array(a) => Some(a.len),
+            _ => None,
+        },
+        _ => None
     }
-}
-
-impl<T, const N: usize> ConstSizeIntoIterator for [T; N] {
-    #[inline]
-    fn size() -> Option<usize> {
-        Some(N)
-    }
-}
-
-impl<T, const N: usize> ConstSizeIntoIterator for &[T; N] {
-    #[inline]
-    fn size() -> Option<usize> {
-        Some(N)
-    }
-}
-
-impl<T, const N: usize> ConstSizeIntoIterator for &mut [T; N] {
-    #[inline]
-    fn size() -> Option<usize> {
-        Some(N)
-    }
-}
+};
 
 #[inline]
 fn and_then_or_clear<T, U>(opt: &mut Option<T>, f: impl FnOnce(&mut T) -> Option<U>) -> Option<U> {
