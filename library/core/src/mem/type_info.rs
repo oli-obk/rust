@@ -2,7 +2,7 @@
 //! runtime or const-eval processable way.
 
 use crate::any::TypeId;
-use crate::intrinsics::type_of;
+use crate::intrinsics::{type_id, type_of};
 
 /// Compile-time type information.
 #[derive(Debug)]
@@ -16,6 +16,28 @@ pub struct Type {
     pub size: Option<usize>,
 }
 
+/// See https://github.com/rust-lang/rust/issues/41875 for why
+/// we cannot just use `TypeId`.
+#[derive(Debug)]
+#[unstable(feature = "type_info", issue = "146922")]
+pub struct TypeHandle(TypeId);
+
+#[unstable(feature = "type_info", issue = "146922")]
+#[rustc_const_unstable(feature = "type_info", issue = "146922")]
+impl const PartialEq<TypeId> for TypeHandle {
+    fn eq(&self, other: &TypeId) -> bool {
+        self.0 == *other
+    }
+}
+
+#[unstable(feature = "type_info", issue = "146922")]
+#[rustc_const_unstable(feature = "type_info", issue = "146922")]
+impl const PartialEq<TypeHandle> for TypeId {
+    fn eq(&self, other: &TypeHandle) -> bool {
+        *self == other.0
+    }
+}
+
 impl TypeId {
     /// Compute the type information of a concrete type.
     /// It can only be called at compile time.
@@ -26,13 +48,22 @@ impl TypeId {
     }
 }
 
+impl TypeHandle {
+    /// Compute the type information of a concrete type.
+    /// It can only be called at compile time.
+    #[unstable(feature = "type_info", issue = "146922")]
+    #[rustc_const_unstable(feature = "type_info", issue = "146922")]
+    pub const fn info(self) -> Type {
+        self.0.info()
+    }
+}
+
 impl Type {
     /// Returns the type information of the generic type parameter.
     #[unstable(feature = "type_info", issue = "146922")]
     #[rustc_const_unstable(feature = "type_info", issue = "146922")]
-    // FIXME(reflection): don't require the 'static bound
-    pub const fn of<T: ?Sized + 'static>() -> Self {
-        const { TypeId::of::<T>().info() }
+    pub const fn of<T: ?Sized>() -> Self {
+        const { type_id::<T>().info() }
     }
 }
 
@@ -82,7 +113,7 @@ pub struct Tuple {
 #[unstable(feature = "type_info", issue = "146922")]
 pub struct Field {
     /// The field's type.
-    pub ty: TypeId,
+    pub ty: TypeHandle,
     /// Offset in bytes from the parent type
     pub offset: usize,
 }
@@ -93,7 +124,7 @@ pub struct Field {
 #[unstable(feature = "type_info", issue = "146922")]
 pub struct Array {
     /// The type of each element in the array.
-    pub element_ty: TypeId,
+    pub element_ty: TypeHandle,
     /// The length of the array.
     pub len: usize,
 }
@@ -104,7 +135,7 @@ pub struct Array {
 #[unstable(feature = "type_info", issue = "146922")]
 pub struct Slice {
     /// The type of each element in the slice.
-    pub element_ty: TypeId,
+    pub element_ty: TypeHandle,
 }
 
 /// Compile-time type information about dynamic traits.
@@ -132,7 +163,7 @@ pub struct DynTraitPredicate {
 #[unstable(feature = "type_info", issue = "146922")]
 pub struct Trait {
     /// The TypeId of the trait as a dynamic type
-    pub ty: TypeId,
+    pub ty: TypeHandle,
     /// Whether the trait is an auto trait
     pub is_auto: bool,
 }
@@ -187,7 +218,7 @@ pub struct Str {
 #[unstable(feature = "type_info", issue = "146922")]
 pub struct Reference {
     /// The type of the value being referred to.
-    pub pointee: TypeId,
+    pub pointee: TypeHandle,
     /// Whether this reference is mutable or not.
     pub mutable: bool,
 }
@@ -198,7 +229,7 @@ pub struct Reference {
 #[unstable(feature = "type_info", issue = "146922")]
 pub struct Pointer {
     /// The type of the value being pointed to.
-    pub pointee: TypeId,
+    pub pointee: TypeHandle,
     /// Whether this pointer is mutable or not.
     pub mutable: bool,
 }
