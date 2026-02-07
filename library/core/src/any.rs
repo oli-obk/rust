@@ -972,7 +972,7 @@ pub const fn type_name_of_val<T: ?Sized>(_val: &T) -> &'static str {
 /// Trait that is automatically implemented for all `dyn Trait<'b, C> + 'a`
 /// * without assoc type bounds,
 /// * adds `T: 'a + 'b` requirements, and
-/// * `C: 'static` requirements.
+/// * `C: 'static` requirements on all params of the dyn trait.
 ///
 /// This is required for `try_as_dyn` to be able to soundly convert non-static
 /// types to `dyn Trait`.

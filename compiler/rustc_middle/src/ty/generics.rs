@@ -430,14 +430,15 @@ impl<'tcx> GenericPredicates<'tcx> {
             type Result = ControlFlow<()>;
             fn visit_region(&mut self, r: Region<'tcx>) -> Self::Result {
                 match r.kind() {
-                    RegionKind::ReEarlyParam(_param) => ControlFlow::Break(()),
-                    RegionKind::ReBound(..)
-                    | RegionKind::ReLateParam(_)
+                    RegionKind::ReEarlyParam(_)
                     | RegionKind::ReStatic
                     | RegionKind::ReVar(_)
                     | RegionKind::RePlaceholder(_)
                     | RegionKind::ReErased
-                    | RegionKind::ReError(_) => ControlFlow::Continue(()),
+                    | RegionKind::ReError(_) => ControlFlow::Break(()),
+                    RegionKind::ReBound(..) | RegionKind::ReLateParam(_) => {
+                        ControlFlow::Continue(())
+                    }
                 }
             }
 
@@ -458,10 +459,18 @@ impl<'tcx> GenericPredicates<'tcx> {
         // don't allow this impl to be used.
         self.predicates.iter().all(|(clause, _)| {
             match clause.kind().skip_binder() {
-                ClauseKind::Trait(_trait_predicate) => {
-                    // FIXME(try_as_dyn): allow trait bounds that do not mention lifetimes.
-                    // These bounds themselves are fine, as their impls either are fine or
-                    // rejected by this very check when encountered.
+                ClauseKind::Trait(trait_predicate) => {
+                    // In a `T: Trait`, if the rhs bound does not contain any generic params
+                    // or 'static lifetimes, then it cannot transitively cause such requirements,
+                    // considering we apply the fully-generic-for-reflection rules to any impls for
+                    // that trait, too.
+                    if matches!(trait_predicate.self_ty().kind(), ty::Param(_))
+                        && trait_predicate.trait_ref.args[1..]
+                            .iter()
+                            .all(|arg| arg.visit_with(&mut ParamChecker).is_continue())
+                    {
+                        return true;
+                    }
                 }
                 ClauseKind::RegionOutlives(_)
                 | ClauseKind::TypeOutlives(_)

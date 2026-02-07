@@ -9,7 +9,7 @@ impl<T> Trait for Thing<T> {}
 
 const _: () = {
     let thing = Thing(1);
-    assert!(try_as_dyn::<_, dyn Trait>(&thing).is_none());
+    assert!(try_as_dyn::<_, dyn Trait>(&thing).is_some());
 };
 
 struct Thing2<T>(T);
@@ -17,7 +17,7 @@ impl<T: std::fmt::Debug> Trait for Thing2<T> {}
 
 const _: () = {
     let thing = Thing2(1);
-    assert!(try_as_dyn::<_, dyn Trait>(&thing).is_none());
+    assert!(try_as_dyn::<_, dyn Trait>(&thing).is_some());
 };
 
 trait Trait2 {}
