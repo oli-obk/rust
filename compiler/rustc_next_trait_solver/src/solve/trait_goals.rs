@@ -2,14 +2,14 @@
 
 use rustc_type_ir::data_structures::IndexSet;
 use rustc_type_ir::fast_reject::DeepRejectCtxt;
-use rustc_type_ir::{ExistentialPredicate, GenericArgKind, inherent::*};
+use rustc_type_ir::inherent::*;
 use rustc_type_ir::lang_items::SolverTraitLangItem;
 use rustc_type_ir::solve::{
     AliasBoundKind, CandidatePreferenceMode, CanonicalResponse, SizedTraitKind,
 };
 use rustc_type_ir::{
-    self as ty, Interner, Movability, PredicatePolarity, TraitPredicate, TraitRef,
-    TypeVisitableExt as _, TypingMode, Upcast as _, elaborate,
+    self as ty, ExistentialPredicate, GenericArgKind, Interner, Movability, PredicatePolarity,
+    TraitPredicate, TraitRef, TypeVisitableExt as _, TypingMode, Upcast as _, elaborate,
 };
 use tracing::{debug, instrument, trace};
 
