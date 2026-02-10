@@ -281,9 +281,9 @@ pub struct ImplTraitHeader<'tcx> {
 }
 
 impl<'tcx> ImplTraitHeader<'tcx> {
-    /// For trait impls, checks whether the type and trait only have generic parameters in their
-    /// arguments and only uses each generic param once, too.
-    /// Pessimistic analysis, so it will reject projection types (except for weak aliases)
+    /// For trait impls, checks whether the type and trait only have generic lifetime parameters in their
+    /// arguments and only use any generic param once.
+    /// This is a pessimistic analysis, so it will reject projection types (except for weak aliases)
     /// and other types that may be actually ok. We can allow more in the future.
     pub fn is_fully_generic_for_reflection(self) -> bool {
         #[derive(Default)]

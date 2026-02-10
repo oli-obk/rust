@@ -424,6 +424,8 @@ impl<'tcx> GenericPredicates<'tcx> {
         instantiated.spans.extend(self.predicates.iter().map(|(_, s)| s));
     }
 
+    /// Allow simple where bounds like `T: Debug`, but prevent any kind of
+    /// outlives bounds or uses of generic parameters on the right hand side.
     pub fn is_fully_generic_for_reflection(self) -> bool {
         struct ParamChecker;
         impl<'tcx> TypeVisitor<TyCtxt<'tcx>> for ParamChecker {
