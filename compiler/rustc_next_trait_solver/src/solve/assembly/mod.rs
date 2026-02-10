@@ -530,6 +530,10 @@ where
         let cx = self.cx();
         let trait_def_id = goal.predicate.trait_def_id(cx);
 
+        if let TypingMode::Reflection = self.typing_mode() {
+            return;
+        }
+
         // N.B. When assembling built-in candidates for lang items that are also
         // `auto` traits, then the auto trait candidate that is assembled in
         // `consider_auto_trait_candidate` MUST be disqualified to remain sound.
@@ -803,6 +807,10 @@ where
         if cx.is_sizedness_trait(goal.predicate.trait_def_id(cx)) {
             // `dyn MetaSized` is valid, but should get its `MetaSized` impl from
             // being `dyn` (SizedCandidate), not from the object candidate.
+            return;
+        }
+
+        if let TypingMode::Reflection = self.typing_mode() {
             return;
         }
 

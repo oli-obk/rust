@@ -1,3 +1,5 @@
+//@ revisions: next old
+//@[next] compile-flags: -Znext-solver
 #![feature(try_as_dyn)]
 //@ check-pass
 

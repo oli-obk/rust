@@ -18,7 +18,7 @@ use rustc_infer::infer::BoundRegionConversionTime::{self, HigherRankedType};
 use rustc_infer::infer::DefineOpaqueTypes;
 use rustc_infer::infer::at::ToTrace;
 use rustc_infer::infer::relate::TypeRelation;
-use rustc_infer::traits::{PredicateObligations, TraitObligation};
+use rustc_infer::traits::{ImplSource, PredicateObligations, TraitObligation};
 use rustc_macros::{TypeFoldable, TypeVisitable};
 use rustc_middle::bug;
 use rustc_middle::dep_graph::{DepKind, DepNodeIndex};
@@ -277,6 +277,11 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
                 Err(SelectionError::Overflow(OverflowError::Canonical))
             }
             Err(e) => Err(e),
+            Ok(ImplSource::Builtin(..))
+                if matches!(self.infcx.typing_mode(), TypingMode::Reflection) =>
+            {
+                Err(SelectionError::Unimplemented)
+            }
             Ok(candidate) => Ok(Some(candidate)),
         }
     }
@@ -1280,6 +1285,11 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
             match this.confirm_candidate(stack.obligation, candidate.clone()) {
                 Ok(selection) => {
                     debug!(?selection);
+                    if let ImplSource::Builtin(..) = selection
+                        && matches!(this.infcx.typing_mode(), TypingMode::Reflection)
+                    {
+                        return Ok(EvaluatedToErr);
+                    }
                     this.evaluate_predicates_recursively(
                         stack.list(),
                         selection.nested_obligations().into_iter(),

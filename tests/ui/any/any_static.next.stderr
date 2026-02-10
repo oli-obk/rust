@@ -1,5 +1,5 @@
 error[E0521]: borrowed data escapes outside of function
-  --> $DIR/any_static.rs:15:35
+  --> $DIR/any_static.rs:17:35
    |
 LL | fn extend(a: &Payload) -> &'static Payload {
    |           -  - let's call the lifetime of this reference `'1`

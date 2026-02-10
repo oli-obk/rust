@@ -1,5 +1,5 @@
 error[E0080]: evaluation panicked: called `Option::unwrap()` on a `None` value
-  --> $DIR/hrtb.rs:12:25
+  --> $DIR/hrtb2.rs:14:25
    |
 LL |     let _dy: &dyn Bar = try_as_dyn(&x).unwrap();
    |                         ^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `_` failed here
