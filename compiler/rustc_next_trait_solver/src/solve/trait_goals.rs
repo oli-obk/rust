@@ -8,8 +8,8 @@ use rustc_type_ir::solve::{
     AliasBoundKind, CandidatePreferenceMode, CanonicalResponse, SizedTraitKind,
 };
 use rustc_type_ir::{
-    self as ty, ExistentialPredicate, GenericArgKind, Interner, Movability, PredicatePolarity,
-    TraitPredicate, TraitRef, TypeVisitableExt as _, TypingMode, Upcast as _, elaborate,
+    self as ty, Interner, Movability, PredicatePolarity, TraitPredicate, TraitRef,
+    TypeVisitableExt as _, TypingMode, Upcast as _, elaborate,
 };
 use tracing::{debug, instrument, trace};
 
@@ -867,41 +867,11 @@ where
             let self_ty = goal.predicate.self_ty();
             let ty = goal.predicate.trait_ref.args.type_at(1);
             match self_ty.kind() {
-                ty::Dynamic(bounds, lifetime) => {
+                ty::Dynamic(_bounds, lifetime) => {
                     ecx.add_goal(
                         GoalSource::Misc,
                         goal.with(cx, ty::OutlivesPredicate(ty, lifetime)),
                     );
-                    for bound in bounds.as_slice() {
-                        match bound.skip_binder() {
-                            ExistentialPredicate::Trait(trait_ref) => {
-                                for param in trait_ref.args.as_slice() {
-                                    match param.kind() {
-                                        GenericArgKind::Lifetime(lifetime) => ecx.add_goal(
-                                            GoalSource::Misc,
-                                            goal.with(cx, ty::OutlivesPredicate(ty, lifetime)),
-                                        ),
-                                        // FIXME(try_as_dyn): For now we just require all generic params of a trait to
-                                        // outlive the `'static` lifetime.
-                                        GenericArgKind::Type(ty) => ecx.add_goal(
-                                            GoalSource::Misc,
-                                            goal.with(
-                                                cx,
-                                                ty::OutlivesPredicate(ty, Region::new_static(cx)),
-                                            ),
-                                        ),
-                                        // Nothing to do, consts do not affect lifetimes
-                                        GenericArgKind::Const(_) => {}
-                                    }
-                                }
-                            }
-                            // FIXME(try_as_dyn): check what kind of projections we can allow
-                            ExistentialPredicate::Projection(_) => return Err(NoSolution),
-                            // Auto traits do not affect lifetimes outside of specialization,
-                            // which is disabled in reflection.
-                            ExistentialPredicate::AutoTrait(_) => {}
-                        }
-                    }
                     ecx.evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
                 }
 

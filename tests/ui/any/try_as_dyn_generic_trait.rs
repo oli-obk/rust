@@ -2,7 +2,7 @@
 
 use std::any::try_as_dyn;
 
-type Payload = &'static i32;
+type Payload = *const i32;
 
 trait Convert<T> {
     fn convert(&self) -> &T;
@@ -15,9 +15,8 @@ impl<T> Convert<T> for T {
 }
 
 const _: () = {
-    let payload: &Payload = &&1;
-    let thing: &Payload = &*payload;
-    let convert: &dyn Convert<&'static Payload> = try_as_dyn(&thing).unwrap();
+    let payload: Payload = std::ptr::null();
+    let convert: &dyn Convert<&'static Payload> = try_as_dyn(&payload).unwrap();
     //~^ ERROR: `Option::unwrap()` on a `None` value
 };
 

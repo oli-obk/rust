@@ -14,10 +14,7 @@ use rustc_hir::lang_items::LangItem;
 use rustc_infer::infer::{BoundRegionConversionTime, DefineOpaqueTypes, InferOk};
 use rustc_infer::traits::ObligationCauseCode;
 use rustc_middle::traits::{BuiltinImplSource, SignatureMismatchData};
-use rustc_middle::ty::{
-    self, ExistentialPredicate, GenericArgKind, GenericArgsRef, Region, SizedTraitKind, Ty, TyCtxt,
-    Upcast,
-};
+use rustc_middle::ty::{self, GenericArgsRef, Region, SizedTraitKind, Ty, TyCtxt, Upcast};
 use rustc_middle::{bug, span_bug};
 use rustc_span::def_id::DefId;
 use thin_vec::thin_vec;
@@ -1352,41 +1349,10 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
         let ty = obligation.predicate.map_bound(|p| p.trait_ref.args.type_at(1));
 
         match *self_ty.skip_binder().kind() {
-            ty::Dynamic(bounds, lifetime) => {
+            ty::Dynamic(_bounds, lifetime) => {
                 obligations.push(
                     obligation.with(tcx, ty.map_bound(|ty| ty::OutlivesPredicate(ty, lifetime))),
                 );
-                for bound in bounds {
-                    match bound.skip_binder() {
-                        ExistentialPredicate::Trait(trait_ref) => {
-                            for param in trait_ref.args {
-                                match param.kind() {
-                                    GenericArgKind::Lifetime(lifetime) => {
-                                        obligations.push(obligation.with(
-                                            tcx,
-                                            ty.map_bound(|ty| ty::OutlivesPredicate(ty, lifetime)),
-                                        ))
-                                    }
-                                    // FIXME(try_as_dyn): For now we just require all generic params of a trait to
-                                    // outlive the `'static` lifetime.
-                                    GenericArgKind::Type(ty) => obligations.push(obligation.with(
-                                        tcx,
-                                        ty::OutlivesPredicate(ty, tcx.lifetimes.re_static),
-                                    )),
-                                    // Nothing to do, consts do not affect lifetimes
-                                    GenericArgKind::Const(_) => {}
-                                }
-                            }
-                        }
-                        // FIXME(try_as_dyn): check what kind of projections we can allow
-                        ExistentialPredicate::Projection(_) => {
-                            panic!("unexpected type `{self_ty:?}`")
-                        }
-                        // Auto traits do not affect lifetimes outside of specialization,
-                        // which is disabled in reflection.
-                        ExistentialPredicate::AutoTrait(_) => {}
-                    }
-                }
             }
 
             ty::Infer(ty::TyVar(_) | ty::FreshTy(_) | ty::FreshIntTy(_) | ty::FreshFloatTy(_)) => {
