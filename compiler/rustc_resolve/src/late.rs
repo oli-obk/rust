@@ -1698,23 +1698,9 @@ impl<'a, 'ast, 'ra, 'tcx> LateResolutionVisitor<'a, 'ast, 'ra, 'tcx> {
 
     #[instrument(level = "debug", skip(self, work))]
     fn with_owner<T>(&mut self, owner: NodeId, work: impl FnOnce(&mut Self) -> T) -> T {
-        let old_owner = std::mem::replace(
-            &mut self.r.current_owner,
-            self.r.owners.remove(&owner).unwrap_or_else(|| {
-                panic!(
-                    "unknown owner {owner}: {:?}",
-                    self.r
-                        .owners
-                        .items()
-                        .filter(|o| o.1.node_id_to_def_id.contains_key(&owner))
-                        .get_only()
-                        .map(|(_, o)| o.node_id_to_def_id[&owner])
-                )
-            }),
-        );
+        let old_owner = self.r.replace_current_owner(owner);
         let ret = work(self);
-        let prev = std::mem::replace(&mut self.r.current_owner, old_owner);
-        self.r.owners.insert(prev.id, prev);
+        self.r.reinsert_prev_owner(old_owner);
         ret
     }
 

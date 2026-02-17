@@ -561,7 +561,7 @@ impl<'ra, 'tcx> ResolverExpand for Resolver<'ra, 'tcx> {
 
     fn set_owner(&mut self, id: NodeId) -> NodeId {
         assert_ne!(id, DUMMY_NODE_ID);
-        let old = std::mem::replace(&mut self.current_owner, self.owners.remove(&id).unwrap());
+        let old = self.replace_current_owner(id);
         let old_id = old.id;
         if old.id == DUMMY_NODE_ID {
             if cfg!(debug_assertions) {
@@ -575,12 +575,11 @@ impl<'ra, 'tcx> ResolverExpand for Resolver<'ra, 'tcx> {
     }
 
     fn reset_owner(&mut self, id: NodeId) {
-        let new = if id == DUMMY_NODE_ID {
-            PerOwnerResolverData::new(DUMMY_NODE_ID)
+        let old = if id == DUMMY_NODE_ID {
+            std::mem::replace(&mut self.current_owner, PerOwnerResolverData::new(DUMMY_NODE_ID))
         } else {
-            self.owners.remove(&id).unwrap()
+            self.replace_current_owner(id)
         };
-        let old = std::mem::replace(&mut self.current_owner, new);
         assert_ne!(old.id, DUMMY_NODE_ID);
         assert!(self.owners.insert(old.id, old).is_none());
     }

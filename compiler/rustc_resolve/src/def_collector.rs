@@ -24,12 +24,10 @@ pub(crate) fn collect_definitions(
     let invocation_parent = resolver.invocation_parents[&expansion];
     debug!("new fragment to visit with invocation_parent: {invocation_parent:?}");
     debug_assert_eq!(resolver.current_owner.id, DUMMY_NODE_ID);
-    resolver.current_owner = resolver.owners.remove(&invocation_parent.owner).unwrap();
+    let prev = resolver.replace_current_owner(invocation_parent.owner);
     let mut visitor = DefCollector { resolver, expansion, invocation_parent };
     fragment.visit_with(&mut visitor);
-    let tables =
-        mem::replace(&mut resolver.current_owner, PerOwnerResolverData::new(DUMMY_NODE_ID));
-    assert!(resolver.owners.insert(invocation_parent.owner, tables).is_none());
+    resolver.reinsert_prev_owner(prev);
 }
 
 /// Creates `DefId`s for nodes in the AST.
@@ -91,8 +89,7 @@ impl<'a, 'ra, 'tcx> DefCollector<'a, 'ra, 'tcx> {
         let orig_owner = mem::replace(&mut self.resolver.current_owner, tables);
         let orig_invoc_owner = mem::replace(&mut self.invocation_parent.owner, owner);
         f(self);
-        let tables = mem::replace(&mut self.resolver.current_owner, orig_owner);
-        assert!(self.resolver.owners.insert(owner, tables).is_none());
+        self.resolver.reinsert_prev_owner(orig_owner);
         assert_eq!(mem::replace(&mut self.invocation_parent.owner, orig_invoc_owner), owner);
     }
 

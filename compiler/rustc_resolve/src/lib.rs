@@ -1536,6 +1536,26 @@ impl<'tcx> Resolver<'_, 'tcx> {
         self.tcx.def_kind(self.local_def_id(node))
     }
 
+    /// Get a new owner out of the owners table and set it as the current owner.
+    /// Returns the previous owner to be stored on the stack and reinserted with [Self::reinsert_prev_owner]
+    fn replace_current_owner(&mut self, owner: NodeId) -> PerOwnerResolverData {
+        assert_ne!(owner, DUMMY_NODE_ID);
+        std::mem::replace(&mut self.current_owner, self.owners.remove(&owner).unwrap())
+    }
+
+    /// Reinsert an owner previously removed and assert the same owner has not been created in the mean time.
+    fn reinsert_prev_owner(&mut self, prev_owner: PerOwnerResolverData) {
+        assert_ne!(self.current_owner.id, DUMMY_NODE_ID);
+        assert!(
+            self.owners
+                .insert(
+                    self.current_owner.id,
+                    std::mem::replace(&mut self.current_owner, prev_owner)
+                )
+                .is_none()
+        )
+    }
+
     /// Adds a definition with a parent definition.
     fn create_def(
         &mut self,
@@ -2543,14 +2563,9 @@ impl<'ra, 'tcx> Resolver<'ra, 'tcx> {
 
     #[instrument(level = "debug", skip(self, work))]
     fn with_owner<T>(&mut self, owner: NodeId, work: impl FnOnce(&mut Self) -> T) -> T {
-        let old_owner =
-            std::mem::replace(&mut self.current_owner, self.owners.remove(&owner).unwrap());
+        let old_owner = self.replace_current_owner(owner);
         let ret = work(self);
-        assert!(
-            self.owners
-                .insert(owner, std::mem::replace(&mut self.current_owner, old_owner))
-                .is_none()
-        );
+        self.reinsert_prev_owner(old_owner);
         ret
     }
 }
