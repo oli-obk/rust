@@ -1172,8 +1172,6 @@ pub struct ResolverOutputs {
 pub struct Owner {
     /// Is `None` while the owner is being processed.
     resolver_data: Option<PerOwnerResolverData>,
-    // TODO
-    #[expect(dead_code)]
     def_id: LocalDefId,
 }
 
@@ -1524,20 +1522,12 @@ impl<'ra, 'tcx> AsRef<Resolver<'ra, 'tcx>> for Resolver<'ra, 'tcx> {
 }
 
 impl<'tcx> Resolver<'_, 'tcx> {
-    fn opt_local_def_id(&self, node: NodeId) -> Option<LocalDefId> {
-        self.opt_feed(node).map(|f| f.key())
-    }
-
     fn local_def_id(&self, node: NodeId) -> LocalDefId {
         self.feed(node).key()
     }
 
-    fn opt_feed(&self, node: NodeId) -> Option<Feed<'tcx, LocalDefId>> {
-        self.feed_for_node_id.get(&node).copied()
-    }
-
     fn feed(&self, node: NodeId) -> Feed<'tcx, LocalDefId> {
-        self.opt_feed(node).unwrap_or_else(|| panic!("no entry for node id: `{node:?}`"))
+        self.feed_for_node_id.get(&node).copied().unwrap_or_else(|| panic!("no entry for node id: `{node:?}`"))
     }
 
     fn local_def_kind(&self, node: NodeId) -> DefKind {
