@@ -803,7 +803,10 @@ impl<'ast, 'ra, 'tcx> Visitor<'ast> for LateResolutionVisitor<'_, 'ast, 'ra, 'tc
         let prev = replace(&mut self.diag_metadata.current_item, Some(item));
         // Always report errors in items we just entered.
         let old_ignore = replace(&mut self.in_func_body, false);
-        self.with_lifetime_rib(LifetimeRibKind::Item, |this| this.resolve_item(item));
+        debug!("{item:#?}");
+        self.with_owner(item.id, |this| {
+            this.with_lifetime_rib(LifetimeRibKind::Item, |this| this.resolve_item(item))
+        });
         self.in_func_body = old_ignore;
         self.diag_metadata.current_item = prev;
     }
@@ -1691,6 +1694,28 @@ impl<'a, 'ast, 'ra, 'tcx> LateResolutionVisitor<'a, 'ast, 'ra, 'tcx> {
                 }
             }
         })
+    }
+
+    #[instrument(level = "debug", skip(self, work))]
+    fn with_owner<T>(&mut self, owner: NodeId, work: impl FnOnce(&mut Self) -> T) -> T {
+        let old_owner = std::mem::replace(
+            &mut self.r.current_owner,
+            self.r.owners.remove(&owner).unwrap_or_else(|| {
+                panic!(
+                    "unknown owner {owner}: {:?}",
+                    self.r
+                        .owners
+                        .items()
+                        .filter(|o| o.1.node_id_to_def_id.contains_key(&owner))
+                        .get_only()
+                        .map(|(_, o)| o.node_id_to_def_id[&owner])
+                )
+            }),
+        );
+        let ret = work(self);
+        let prev = std::mem::replace(&mut self.r.current_owner, old_owner);
+        self.r.owners.insert(prev.id, prev);
+        ret
     }
 
     #[instrument(level = "debug", skip(self, work))]
@@ -3255,7 +3280,9 @@ impl<'a, 'ast, 'ra, 'tcx> LateResolutionVisitor<'a, 'ast, 'ra, 'tcx> {
             replace(&mut self.diag_metadata.current_trait_assoc_items, Some(trait_items));
 
         for item in trait_items {
-            self.resolve_trait_item(item);
+            self.with_owner(item.id, |this| {
+                this.resolve_trait_item(item);
+            })
         }
 
         self.diag_metadata.current_trait_assoc_items = trait_assoc_items;
@@ -3465,7 +3492,9 @@ impl<'a, 'ast, 'ra, 'tcx> LateResolutionVisitor<'a, 'ast, 'ra, 'tcx> {
                                                 debug!("resolve_implementation with_self_rib_ns(ValueNS, ...)");
                                                 let mut seen_trait_items = Default::default();
                                                 for item in impl_items {
-                                                    this.resolve_impl_item(&**item, &mut seen_trait_items, trait_id, of_trait.is_some());
+                                                    this.with_owner(item.id, |this| {
+                                                        this.resolve_impl_item(&**item, &mut seen_trait_items, trait_id, of_trait.is_some());
+                                                    })
                                                 }
                                             });
                                         });
@@ -5578,18 +5607,21 @@ impl<'ast> Visitor<'ast> for ItemInfoCollector<'_, '_, '_> {
 
 impl<'ra, 'tcx> Resolver<'ra, 'tcx> {
     pub(crate) fn late_resolve_crate(&mut self, krate: &Crate) {
-        visit::walk_crate(&mut ItemInfoCollector { r: self }, krate);
-        let mut late_resolution_visitor = LateResolutionVisitor::new(self);
-        late_resolution_visitor.resolve_doc_links(&krate.attrs, MaybeExported::Ok(CRATE_NODE_ID));
-        visit::walk_crate(&mut late_resolution_visitor, krate);
-        for (id, span) in late_resolution_visitor.diag_metadata.unused_labels.iter() {
-            self.lint_buffer.buffer_lint(
-                lint::builtin::UNUSED_LABELS,
-                *id,
-                *span,
-                errors::UnusedLabel,
-            );
-        }
+        self.with_owner(CRATE_NODE_ID, |this| {
+            visit::walk_crate(&mut ItemInfoCollector { r: this }, krate);
+            let mut late_resolution_visitor = LateResolutionVisitor::new(this);
+            late_resolution_visitor
+                .resolve_doc_links(&krate.attrs, MaybeExported::Ok(CRATE_NODE_ID));
+            visit::walk_crate(&mut late_resolution_visitor, krate);
+            for (id, span) in late_resolution_visitor.diag_metadata.unused_labels.iter() {
+                this.lint_buffer.buffer_lint(
+                    lint::builtin::UNUSED_LABELS,
+                    *id,
+                    *span,
+                    errors::UnusedLabel,
+                );
+            }
+        })
     }
 }
 

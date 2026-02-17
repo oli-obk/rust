@@ -42,8 +42,8 @@ use macros::{MacroRulesDecl, MacroRulesScope, MacroRulesScopeRef};
 use rustc_arena::{DroplessArena, TypedArena};
 use rustc_ast::node_id::NodeMap;
 use rustc_ast::{
-    self as ast, AngleBracketedArg, CRATE_NODE_ID, Crate, Expr, ExprKind, GenericArg, GenericArgs,
-    NodeId, Path, attr,
+    self as ast, AngleBracketedArg, CRATE_NODE_ID, Crate, DUMMY_NODE_ID, Expr, ExprKind,
+    GenericArg, GenericArgs, NodeId, Path, attr,
 };
 use rustc_data_structures::fx::{FxHashMap, FxHashSet, FxIndexMap, FxIndexSet, default};
 use rustc_data_structures::intern::Interned;
@@ -68,15 +68,15 @@ use rustc_middle::metadata::{AmbigModChild, ModChild, Reexport};
 use rustc_middle::middle::privacy::EffectiveVisibilities;
 use rustc_middle::query::Providers;
 use rustc_middle::ty::{
-    self, DelegationFnSig, DelegationInfo, Feed, MainDefinition, RegisteredTools,
-    ResolverAstLowering, ResolverGlobalCtxt, TyCtxt, TyCtxtFeed, Visibility,
+    self, DelegationFnSig, DelegationInfo, Feed, MainDefinition, PerOwnerResolverData,
+    RegisteredTools, ResolverAstLowering, ResolverGlobalCtxt, TyCtxt, TyCtxtFeed, Visibility,
 };
 use rustc_session::config::CrateType;
 use rustc_session::lint::builtin::PRIVATE_MACRO_USE;
 use rustc_span::hygiene::{ExpnId, LocalExpnId, MacroKind, SyntaxContext, Transparency};
 use rustc_span::{DUMMY_SP, Ident, Span, Symbol, kw, sym};
 use smallvec::{SmallVec, smallvec};
-use tracing::debug;
+use tracing::{debug, instrument};
 
 type Res = def::Res<NodeId>;
 
@@ -190,6 +190,7 @@ struct InvocationParent {
     impl_trait_context: ImplTraitContext,
     in_attr: bool,
     const_arg_context: ConstArgContext,
+    owner: NodeId,
 }
 
 impl InvocationParent {
@@ -198,6 +199,7 @@ impl InvocationParent {
         impl_trait_context: ImplTraitContext::Existential,
         in_attr: false,
         const_arg_context: ConstArgContext::NonDirect,
+        owner: CRATE_NODE_ID,
     };
 }
 
@@ -1202,6 +1204,12 @@ pub struct Resolver<'ra, 'tcx> {
     // Used for suggestions during error reporting.
     pat_span_map: NodeMap<Span> = Default::default(),
 
+    /// Preserves per owner data once the owner is finished resolving.
+    owners: NodeMap<PerOwnerResolverData>,
+
+    /// An entry of `owners` that gets taken out and reinserted whenever an owner is handled.
+    current_owner: PerOwnerResolverData,
+
     /// Resolutions for nodes that have a single resolution.
     partial_res_map: NodeMap<PartialRes> = Default::default(),
     /// Resolutions for import nodes, which have multiple resolutions in different namespaces.
@@ -1331,7 +1339,7 @@ pub struct Resolver<'ra, 'tcx> {
 
     next_node_id: NodeId = CRATE_NODE_ID,
 
-    node_id_to_def_id: NodeMap<Feed<'tcx, LocalDefId>>,
+    feed_for_node_id: NodeMap<Feed<'tcx, LocalDefId>>,
 
     disambiguator: DisambiguatorState = DisambiguatorState::new(),
 
@@ -1389,6 +1397,22 @@ pub struct Resolver<'ra, 'tcx> {
     // that were encountered during resolution. These names are used to generate item names
     // for APITs, so we don't want to leak details of resolution into these names.
     impl_trait_names: FxHashMap<NodeId, Symbol> = default::fx_hash_map(),
+}
+
+impl<'ra, 'tcx> std::ops::DerefMut for Resolver<'ra, 'tcx> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        assert_ne!(self.current_owner.id, DUMMY_NODE_ID);
+        &mut self.current_owner
+    }
+}
+
+impl<'ra, 'tcx> std::ops::Deref for Resolver<'ra, 'tcx> {
+    type Target = PerOwnerResolverData;
+
+    fn deref(&self) -> &Self::Target {
+        assert_ne!(self.current_owner.id, DUMMY_NODE_ID);
+        &self.current_owner
+    }
 }
 
 /// This provides memory for the rest of the crate. The `'ra` lifetime that is
@@ -1501,7 +1525,7 @@ impl<'tcx> Resolver<'_, 'tcx> {
     }
 
     fn opt_feed(&self, node: NodeId) -> Option<Feed<'tcx, LocalDefId>> {
-        self.node_id_to_def_id.get(&node).copied()
+        self.feed_for_node_id.get(&node).copied()
     }
 
     fn feed(&self, node: NodeId) -> Feed<'tcx, LocalDefId> {
@@ -1523,12 +1547,12 @@ impl<'tcx> Resolver<'_, 'tcx> {
         span: Span,
     ) -> TyCtxtFeed<'tcx, LocalDefId> {
         assert!(
-            !self.node_id_to_def_id.contains_key(&node_id),
+            !self.feed_for_node_id.contains_key(&node_id),
             "adding a def for node-id {:?}, name {:?}, data {:?} but a previous def exists: {:?}",
             node_id,
             name,
             def_kind,
-            self.tcx.definitions_untracked().def_key(self.node_id_to_def_id[&node_id].key()),
+            self.tcx.definitions_untracked().def_key(self.feed_for_node_id[&node_id].key()),
         );
 
         // FIXME: remove `def_span` body, pass in the right spans here and call `tcx.at().create_def()`
@@ -1550,7 +1574,7 @@ impl<'tcx> Resolver<'_, 'tcx> {
         // we don't need a mapping from `NodeId` to `LocalDefId`.
         if node_id != ast::DUMMY_NODE_ID {
             debug!("create_def: def_id_to_node_id[{:?}] <-> {:?}", def_id, node_id);
-            self.node_id_to_def_id.insert(node_id, feed.downgrade());
+            self.feed_for_node_id.insert(node_id, feed.downgrade());
         }
 
         feed
@@ -1595,11 +1619,11 @@ impl<'tcx> Resolver<'_, 'tcx> {
     }
 
     /// This function is very slow, as it iterates over the entire
-    /// [Resolver::node_id_to_def_id] map just to find the [NodeId]
+    /// [Resolver::feed_for_node_id] map just to find the [NodeId]
     /// that corresponds to the given [LocalDefId]. Only use this in
     /// diagnostics code paths.
     fn def_id_to_node_id(&self, def_id: LocalDefId) -> NodeId {
-        self.node_id_to_def_id
+        self.feed_for_node_id
             .items()
             .filter(|(_, v)| v.key() == def_id)
             .map(|(k, _)| *k)
@@ -1634,12 +1658,16 @@ impl<'ra, 'tcx> Resolver<'ra, 'tcx> {
             true,
         );
 
-        let mut node_id_to_def_id = NodeMap::default();
+        let mut feed_for_node_id = NodeMap::default();
+        let mut owner_data = PerOwnerResolverData::new(CRATE_NODE_ID);
         let crate_feed = tcx.create_local_crate_def_id(crate_span);
 
         crate_feed.def_kind(DefKind::Mod);
         let crate_feed = crate_feed.downgrade();
-        node_id_to_def_id.insert(CRATE_NODE_ID, crate_feed);
+        owner_data.node_id_to_def_id.insert(CRATE_NODE_ID, crate_feed.key());
+        let mut owners = NodeMap::default();
+        owners.insert(CRATE_NODE_ID, owner_data);
+        feed_for_node_id.insert(CRATE_NODE_ID, crate_feed);
 
         let mut invocation_parents = FxHashMap::default();
         invocation_parents.insert(LocalExpnId::ROOT, InvocationParent::ROOT);
@@ -1731,7 +1759,7 @@ impl<'ra, 'tcx> Resolver<'ra, 'tcx> {
             single_segment_macro_resolutions: Default::default(),
             multi_segment_macro_resolutions: Default::default(),
             lint_buffer: LintBuffer::default(),
-            node_id_to_def_id,
+            feed_for_node_id,
             invocation_parents,
             trait_impls: Default::default(),
             confused_type_with_std_module: Default::default(),
@@ -1740,6 +1768,8 @@ impl<'ra, 'tcx> Resolver<'ra, 'tcx> {
             doc_link_resolutions: Default::default(),
             doc_link_traits_in_scope: Default::default(),
             current_crate_outer_attr_insert_span,
+            owners,
+            current_owner: PerOwnerResolverData::new(DUMMY_NODE_ID),
             ..
         };
 
@@ -1827,8 +1857,12 @@ impl<'ra, 'tcx> Resolver<'ra, 'tcx> {
             .stripped_cfg_items
             .into_iter()
             .filter_map(|item| {
-                let parent_module =
-                    self.node_id_to_def_id.get(&item.parent_module)?.key().to_def_id();
+                let parent_module = self
+                    .owners
+                    .get(&item.parent_module)?
+                    .node_id_to_def_id
+                    .get(&item.parent_module)?
+                    .to_def_id();
                 Some(StrippedCfgItem { parent_module, ident: item.ident, cfg: item.cfg })
             })
             .collect();
@@ -1852,17 +1886,13 @@ impl<'ra, 'tcx> Resolver<'ra, 'tcx> {
             stripped_cfg_items,
         };
         let ast_lowering = ty::ResolverAstLowering {
+            owners: self.owners,
             partial_res_map: self.partial_res_map,
             import_res_map: self.import_res_map,
             label_res_map: self.label_res_map,
             lifetimes_res_map: self.lifetimes_res_map,
             extra_lifetime_params_map: self.extra_lifetime_params_map,
             next_node_id: self.next_node_id,
-            node_id_to_def_id: self
-                .node_id_to_def_id
-                .into_items()
-                .map(|(k, f)| (k, f.key()))
-                .collect(),
             trait_map: self.trait_map,
             lifetime_elision_allowed: self.lifetime_elision_allowed,
             lint_buffer: Steal::new(self.lint_buffer),
@@ -2509,6 +2539,19 @@ impl<'ra, 'tcx> Resolver<'ra, 'tcx> {
             self.record_use(ident, name_binding, Used::Other);
         }
         self.main_def = Some(MainDefinition { res, is_import, span });
+    }
+
+    #[instrument(level = "debug", skip(self, work))]
+    fn with_owner<T>(&mut self, owner: NodeId, work: impl FnOnce(&mut Self) -> T) -> T {
+        let old_owner =
+            std::mem::replace(&mut self.current_owner, self.owners.remove(&owner).unwrap());
+        let ret = work(self);
+        assert!(
+            self.owners
+                .insert(owner, std::mem::replace(&mut self.current_owner, old_owner))
+                .is_none()
+        );
+        ret
     }
 }
 

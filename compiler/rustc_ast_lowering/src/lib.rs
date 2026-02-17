@@ -58,7 +58,7 @@ use rustc_hir::{
 };
 use rustc_index::{Idx, IndexSlice, IndexVec};
 use rustc_middle::span_bug;
-use rustc_middle::ty::{ResolverAstLowering, TyCtxt};
+use rustc_middle::ty::{PerOwnerResolverData, ResolverAstLowering, TyCtxt};
 use rustc_session::parse::add_feature_diagnostics;
 use rustc_span::symbol::{Ident, Symbol, kw, sym};
 use rustc_span::{DUMMY_SP, DesugaringKind, Span};
@@ -154,7 +154,10 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
         Self {
             // Pseudo-globals.
             tcx,
-            resolver: PerOwnerResolver { general: resolver },
+            resolver: PerOwnerResolver {
+                general: resolver,
+                item: PerOwnerResolverData::new(DUMMY_NODE_ID),
+            },
             disambiguator: DisambiguatorState::new(),
             arena: tcx.hir_arena,
 
@@ -234,6 +237,15 @@ impl SpanLowerer {
 
 pub(crate) struct PerOwnerResolver<'a> {
     pub general: &'a mut ResolverAstLowering,
+    pub item: PerOwnerResolverData,
+}
+
+impl<'a> std::ops::Deref for PerOwnerResolver<'a> {
+    type Target = PerOwnerResolverData;
+
+    fn deref(&self) -> &Self::Target {
+        &self.item
+    }
 }
 
 impl PerOwnerResolver<'_> {
@@ -434,10 +446,14 @@ enum TryBlockScope {
 }
 
 fn index_crate<'a>(
-    node_id_to_def_id: &NodeMap<LocalDefId>,
+    owners: &NodeMap<PerOwnerResolverData>,
     krate: &'a Crate,
 ) -> IndexVec<LocalDefId, AstOwner<'a>> {
-    let mut indexer = Indexer { node_id_to_def_id, index: IndexVec::new() };
+    let mut indexer = Indexer {
+        owners,
+        node_id_to_def_id: &owners[&CRATE_NODE_ID].node_id_to_def_id,
+        index: IndexVec::new(),
+    };
     *indexer.index.ensure_contains_elem(CRATE_DEF_ID, || AstOwner::NonOwner) =
         AstOwner::Crate(krate);
     visit::walk_crate(&mut indexer, krate);
@@ -445,6 +461,7 @@ fn index_crate<'a>(
 
     struct Indexer<'s, 'a> {
         node_id_to_def_id: &'s NodeMap<LocalDefId>,
+        owners: &'s NodeMap<PerOwnerResolverData>,
         index: IndexVec<LocalDefId, AstOwner<'a>>,
     }
 
@@ -455,23 +472,38 @@ fn index_crate<'a>(
         }
 
         fn visit_item(&mut self, item: &'a ast::Item) {
+            let old = std::mem::replace(
+                &mut self.node_id_to_def_id,
+                &self.owners[&item.id].node_id_to_def_id,
+            );
             let def_id = self.node_id_to_def_id[&item.id];
             *self.index.ensure_contains_elem(def_id, || AstOwner::NonOwner) = AstOwner::Item(item);
-            visit::walk_item(self, item)
+            visit::walk_item(self, item);
+            self.node_id_to_def_id = old;
         }
 
         fn visit_assoc_item(&mut self, item: &'a ast::AssocItem, ctxt: visit::AssocCtxt) {
+            let old = std::mem::replace(
+                &mut self.node_id_to_def_id,
+                &self.owners[&item.id].node_id_to_def_id,
+            );
             let def_id = self.node_id_to_def_id[&item.id];
             *self.index.ensure_contains_elem(def_id, || AstOwner::NonOwner) =
                 AstOwner::AssocItem(item, ctxt);
             visit::walk_assoc_item(self, item, ctxt);
+            self.node_id_to_def_id = old;
         }
 
         fn visit_foreign_item(&mut self, item: &'a ast::ForeignItem) {
+            let old = std::mem::replace(
+                &mut self.node_id_to_def_id,
+                &self.owners[&item.id].node_id_to_def_id,
+            );
             let def_id = self.node_id_to_def_id[&item.id];
             *self.index.ensure_contains_elem(def_id, || AstOwner::NonOwner) =
                 AstOwner::ForeignItem(item);
             visit::walk_item(self, item);
+            self.node_id_to_def_id = old;
         }
     }
 }
@@ -508,7 +540,7 @@ pub fn lower_to_hir(tcx: TyCtxt<'_>, (): ()) -> hir::Crate<'_> {
     tcx.ensure_done().get_lang_items(());
     let (mut resolver, krate) = tcx.resolver_for_lowering().steal();
 
-    let ast_index = index_crate(&resolver.node_id_to_def_id, &krate);
+    let ast_index = index_crate(&resolver.owners, &krate);
     let mut owners = IndexVec::from_fn_n(
         |_| hir::MaybeOwner::Phantom,
         tcx.definitions_untracked().def_index_count(),
@@ -592,7 +624,7 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
             .def_id();
 
         debug!("create_def: def_id_to_node_id[{:?}] <-> {:?}", def_id, node_id);
-        self.resolver.general.node_id_to_def_id.insert(node_id, def_id);
+        self.resolver.item.node_id_to_def_id.insert(node_id, def_id);
 
         def_id
     }
@@ -607,16 +639,29 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
     /// Given the id of some node in the AST, finds the `LocalDefId` associated with it by the name
     /// resolver (if any).
     fn opt_local_def_id(&self, node: NodeId) -> Option<LocalDefId> {
-        self.resolver.general.node_id_to_def_id.get(&node).copied()
+        self.resolver.node_id_to_def_id.get(&node).copied()
     }
 
     fn local_def_id(&self, node: NodeId) -> LocalDefId {
-        self.opt_local_def_id(node).unwrap_or_else(|| panic!("no entry for node id: `{node:?}`"))
+        self.opt_local_def_id(node).unwrap_or_else(|| {
+            self.resolver.general.owners.items().any(|(id, items)| {
+                items.node_id_to_def_id.items().any(|(node_id, def_id)| {
+                    if *node_id == node {
+                        panic!(
+                            "{def_id:?} ({node_id}) was found in {:?} ({id})",
+                            items.node_id_to_def_id.get(id),
+                        )
+                    }
+                    false
+                })
+            });
+            panic!("no entry for node id: `{node:?}`");
+        })
     }
 
     /// Given the id of an owner node in the AST, returns the corresponding `OwnerId`.
     fn owner_id(&self, node: NodeId) -> hir::OwnerId {
-        hir::OwnerId { def_id: self.local_def_id(node) }
+        hir::OwnerId { def_id: self.resolver.general.owners[&node].node_id_to_def_id[&node] }
     }
 
     /// Freshen the `LoweringContext` and ready it to lower a nested item.
@@ -635,6 +680,10 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
         let current_attrs = std::mem::take(&mut self.attrs);
         let current_bodies = std::mem::take(&mut self.bodies);
         let current_define_opaque = std::mem::take(&mut self.define_opaque);
+        let current_ast_owner = std::mem::replace(
+            &mut self.resolver.item,
+            self.resolver.general.owners.remove(&owner).unwrap(),
+        );
         let current_ident_and_label_to_local_id =
             std::mem::take(&mut self.ident_and_label_to_local_id);
 
@@ -681,6 +730,10 @@ impl<'a, 'hir> LoweringContext<'a, 'hir> {
         self.impl_trait_defs = current_impl_trait_defs;
         self.impl_trait_bounds = current_impl_trait_bounds;
         self.delayed_lints = current_delayed_lints;
+
+        let _prev_owner_data = std::mem::replace(&mut self.resolver.item, current_ast_owner);
+        #[cfg(debug_assertions)]
+        self.resolver.general.owners.insert(owner, _prev_owner_data);
 
         debug_assert!(!self.children.iter().any(|(id, _)| id == &owner_id.def_id));
         self.children.push((owner_id.def_id, hir::MaybeOwner::Owner(info)));
