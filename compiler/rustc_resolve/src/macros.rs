@@ -569,7 +569,7 @@ impl<'ra, 'tcx> ResolverExpand for Resolver<'ra, 'tcx> {
                 assert!(node_id_to_def_id.is_empty());
             }
         } else {
-            assert!(self.owners.insert(old.id, old).is_none());
+            assert!(self.owners.get_mut(&old.id).unwrap().resolver_data.replace(old).is_none());
         }
         old_id
     }
@@ -581,7 +581,7 @@ impl<'ra, 'tcx> ResolverExpand for Resolver<'ra, 'tcx> {
             self.replace_current_owner(id)
         };
         assert_ne!(old.id, DUMMY_NODE_ID);
-        assert!(self.owners.insert(old.id, old).is_none());
+        assert!(self.owners.get_mut(&old.id).unwrap().resolver_data.replace(old).is_none());
     }
 }
 

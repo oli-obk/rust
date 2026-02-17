@@ -1169,6 +1169,14 @@ pub struct ResolverOutputs {
     pub ast_lowering: ResolverAstLowering,
 }
 
+pub struct Owner {
+    /// Is `None` while the owner is being processed.
+    resolver_data: Option<PerOwnerResolverData>,
+    // TODO
+    #[expect(dead_code)]
+    def_id: LocalDefId,
+}
+
 /// The main resolver class.
 ///
 /// This is the visitor that walks the whole crate.
@@ -1205,7 +1213,7 @@ pub struct Resolver<'ra, 'tcx> {
     pat_span_map: NodeMap<Span> = Default::default(),
 
     /// Preserves per owner data once the owner is finished resolving.
-    owners: NodeMap<PerOwnerResolverData>,
+    owners: NodeMap<Owner>,
 
     /// An entry of `owners` that gets taken out and reinserted whenever an owner is handled.
     current_owner: PerOwnerResolverData,
@@ -1540,7 +1548,10 @@ impl<'tcx> Resolver<'_, 'tcx> {
     /// Returns the previous owner to be stored on the stack and reinserted with [Self::reinsert_prev_owner]
     fn replace_current_owner(&mut self, owner: NodeId) -> PerOwnerResolverData {
         assert_ne!(owner, DUMMY_NODE_ID);
-        std::mem::replace(&mut self.current_owner, self.owners.remove(&owner).unwrap())
+        std::mem::replace(
+            &mut self.current_owner,
+            self.owners.get_mut(&owner).unwrap().resolver_data.take().unwrap(),
+        )
     }
 
     /// Reinsert an owner previously removed and assert the same owner has not been created in the mean time.
@@ -1548,10 +1559,10 @@ impl<'tcx> Resolver<'_, 'tcx> {
         assert_ne!(self.current_owner.id, DUMMY_NODE_ID);
         assert!(
             self.owners
-                .insert(
-                    self.current_owner.id,
-                    std::mem::replace(&mut self.current_owner, prev_owner)
-                )
+                .get_mut(&self.current_owner.id)
+                .unwrap()
+                .resolver_data
+                .replace(std::mem::replace(&mut self.current_owner, prev_owner))
                 .is_none()
         )
     }
@@ -1686,7 +1697,10 @@ impl<'ra, 'tcx> Resolver<'ra, 'tcx> {
         let crate_feed = crate_feed.downgrade();
         owner_data.node_id_to_def_id.insert(CRATE_NODE_ID, crate_feed.key());
         let mut owners = NodeMap::default();
-        owners.insert(CRATE_NODE_ID, owner_data);
+        owners.insert(
+            CRATE_NODE_ID,
+            Owner { resolver_data: Some(owner_data), def_id: crate_feed.key() },
+        );
         feed_for_node_id.insert(CRATE_NODE_ID, crate_feed);
 
         let mut invocation_parents = FxHashMap::default();
@@ -1880,6 +1894,9 @@ impl<'ra, 'tcx> Resolver<'ra, 'tcx> {
                 let parent_module = self
                     .owners
                     .get(&item.parent_module)?
+                    .resolver_data
+                    .as_ref()
+                    .unwrap()
                     .node_id_to_def_id
                     .get(&item.parent_module)?
                     .to_def_id();
@@ -1906,7 +1923,7 @@ impl<'ra, 'tcx> Resolver<'ra, 'tcx> {
             stripped_cfg_items,
         };
         let ast_lowering = ty::ResolverAstLowering {
-            owners: self.owners,
+            owners: self.owners.into_items().map(|(k, v)| (k, v.resolver_data.unwrap())).collect(),
             partial_res_map: self.partial_res_map,
             import_res_map: self.import_res_map,
             label_res_map: self.label_res_map,

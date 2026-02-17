@@ -14,7 +14,7 @@ use rustc_span::hygiene::LocalExpnId;
 use rustc_span::{Span, Symbol, sym};
 use tracing::{debug, instrument};
 
-use crate::{ConstArgContext, ImplTraitContext, InvocationParent, Resolver};
+use crate::{ConstArgContext, ImplTraitContext, InvocationParent, Owner, Resolver};
 
 pub(crate) fn collect_definitions(
     resolver: &mut Resolver<'_, '_>,
@@ -89,7 +89,16 @@ impl<'a, 'ra, 'tcx> DefCollector<'a, 'ra, 'tcx> {
         let orig_owner = mem::replace(&mut self.resolver.current_owner, tables);
         let orig_invoc_owner = mem::replace(&mut self.invocation_parent.owner, owner);
         f(self);
-        self.resolver.reinsert_prev_owner(orig_owner);
+        let tables = mem::replace(&mut self.resolver.current_owner, orig_owner);
+        assert!(
+            self.resolver
+                .owners
+                .insert(
+                    owner,
+                    Owner { def_id: tables.node_id_to_def_id[&owner], resolver_data: Some(tables) }
+                )
+                .is_none()
+        );
         assert_eq!(mem::replace(&mut self.invocation_parent.owner, orig_invoc_owner), owner);
     }
 
