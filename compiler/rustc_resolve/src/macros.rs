@@ -221,7 +221,7 @@ impl<'ra, 'tcx> ResolverExpand for Resolver<'ra, 'tcx> {
         parent_module_id: Option<NodeId>,
     ) -> LocalExpnId {
         let parent_module =
-            parent_module_id.map(|module_id| self.local_def_id(module_id).to_def_id());
+            parent_module_id.map(|module_id| self.owners[&module_id].def_id.to_def_id());
         let expn_id = self.tcx.with_stable_hashing_context(|hcx| {
             LocalExpnId::fresh(
                 ExpnData::allow_unstable(
@@ -363,7 +363,7 @@ impl<'ra, 'tcx> ResolverExpand for Resolver<'ra, 'tcx> {
             if unused_arms.is_empty() {
                 continue;
             }
-            let def_id = self.local_def_id(node_id);
+            let def_id = self.owners[&node_id].def_id;
             let m = &self.local_macro_map[&def_id];
             let SyntaxExtensionKind::MacroRules(ref m) = m.ext.kind else {
                 continue;
@@ -495,7 +495,7 @@ impl<'ra, 'tcx> ResolverExpand for Resolver<'ra, 'tcx> {
     }
 
     fn declare_proc_macro(&mut self, id: NodeId) {
-        self.proc_macros.push(self.local_def_id(id))
+        self.proc_macros.push(self.owners[&id].def_id)
     }
 
     fn append_stripped_cfg_item(

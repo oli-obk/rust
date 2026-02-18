@@ -1522,16 +1522,16 @@ impl<'ra, 'tcx> AsRef<Resolver<'ra, 'tcx>> for Resolver<'ra, 'tcx> {
 }
 
 impl<'tcx> Resolver<'_, 'tcx> {
-    fn local_def_id(&self, node: NodeId) -> LocalDefId {
-        self.feed(node).key()
-    }
-
     fn feed(&self, node: NodeId) -> Feed<'tcx, LocalDefId> {
-        self.feed_for_node_id.get(&node).copied().unwrap_or_else(|| panic!("no entry for node id: `{node:?}`"))
+        self.feed_for_node_id
+            .get(&node)
+            .copied()
+            .unwrap_or_else(|| panic!("no entry for node id: `{node:?}`"))
     }
 
+    /// Obtain the `DefKind` for an owner's `NodeId`.
     fn local_def_kind(&self, node: NodeId) -> DefKind {
-        self.tcx.def_kind(self.local_def_id(node))
+        self.tcx.def_kind(self.owners[&node].def_id)
     }
 
     /// Get a new owner out of the owners table and set it as the current owner.
@@ -2104,7 +2104,7 @@ impl<'ra, 'tcx> Resolver<'ra, 'tcx> {
         let mut import_ids = smallvec![];
         while let DeclKind::Import { import, source_decl, .. } = kind {
             if let Some(node_id) = import.id() {
-                let def_id = self.local_def_id(node_id);
+                let def_id = self.owners[&node_id].def_id;
                 self.maybe_unused_trait_imports.insert(def_id);
                 import_ids.push(def_id);
             }
@@ -2240,7 +2240,7 @@ impl<'ra, 'tcx> Resolver<'ra, 'tcx> {
     #[inline]
     fn add_to_glob_map(&mut self, import: Import<'_>, name: Symbol) {
         if let ImportKind::Glob { id, .. } = import.kind {
-            let def_id = self.local_def_id(id);
+            let def_id = self.owners[&id].def_id;
             self.glob_map.entry(def_id).or_default().insert(name);
         }
     }
