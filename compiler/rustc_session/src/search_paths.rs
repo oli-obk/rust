@@ -61,8 +61,16 @@ impl FilesIndex {
 /// UTF-8, and so a non-UTF-8 filename couldn't be one we're looking for.)
 #[derive(Clone, Debug)]
 pub struct SearchPathFile {
-    pub path: Arc<Path>,
-    pub file_name_str: Arc<str>,
+    // We store the directory in a shared Arc, as many files can share the same directory.
+    dir: Arc<Path>,
+    file_name_str: Arc<str>,
+}
+
+impl SearchPathFile {
+    /// Constructs the full path to the file.
+    pub fn path(&self) -> PathBuf {
+        self.dir.join(&*self.file_name_str)
+    }
 }
 
 #[derive(PartialEq, Clone, Copy, Debug, Hash, Eq, Encodable, Decodable, HashStable_Generic)]
@@ -129,6 +137,7 @@ impl SearchPath {
     }
 
     pub fn new(kind: PathKind, dir: PathBuf) -> Self {
+        let dir_file: Arc<Path> = dir.clone().into();
         // Get the files within the directory.
         let mut files = match std::fs::read_dir(&dir) {
             Ok(files) => files
@@ -136,11 +145,11 @@ impl SearchPath {
                     e.ok().and_then(|e| {
                         e.file_name().to_str().map(|s| {
                             let file_name_str: Arc<str> = s.into();
-                            SearchPathFile { path: e.path().into(), file_name_str }
+                            SearchPathFile { dir: dir_file.clone(), file_name_str }
                         })
                     })
                 })
-                .collect::<Vec<_>>(),
+                .collect::<Vec<SearchPathFile>>(),
 
             Err(..) => Default::default(),
         };
