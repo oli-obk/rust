@@ -302,14 +302,12 @@ impl<'tcx> ImplTraitHeader<'tcx> {
                             ControlFlow::Break(())
                         }
                     }
-                    RegionKind::ReBound(..) | RegionKind::ReLateParam(_) => {
-                        ControlFlow::Continue(())
-                    }
-                    RegionKind::ReStatic
-                    | RegionKind::ReVar(_)
+                    RegionKind::ReBound(..) => ControlFlow::Continue(()),
+                    RegionKind::ReStatic | RegionKind::ReError(_) => ControlFlow::Break(()),
+                    RegionKind::ReVar(_)
                     | RegionKind::RePlaceholder(_)
                     | RegionKind::ReErased
-                    | RegionKind::ReError(_) => ControlFlow::Break(()),
+                    | RegionKind::ReLateParam(_) => bug!("unexpected lifetime in impl: {r:?}"),
                 }
             }
 

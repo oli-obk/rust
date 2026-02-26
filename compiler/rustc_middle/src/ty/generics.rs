@@ -432,15 +432,16 @@ impl<'tcx> GenericPredicates<'tcx> {
             type Result = ControlFlow<()>;
             fn visit_region(&mut self, r: Region<'tcx>) -> Self::Result {
                 match r.kind() {
-                    RegionKind::ReEarlyParam(_)
-                    | RegionKind::ReStatic
-                    | RegionKind::ReVar(_)
+                    RegionKind::ReEarlyParam(_) | RegionKind::ReStatic | RegionKind::ReError(_) => {
+                        ControlFlow::Break(())
+                    }
+                    RegionKind::ReVar(_)
                     | RegionKind::RePlaceholder(_)
                     | RegionKind::ReErased
-                    | RegionKind::ReError(_) => ControlFlow::Break(()),
-                    RegionKind::ReBound(..) | RegionKind::ReLateParam(_) => {
-                        ControlFlow::Continue(())
+                    | RegionKind::ReLateParam(_) => {
+                        bug!("unexpected lifetime in impl: {r:?}")
                     }
+                    RegionKind::ReBound(..) => ControlFlow::Continue(()),
                 }
             }
 
