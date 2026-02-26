@@ -16,10 +16,13 @@ const _: () = {
 
 struct Thing2<T>(T);
 impl<T: std::fmt::Debug> Trait for Thing2<T> {}
+struct NoDebug;
 
 const _: () = {
     let thing = Thing2(1);
     assert!(try_as_dyn::<_, dyn Trait>(&thing).is_some());
+    let thing = Thing2(NoDebug);
+    assert!(try_as_dyn::<_, dyn Trait>(&thing).is_none());
 };
 
 trait Trait2 {}

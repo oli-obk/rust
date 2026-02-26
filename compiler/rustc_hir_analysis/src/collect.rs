@@ -1347,7 +1347,11 @@ pub fn suggest_impl_trait<'tcx>(
 
 fn impl_is_fully_generic_for_reflection(tcx: TyCtxt<'_>, def_id: LocalDefId) -> bool {
     tcx.impl_trait_header(def_id).is_fully_generic_for_reflection()
-        && tcx.explicit_predicates_of(def_id).is_fully_generic_for_reflection()
+        && rustc_trait_selection::traits::elaborate(
+            tcx,
+            tcx.predicates_of(def_id).instantiate_identity(tcx).into_iter(),
+        )
+        .all(|(clause, _)| clause.is_fully_generic_for_reflection())
 }
 
 fn impl_trait_header(tcx: TyCtxt<'_>, def_id: LocalDefId) -> ty::ImplTraitHeader<'_> {

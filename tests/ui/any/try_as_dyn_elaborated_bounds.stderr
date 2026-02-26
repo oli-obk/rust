@@ -1,9 +1,0 @@
-error[E0080]: evaluation panicked: assertion failed: try_as_dyn::<Foo<()>, dyn Other>(&Foo(())).is_some()
-  --> $DIR/try_as_dyn_elaborated_bounds.rs:13:5
-   |
-LL |     assert!(try_as_dyn::<Foo<()>, dyn Other>(&Foo(())).is_some());
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ evaluation of `_` failed here
-
-error: aborting due to 1 previous error
-
-For more information about this error, try `rustc --explain E0080`.

@@ -1,3 +1,6 @@
+//@ revisions: next old
+//@[next] compile-flags: -Znext-solver
+
 #![feature(try_as_dyn)]
 
 use std::any::try_as_dyn;
@@ -10,7 +13,9 @@ struct Foo<T>(T);
 impl<T: Trait> Other for Foo<T> {}
 
 const _: () = {
-    assert!(try_as_dyn::<Foo<()>, dyn Other>(&Foo(())).is_some());
+    let foo = Foo(());
+    // TODO
+    assert!(try_as_dyn::<Foo<()>, dyn Other>(&foo).is_some());
     //~^ ERROR: assertion failed
 };
 
