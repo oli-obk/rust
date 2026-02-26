@@ -144,7 +144,7 @@ impl SearchPath {
 
             Err(..) => Default::default(),
         };
-        files.sort_by(|lhs, rhs| lhs.file_name_str.cmp(&rhs.file_name_str));
+        files.sort_unstable_by(|lhs, rhs| lhs.file_name_str.cmp(&rhs.file_name_str));
         let files = FilesIndex(files);
         SearchPath { kind, dir, files }
     }
