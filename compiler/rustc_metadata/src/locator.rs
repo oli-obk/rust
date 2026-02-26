@@ -438,7 +438,7 @@ impl<'a> CrateLocator<'a> {
                 }
                 if let Some(matches) = spf.query(prefix, suffix) {
                     for (hash, spf) in matches {
-                        let spf_path = spf.path();
+                        let spf_path = spf.path(&search_path.dir);
                         info!("lib candidate: {}", spf_path.display());
 
                         let (rlibs, rmetas, dylibs, interfaces) =
@@ -471,9 +471,10 @@ impl<'a> CrateLocator<'a> {
                 .flatten()
             {
                 for (_, spf) in static_matches {
-                    crate_rejections
-                        .via_kind
-                        .push(CrateMismatch { path: spf.path(), got: "static".to_string() });
+                    crate_rejections.via_kind.push(CrateMismatch {
+                        path: spf.path(&search_path.dir),
+                        got: "static".to_string(),
+                    });
                 }
             }
         }
