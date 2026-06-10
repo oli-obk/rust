@@ -2830,20 +2830,12 @@ impl<'ra, 'tcx> Resolver<'ra, 'tcx> {
     /// ```
     fn mention_default_field_values(
         &self,
-        source: &Option<ast::Expr>,
+        source: &Option<(Box<ast::StructExpr>, DefId)>,
         ident: Ident,
         err: &mut Diag<'_>,
     ) {
-        let Some(expr) = source else { return };
-        let ast::ExprKind::Struct(struct_expr) = &expr.kind else { return };
-        // We don't have to handle type-relative paths because they're forbidden in ADT
-        // expressions, but that would change with `#[feature(more_qualified_paths)]`.
-        let Some(segment) = struct_expr.path.segments.last() else { return };
-        let Some(partial_res) = self.partial_res_map.get(&segment.id) else { return };
-        let Some(Res::Def(_, def_id)) = partial_res.full_res() else {
-            return;
-        };
-        let Some(default_fields) = self.field_defaults(def_id) else { return };
+        let Some((struct_expr, def_id)) = source else { return };
+        let Some(default_fields) = self.field_defaults(*def_id) else { return };
         if struct_expr.fields.is_empty() {
             return;
         }
@@ -2876,7 +2868,7 @@ impl<'ra, 'tcx> Resolver<'ra, 'tcx> {
                              the default value defined for it in `{}` using `..` in the struct \
                              initializer expression",
                             field.ident,
-                            self.tcx.item_name(def_id),
+                            self.tcx.item_name(*def_id),
                         ),
                         sugg,
                         Applicability::MachineApplicable,

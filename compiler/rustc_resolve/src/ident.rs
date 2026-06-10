@@ -2034,14 +2034,31 @@ impl<'ra, 'tcx> Resolver<'ra, 'tcx> {
                     // to detect the item the user cares about and either find an alternative import, or tell
                     // the user it is not accessible.
                     if finalize.is_some() {
-                        for error in &mut self.get_mut().privacy_errors[privacy_errors_len..] {
+                        let mut privacy_errors = std::mem::take(&mut self.get_mut().privacy_errors);
+                        for error in &mut privacy_errors[privacy_errors_len..] {
                             error.outermost_res = Some((res, ident));
-                            error.source = match source {
-                                Some(PathSource::Struct(Some(expr)))
-                                | Some(PathSource::Expr(Some(expr))) => Some(expr.clone()),
+                            error.source = source.and_then(|source| match source {
+                                PathSource::Struct(Some(expr)) | PathSource::Expr(Some(expr)) => {
+                                    match &expr.kind {
+                                        ast::ExprKind::Struct(struct_expr) => {
+                                            // We don't have to handle type-relative paths because they're forbidden in ADT
+                                            // expressions, but that would change with `#[feature(more_qualified_paths)]`.
+                                            let segment = struct_expr.path.segments.last()?;
+                                            let partial_res =
+                                                self.partial_res_map.get(&segment.id)?;
+                                            let Some(Res::Def(_, def_id)) = partial_res.full_res()
+                                            else {
+                                                return None;
+                                            };
+                                            Some((struct_expr.clone(), def_id))
+                                        }
+                                        _ => None,
+                                    }
+                                }
                                 _ => None,
-                            };
+                            });
                         }
+                        self.get_mut().privacy_errors = privacy_errors;
                     }
 
                     let maybe_assoc = opt_ns != Some(MacroNS) && PathSource::Type.is_expected(res);

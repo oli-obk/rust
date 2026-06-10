@@ -1035,7 +1035,7 @@ struct PrivacyError<'ra> {
     parent_scope: ParentScope<'ra>,
     /// Is the format `use a::{b,c}`?
     single_nested: bool,
-    source: Option<ast::Expr>,
+    source: Option<(Box<ast::StructExpr>, DefId)>,
 }
 
 #[derive(Debug)]
