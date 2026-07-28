@@ -14,7 +14,7 @@ use rustc_middle::ty::{
 };
 use rustc_span::{ErrorGuaranteed, Ident, Span, kw};
 use rustc_trait_selection::traits;
-use tracing::{debug, instrument};
+use tracing::{debug, instrument, trace};
 
 use crate::diagnostics;
 use crate::hir_ty_lowering::{
@@ -451,7 +451,9 @@ impl<'tcx> dyn HirTyLowerer<'tcx> + '_ {
         }
 
         let projection_term = if let ty::AssocTag::Fn = assoc_tag {
+            trace!(?constraint.hir_id);
             let bound_vars = tcx.late_bound_vars(constraint.hir_id);
+            trace!(?bound_vars);
             ty::Binder::bind_with_vars(
                 self.lower_return_type_notation_ty(candidate, assoc_item.def_id, path_span)?.into(),
                 bound_vars,

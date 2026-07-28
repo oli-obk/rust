@@ -1,8 +1,12 @@
 //@ needs-rustc-debug-assertions
-//@ known-bug: #133613
+//! This test used to ICE #133613
 
-struct Wrapper<'a>();
+#![feature(return_type_notation)]
+
+struct Wrapper();
 
 trait IntFactory {
     fn stream(&self) -> impl IntFactory<stream(..): IntFactory<stream(..): Send>>;
 }
+
+fn main() {}

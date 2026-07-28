@@ -50,6 +50,7 @@ where
         Binder { value, bound_vars: Default::default() }
     }
 
+    #[instrument(level = "trace")]
     pub fn bind_with_vars(value: T, bound_vars: I::BoundVarKinds) -> Binder<I, T> {
         if cfg!(debug_assertions) {
             let mut validator = ValidateBoundVars::new(bound_vars);
