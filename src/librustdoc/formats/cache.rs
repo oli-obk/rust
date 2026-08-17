@@ -361,12 +361,7 @@ impl DocFolder for CacheBuilder<'_, '_> {
             | clean::VariantItem(..) => {
                 use rustc_data_structures::fx::IndexEntry as Entry;
 
-                let skip_because_unstable = matches!(
-                    item.stability.map(|stab| stab.level),
-                    Some(StabilityLevel::Stable { allowed_through_unstable_modules: Some(_), .. })
-                );
-
-                if (!self.cache.stripped_mod && !skip_because_unstable) || self.is_json_output {
+                if !self.cache.stripped_mod || self.is_json_output {
                     // Re-exported items mean that the same id can show up twice
                     // in the rustdoc ast that we're looking at. We know,
                     // however, that a re-exported item doesn't show up in the

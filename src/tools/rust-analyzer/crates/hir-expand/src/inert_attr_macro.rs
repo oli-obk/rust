@@ -363,9 +363,6 @@ pub const INERT_ATTRIBUTES: &[BuiltinAttribute] = &[
         allow_internal_unsafe, Normal, template!(Word), WarnFollowing,
         "allow_internal_unsafe side-steps the unsafe_code lint",
     ),
-    rustc_attr!(rustc_allowed_through_unstable_modules, Normal, template!(Word), WarnFollowing,
-    "rustc_allowed_through_unstable_modules special cases accidental stabilizations of stable items \
-    through unstable paths"),
 
     // ==========================================================================
     // Internal attributes: Type system related:

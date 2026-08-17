@@ -45,7 +45,6 @@ const ALLOWED_TARGETS: AllowedTargets<'_> = AllowedTargets::AllowList(&[
 
 #[derive(Default)]
 pub(crate) struct StabilityParser {
-    allowed_through_unstable_modules: Option<Symbol>,
     stability: Option<(Stability, Span)>,
 }
 
@@ -87,40 +86,10 @@ impl AttributeParser for StabilityParser {
                 }
             },
         ),
-        (
-            &[sym::rustc_allowed_through_unstable_modules],
-            template!(NameValueStr: "deprecation message"),
-            unstable!(staged_api),
-            |this, cx, args| {
-                let Some(nv) = cx.expect_name_value(args, cx.attr_span, None) else {
-                    return;
-                };
-                let Some(value_str) = cx.expect_string_literal(nv) else {
-                    return;
-                };
-                this.allowed_through_unstable_modules = Some(value_str);
-            },
-        ),
     ];
     const ALLOWED_TARGETS: AllowedTargets<'_> = ALLOWED_TARGETS;
 
-    fn finalize(mut self, cx: &FinalizeContext<'_, '_>) -> Option<AttributeKind> {
-        if let Some(atum) = self.allowed_through_unstable_modules {
-            if let Some((
-                Stability {
-                    level: StabilityLevel::Stable { ref mut allowed_through_unstable_modules, .. },
-                    ..
-                },
-                _,
-            )) = self.stability
-            {
-                *allowed_through_unstable_modules = Some(atum);
-            } else {
-                cx.dcx()
-                    .emit_err(diagnostics::RustcAllowedUnstablePairing { span: cx.target_span });
-            }
-        }
-
+    fn finalize(self, cx: &FinalizeContext<'_, '_>) -> Option<AttributeKind> {
         if let Some((Stability { level: StabilityLevel::Stable { .. }, .. }, _)) = self.stability {
             for other_attr in cx.all_attrs {
                 if other_attr.word_is(sym::unstable_feature_bound) {
@@ -339,7 +308,7 @@ pub(crate) fn parse_stability(
 
     match feature {
         Ok(feature) => {
-            let level = StabilityLevel::Stable { since, allowed_through_unstable_modules: None };
+            let level = StabilityLevel::Stable { since };
             Some((feature, level))
         }
         Err(ErrorGuaranteed { .. }) => None,

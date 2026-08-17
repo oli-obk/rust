@@ -50,20 +50,13 @@ impl DocFolder for StabilityPropagator<'_, '_> {
                     )
                 });
                 let own_stability = if let Some(item_stab) = item_stability
-                    && let StabilityLevel::Stable { since: _, allowed_through_unstable_modules } =
-                        item_stab.level
+                    && let StabilityLevel::Stable { since: _ } = item_stab.level
                     && let Some(mut inline_stab) = inline_stability
-                    && let StabilityLevel::Stable {
-                        since: inline_since,
-                        allowed_through_unstable_modules: _,
-                    } = inline_stab.level
+                    && let StabilityLevel::Stable { since: inline_since } = inline_stab.level
                     && let Some(is_global_export) = is_glob_export
                     && !is_global_export
                 {
-                    inline_stab.level = StabilityLevel::Stable {
-                        since: inline_since,
-                        allowed_through_unstable_modules,
-                    };
+                    inline_stab.level = StabilityLevel::Stable { since: inline_since };
                     Some(inline_stab)
                 } else {
                     item_stability
@@ -136,7 +129,7 @@ fn merge_stability(
     parent_stability: Option<Stability>,
 ) -> Option<Stability> {
     if let Some(own_stab) = own_stability
-        && let StabilityLevel::Stable { since: own_since, allowed_through_unstable_modules: None } =
+        && let StabilityLevel::Stable { since: own_since } =
             own_stab.level
         && let Some(parent_stab) = parent_stability
         && (parent_stab.is_unstable()
@@ -144,12 +137,12 @@ fn merge_stability(
     {
         parent_stability
     } else if let Some(mut own_stab) = own_stability
-        && let StabilityLevel::Stable { since, allowed_through_unstable_modules: Some(_) } =
+        && let StabilityLevel::Stable { since } =
             own_stab.level
         && parent_stability.is_some_and(|stab| stab.is_stable())
     {
         // this property does not apply transitively through re-exports
-        own_stab.level = StabilityLevel::Stable { since, allowed_through_unstable_modules: None };
+        own_stab.level = StabilityLevel::Stable { since };
         Some(own_stab)
     } else {
         own_stability

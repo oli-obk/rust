@@ -240,12 +240,6 @@ fn is_stable(cx: &LateContext<'_>, mut def_id: DefId, msrv: Msrv) -> bool {
     loop {
         if let Some(stability) = cx.tcx.lookup_stability(def_id) {
             match stability.level {
-                // Workaround for items from `core::intrinsics` with a stable export in a different module.
-                // Not that we ignore the `since` field as we are already accessing the item in question.
-                StabilityLevel::Stable {
-                    allowed_through_unstable_modules: Some(_),
-                    ..
-                } => return true,
                 StabilityLevel::Stable { since, .. } => match since {
                     StableSince::Version(v) if !msrv.meets(cx, v) => return false,
                     StableSince::Current if msrv.current(cx).is_none() => return false,

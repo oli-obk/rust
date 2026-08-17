@@ -445,25 +445,7 @@ impl Item {
     }
 
     pub(crate) fn deprecation(&self, tcx: TyCtxt<'_>) -> Option<Deprecation> {
-        self.def_id().and_then(|did| tcx.lookup_deprecation(did)).or_else(|| {
-            // `allowed_through_unstable_modules` is a bug-compatibility hack for old rustc
-            // versions; the paths that are exposed through it are "deprecated" because they
-            // were never supposed to work at all.
-            let stab = self.stability(tcx)?;
-            if let rustc_hir::StabilityLevel::Stable {
-                allowed_through_unstable_modules: Some(note),
-                ..
-            } = stab.level
-            {
-                Some(Deprecation {
-                    since: DeprecatedSince::Unspecified,
-                    note: Some(Ident { name: note, span: DUMMY_SP }),
-                    suggestion: None,
-                })
-            } else {
-                None
-            }
-        })
+        self.def_id().and_then(|did| tcx.lookup_deprecation(did))
     }
 
     pub(crate) fn is_deprecated(&self, tcx: TyCtxt<'_>) -> bool {

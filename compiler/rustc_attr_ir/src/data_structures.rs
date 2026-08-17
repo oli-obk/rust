@@ -1678,7 +1678,7 @@ pub enum AttributeKind {
     /// Represents `#[rustc_splat]`
     Splat(Span),
 
-    /// Represents `#[stable]`, `#[unstable]` and `#[rustc_allowed_through_unstable_modules]`.
+    /// Represents `#[stable]`, `#[unstable]`.
     Stability {
         stability: Stability,
         /// Span of the attribute.

@@ -1130,13 +1130,6 @@ pub(crate) struct RustcPromotablePairing {
 }
 
 #[derive(Diagnostic)]
-#[diag("`rustc_allowed_through_unstable_modules` attribute must be paired with a `stable` attribute", code = E0789)]
-pub(crate) struct RustcAllowedUnstablePairing {
-    #[primary_span]
-    pub span: Span,
-}
-
-#[derive(Diagnostic)]
 #[diag("suggestions on deprecated items are unstable")]
 pub(crate) struct DeprecatedItemSuggestion {
     #[primary_span]
