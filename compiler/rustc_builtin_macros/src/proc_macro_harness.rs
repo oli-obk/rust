@@ -39,7 +39,6 @@ enum ProcMacro {
 struct CollectProcMacros<'a> {
     macros: Vec<ProcMacro>,
     in_root: bool,
-    dcx: DiagCtxtHandle<'a>,
     session: &'a Session,
     source_map: &'a SourceMap,
     is_proc_macro_crate: bool,
@@ -54,7 +53,6 @@ pub fn inject(
     is_proc_macro_crate: bool,
     has_proc_macro_decls: bool,
     is_test_crate: bool,
-    dcx: DiagCtxtHandle<'_>,
 ) {
     let ecfg = ExpansionConfig::default(sym::proc_macro, features);
     let mut cx = ExtCtxt::new(sess, ecfg, resolver, None);
@@ -62,7 +60,6 @@ pub fn inject(
     let mut collect = CollectProcMacros {
         macros: Vec::new(),
         in_root: true,
-        dcx,
         session: sess,
         source_map: sess.source_map(),
         is_proc_macro_crate,
@@ -89,7 +86,7 @@ pub fn inject(
 impl<'a> CollectProcMacros<'a> {
     fn check_not_pub_in_root(&self, vis: &ast::Visibility, sp: Span) {
         if self.is_proc_macro_crate && self.in_root && vis.kind.is_pub() {
-            self.dcx.emit_err(diagnostics::ProcMacro { span: sp });
+            self.dcx().emit_err(diagnostics::ProcMacro { span: sp });
         }
     }
 
@@ -122,7 +119,7 @@ impl<'a> CollectProcMacros<'a> {
             } else {
                 "functions tagged with `#[proc_macro_derive]` must be `pub`"
             };
-            self.dcx.span_err(self.source_map.guess_head_span(item.span), msg);
+            self.dcx().span_err(self.source_map.guess_head_span(item.span), msg);
         }
     }
 
@@ -140,7 +137,7 @@ impl<'a> CollectProcMacros<'a> {
             } else {
                 "functions tagged with `#[proc_macro_attribute]` must be `pub`"
             };
-            self.dcx.span_err(self.source_map.guess_head_span(item.span), msg);
+            self.dcx().span_err(self.source_map.guess_head_span(item.span), msg);
         }
     }
 
@@ -158,8 +155,12 @@ impl<'a> CollectProcMacros<'a> {
             } else {
                 "functions tagged with `#[proc_macro]` must be `pub`"
             };
-            self.dcx.span_err(self.source_map.guess_head_span(item.span), msg);
+            self.dcx().span_err(self.source_map.guess_head_span(item.span), msg);
         }
+    }
+
+    fn dcx(&self) -> DiagCtxtHandle<'a> {
+        self.session.dcx()
     }
 }
 
@@ -167,7 +168,7 @@ impl<'a> Visitor<'a> for CollectProcMacros<'a> {
     fn visit_item(&mut self, item: &'a ast::Item) {
         if let ast::ItemKind::MacroDef(..) = item.kind {
             if self.is_proc_macro_crate && attr::contains_name(&item.attrs, sym::macro_export) {
-                self.dcx.emit_err(diagnostics::ExportMacroRules {
+                self.dcx().emit_err(diagnostics::ExportMacroRules {
                     span: self.source_map.guess_head_span(item.span),
                 });
             }
@@ -196,7 +197,7 @@ impl<'a> Visitor<'a> for CollectProcMacros<'a> {
                         )
                     };
 
-                    self.dcx
+                    self.dcx()
                         .struct_span_err(attr.span, msg)
                         .with_span_label(prev_attr.span, "previous attribute here")
                         .emit();
@@ -231,7 +232,7 @@ impl<'a> Visitor<'a> for CollectProcMacros<'a> {
 
         if !self.is_proc_macro_crate {
             let path = &attr.get_normal_item().path;
-            self.dcx.emit_err(diagnostics::AttributeOnlyUsableWithCrateType {
+            self.dcx().emit_err(diagnostics::AttributeOnlyUsableWithCrateType {
                 span: path.span,
                 path: &pprust::path_to_string(&attr.get_normal_item().path),
             });
