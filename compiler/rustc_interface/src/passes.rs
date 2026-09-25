@@ -304,7 +304,6 @@ fn configure_and_expand(
             is_proc_macro_crate,
             has_proc_macro_decls,
             is_test_crate,
-            sess.dcx(),
         )
     });
 
