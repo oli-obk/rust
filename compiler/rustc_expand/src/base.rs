@@ -1057,6 +1057,10 @@ pub trait ResolverExpand {
         force: bool,
     ) -> Result<Arc<SyntaxExtension>, Indeterminate>;
 
+    fn resolve_path(&mut self, path: &ast::Path) -> Result<DefId, Indeterminate>;
+
+    fn has_eq_impl(&mut self, id: DefId, span: Span) -> bool;
+
     fn record_macro_rule_usage(&mut self, mac_id: NodeId, rule_index: usize);
 
     fn check_unused_macros(&mut self);
