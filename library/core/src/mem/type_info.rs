@@ -790,3 +790,13 @@ impl FieldId {
         intrinsics::field_representing_type_offset(self.frt_type_id)
     }
 }
+
+/// Demo for accessing type information during macro expansion
+#[macro_export]
+#[rustc_builtin_macro(expansion_time_type_system_demo)]
+#[unstable(feature = "ettsd", issue = "123646")]
+macro_rules! expansion_time_type_system_demo {
+    ($($arg:tt)*) => {
+        /* compiler built-in */
+    };
+}

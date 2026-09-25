@@ -1,0 +1,9 @@
+error[E0391]: cycle detected when getting the resolver for lowering
+   |
+   = note: ...which requires calculating the lang items map...
+   = note: ...which again requires getting the resolver for lowering, completing the cycle
+   = note: for more information, see <https://rustc-dev-guide.rust-lang.org/overview.html#queries> and <https://rustc-dev-guide.rust-lang.org/query.html>
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0391`.

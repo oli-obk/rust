@@ -936,6 +936,7 @@ symbols! {
         exp2,
         expand1,
         expand2,
+        expansion_time_type_system_demo,
         expect,
         expected,
         explicit_extern_abis,

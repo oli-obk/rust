@@ -37,6 +37,7 @@ mod diagnostics;
 mod edition_panic;
 mod eii;
 mod env;
+mod ettsd;
 mod format;
 mod format_foreign;
 mod gca;
@@ -84,6 +85,7 @@ pub fn register_builtin_macros(resolver: &mut dyn ResolverExpand) {
         const_format_args: format::expand_format_args,
         core_panic: edition_panic::expand_panic,
         env: env::expand_env,
+        expansion_time_type_system_demo: ettsd::expand,
         file: source_util::expand_file,
         format_args: format::expand_format_args,
         format_args_nl: format::expand_format_args_nl,

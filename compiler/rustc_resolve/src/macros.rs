@@ -6,7 +6,9 @@ use std::sync::Arc;
 
 use rustc_ast::{self as ast, Crate, DelegationSuffixes, NodeId};
 use rustc_ast_pretty::pprust;
-use rustc_attr_ir::{Attribute, AttributeKind, CfgEntry, StabilityLevel, StrippedCfgItem};
+use rustc_attr_ir::{
+    Attribute, AttributeKind, CfgEntry, LangItem, StabilityLevel, StrippedCfgItem,
+};
 use rustc_attr_parsing::AttributeParser;
 use rustc_data_structures::sync::RwLock;
 use rustc_errors::{Applicability, StashKey};
@@ -19,7 +21,7 @@ use rustc_expand::expand::{
     AstFragment, AstFragmentKind, Invocation, InvocationKind, SupportsMacroExpansion,
 };
 use rustc_hir::def::{DefKind, MacroKinds, Namespace, NonMacroAttrKind};
-use rustc_hir::def_id::{CrateNum, DefId, LocalDefId};
+use rustc_hir::def_id::{CRATE_DEF_ID, CrateNum, DefId, LocalDefId};
 use rustc_lint_defs::builtin::{
     LEGACY_DERIVE_HELPERS, OUT_OF_SCOPE_MACRO_CALLS, UNUSED_MACRO_RULES, UNUSED_MACROS,
 };
@@ -591,6 +593,44 @@ impl<'ra, 'tcx> ResolverExpand for Resolver<'ra, 'tcx> {
 
     fn insert_impl_trait_name(&mut self, id: NodeId, name: Symbol) {
         self.impl_trait_names.insert(id, name);
+    }
+
+    fn resolve_path(&mut self, path: &ast::Path) -> Result<DefId, Indeterminate> {
+        let parent_scope = ParentScope::module(
+            self.get_module(CRATE_DEF_ID.into()).unwrap().expect_local(),
+            self.arenas,
+        );
+        let res = self.cm_mut().resolve_path(
+            &Segment::from_path(path),
+            Some(Namespace::TypeNS),
+            &parent_scope,
+            None,
+            None,
+            None,
+        );
+        match res {
+            PathResult::Module(_) => todo!(),
+            PathResult::NonModule(partial_res) => {
+                partial_res.expect_full_res().opt_def_id().ok_or(Indeterminate)
+            }
+            PathResult::Indeterminate => Err(Indeterminate),
+            PathResult::Failed { span, message, .. } => {
+                self.dcx().span_err(span, message);
+                Err(Indeterminate)
+            }
+        }
+    }
+
+    fn has_eq_impl(&mut self, id: DefId, span: Span) -> bool {
+        let ty = self.tcx.type_of(id).instantiate_identity().skip_norm_wip();
+        let eq_id = self.tcx.require_lang_item(LangItem::PartialEq, span);
+        self.tcx.trait_impls_in_crate(id.krate).iter().any(|&impl_id| {
+            let header = self.tcx.impl_trait_header(impl_id);
+            header.trait_ref.instantiate_identity().skip_norm_wip().self_ty() == ty && {
+                let trait_id = header.trait_ref.def_id();
+                trait_id == eq_id
+            }
+        })
     }
 }
 
