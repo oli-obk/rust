@@ -11,7 +11,6 @@ use rustc_expand::expand::{AstFragment, ExpansionConfig};
 use rustc_feature::Features;
 use rustc_session::Session;
 use rustc_span::hygiene::AstPass;
-use rustc_span::source_map::SourceMap;
 use rustc_span::{DUMMY_SP, Ident, Span, kw, sym};
 use smallvec::smallvec;
 use thin_vec::{ThinVec, thin_vec};
@@ -40,7 +39,6 @@ struct CollectProcMacros<'a> {
     macros: Vec<ProcMacro>,
     in_root: bool,
     session: &'a Session,
-    source_map: &'a SourceMap,
     is_proc_macro_crate: bool,
     is_test_crate: bool,
 }
@@ -61,7 +59,6 @@ pub fn inject(
         macros: Vec::new(),
         in_root: true,
         session: sess,
-        source_map: sess.source_map(),
         is_proc_macro_crate,
         is_test_crate,
     };
@@ -86,6 +83,7 @@ pub fn inject(
 impl<'a> CollectProcMacros<'a> {
     fn check_not_pub_in_root(&self, vis: &ast::Visibility, sp: Span) {
         if self.is_proc_macro_crate && self.in_root && vis.kind.is_pub() {
+            let sp = self.session.source_map().guess_head_span(sp);
             self.dcx().emit_err(diagnostics::ProcMacro { span: sp });
         }
     }
@@ -119,7 +117,7 @@ impl<'a> CollectProcMacros<'a> {
             } else {
                 "functions tagged with `#[proc_macro_derive]` must be `pub`"
             };
-            self.dcx().span_err(self.source_map.guess_head_span(item.span), msg);
+            self.dcx().span_err(self.session.source_map().guess_head_span(item.span), msg);
         }
     }
 
@@ -137,7 +135,7 @@ impl<'a> CollectProcMacros<'a> {
             } else {
                 "functions tagged with `#[proc_macro_attribute]` must be `pub`"
             };
-            self.dcx().span_err(self.source_map.guess_head_span(item.span), msg);
+            self.dcx().span_err(self.session.source_map().guess_head_span(item.span), msg);
         }
     }
 
@@ -155,7 +153,7 @@ impl<'a> CollectProcMacros<'a> {
             } else {
                 "functions tagged with `#[proc_macro]` must be `pub`"
             };
-            self.dcx().span_err(self.source_map.guess_head_span(item.span), msg);
+            self.dcx().span_err(self.session.source_map().guess_head_span(item.span), msg);
         }
     }
 
@@ -169,7 +167,7 @@ impl<'a> Visitor<'a> for CollectProcMacros<'a> {
         if let ast::ItemKind::MacroDef(..) = item.kind {
             if self.is_proc_macro_crate && attr::contains_name(&item.attrs, sym::macro_export) {
                 self.dcx().emit_err(diagnostics::ExportMacroRules {
-                    span: self.source_map.guess_head_span(item.span),
+                    span: self.session.source_map().guess_head_span(item.span),
                 });
             }
         }
@@ -210,7 +208,7 @@ impl<'a> Visitor<'a> for CollectProcMacros<'a> {
         }
 
         let Some(attr) = found_attr else {
-            self.check_not_pub_in_root(&item.vis, self.source_map.guess_head_span(item.span));
+            self.check_not_pub_in_root(&item.vis, item.span);
             let prev_in_root = mem::replace(&mut self.in_root, false);
             visit::walk_item(self, item);
             self.in_root = prev_in_root;
