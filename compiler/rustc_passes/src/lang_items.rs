@@ -7,13 +7,11 @@
 //! * Traits that represent operators; e.g., `Add`, `Sub`, `Index`.
 //! * Functions called by the compiler itself.
 
-use rustc_ast as ast;
-use rustc_ast::visit;
+use rustc_ast::{self as ast, NodeId, visit};
 use rustc_attr_ir::lang_items::{GenericRequirement, LangItem, LanguageItems};
 use rustc_attr_ir::target::Target;
 use rustc_crate_store::ExternCrate;
 use rustc_hir::def_id::{DefId, LocalDefId};
-use rustc_middle::middle::resolve::ResolverAstLowering;
 use rustc_middle::query::Providers;
 use rustc_middle::ty::TyCtxt;
 use rustc_span::{Span, Symbol, sym};
@@ -30,16 +28,21 @@ pub(crate) enum Duplicate {
 struct LanguageItemCollector<'ast, 'tcx> {
     items: LanguageItems,
     tcx: TyCtxt<'tcx>,
-    resolver: &'ast ResolverAstLowering<'tcx>,
+    node_id_to_def_id: &'ast dyn Fn(NodeId, NodeId) -> LocalDefId,
     parent_item: Option<&'ast ast::Item>,
 }
 
 impl<'ast, 'tcx> LanguageItemCollector<'ast, 'tcx> {
     fn new(
         tcx: TyCtxt<'tcx>,
-        resolver: &'ast ResolverAstLowering<'tcx>,
+        node_id_to_def_id: &'ast dyn Fn(NodeId, NodeId) -> LocalDefId,
     ) -> LanguageItemCollector<'ast, 'tcx> {
-        LanguageItemCollector { tcx, resolver, items: LanguageItems::new(), parent_item: None }
+        LanguageItemCollector {
+            tcx,
+            node_id_to_def_id,
+            items: LanguageItems::new(),
+            parent_item: None,
+        }
     }
 
     fn check_for_lang(
@@ -245,8 +248,16 @@ fn get_lang_items(tcx: TyCtxt<'_>, (): ()) -> LanguageItems {
     let resolver = &*resolver.borrow();
     let krate = &*krate.borrow();
 
+    let node_id_to_def_id = |owner, id| {
+        if owner == id {
+            resolver.owners[&owner].def_id
+        } else {
+            resolver.owners[&owner].node_id_to_def_id[&id]
+        }
+    };
+
     // Initialize the collector.
-    let mut collector = LanguageItemCollector::new(tcx, resolver);
+    let mut collector = LanguageItemCollector::new(tcx, &node_id_to_def_id);
 
     // Collect lang items in other crates.
     for &cnum in tcx.used_crates(()).iter() {
@@ -271,7 +282,7 @@ impl<'ast, 'tcx> visit::Visitor<'ast> for LanguageItemCollector<'ast, 'tcx> {
 
         self.check_for_lang(
             target,
-            self.resolver.owners[&i.id].def_id,
+            (self.node_id_to_def_id)(i.id, i.id),
             &i.attrs,
             i.span,
             i.opt_generics(),
@@ -285,7 +296,7 @@ impl<'ast, 'tcx> visit::Visitor<'ast> for LanguageItemCollector<'ast, 'tcx> {
     fn visit_foreign_item(&mut self, i: &'ast ast::ForeignItem) {
         self.check_for_lang(
             Target::from_foreign_item_kind(&i.kind),
-            self.resolver.owners[&i.id].def_id,
+            (self.node_id_to_def_id)(i.id, i.id),
             &i.attrs,
             i.span,
             None,
@@ -295,7 +306,7 @@ impl<'ast, 'tcx> visit::Visitor<'ast> for LanguageItemCollector<'ast, 'tcx> {
     fn visit_variant(&mut self, variant: &'ast ast::Variant) {
         self.check_for_lang(
             Target::Variant,
-            self.resolver.owners[&self.parent_item.unwrap().id].node_id_to_def_id[&variant.id],
+            (self.node_id_to_def_id)(self.parent_item.unwrap().id, variant.id),
             &variant.attrs,
             variant.span,
             None,
@@ -306,7 +317,13 @@ impl<'ast, 'tcx> visit::Visitor<'ast> for LanguageItemCollector<'ast, 'tcx> {
         let target = Target::from_assoc_item_kind(&i.kind, ctxt);
         let generics = i.opt_generics();
 
-        self.check_for_lang(target, self.resolver.owners[&i.id].def_id, &i.attrs, i.span, generics);
+        self.check_for_lang(
+            target,
+            (self.node_id_to_def_id)(i.id, i.id),
+            &i.attrs,
+            i.span,
+            generics,
+        );
 
         visit::walk_assoc_item(self, i, ctxt);
     }
