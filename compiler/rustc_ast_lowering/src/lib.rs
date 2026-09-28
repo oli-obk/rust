@@ -591,7 +591,7 @@ fn index_ast<'tcx>(
     // Queries that borrow `resolver_for_lowering`.
     tcx.ensure_done().output_filenames(());
     tcx.ensure_done().early_lint_checks(());
-    tcx.ensure_done().get_lang_items(());
+    tcx.ensure_done().get_lang_items(rustc_middle::ty::CoherenceDomain::Everything);
     tcx.ensure_done().debugger_visualizers(LOCAL_CRATE);
 
     let (resolver, krate) = tcx.resolver_for_lowering();

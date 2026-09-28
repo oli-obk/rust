@@ -6,9 +6,7 @@ use std::sync::Arc;
 
 use rustc_ast::{self as ast, Crate, DelegationSuffixes, NodeId};
 use rustc_ast_pretty::pprust;
-use rustc_attr_ir::{
-    Attribute, AttributeKind, CfgEntry, LangItem, StabilityLevel, StrippedCfgItem,
-};
+use rustc_attr_ir::{Attribute, AttributeKind, CfgEntry, StabilityLevel, StrippedCfgItem};
 use rustc_attr_parsing::AttributeParser;
 use rustc_data_structures::sync::RwLock;
 use rustc_errors::{Applicability, StashKey};
@@ -621,9 +619,13 @@ impl<'ra, 'tcx> ResolverExpand for Resolver<'ra, 'tcx> {
         }
     }
 
-    fn has_eq_impl(&mut self, id: DefId, span: Span) -> bool {
+    fn has_eq_impl(&mut self, id: DefId, _span: Span) -> bool {
         let ty = self.tcx.type_of(id).instantiate_identity().skip_norm_wip();
-        let eq_id = self.tcx.require_lang_item(LangItem::PartialEq, span);
+        let eq_id = self
+            .tcx
+            .get_lang_items(rustc_middle::ty::CoherenceDomain::Upstream)
+            .eq_trait()
+            .unwrap();
         self.tcx.trait_impls_in_crate(id.krate).iter().any(|&impl_id| {
             let header = self.tcx.impl_trait_header(impl_id);
             header.trait_ref.instantiate_identity().skip_norm_wip().self_ty() == ty && {

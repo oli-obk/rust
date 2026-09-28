@@ -992,7 +992,7 @@ impl<'tcx> TyCtxt<'tcx> {
 
     /// Obtain all lang items of this crate and all dependencies (recursively)
     pub fn lang_items(self) -> &'tcx rustc_attr_ir::lang_items::LanguageItems {
-        self.get_lang_items(())
+        self.get_lang_items(ty::CoherenceDomain::Everything)
     }
 
     /// Gets a `Ty` representing the [`LangItem::OrderingEnum`]

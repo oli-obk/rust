@@ -2296,7 +2296,7 @@ rustc_queries! {
     }
     /// Returns the lang items defined in all crates by loading them from metadata of dependencies
     /// and collecting the ones from the current crate.
-    query get_lang_items(_: ()) -> &'tcx LanguageItems {
+    query get_lang_items(coherence_domain: ty::CoherenceDomain) -> &'tcx LanguageItems {
         arena_cache
         eval_always
         desc { "calculating the lang items map" }
@@ -2412,7 +2412,7 @@ rustc_queries! {
     // Crates that are loaded non-speculatively (not for diagnostics or doc links).
     // FIXME: This is currently only used for collecting lang items, but should be used instead of
     // `crates` in most other cases too.
-    query used_crates(_: ()) -> &'tcx [CrateNum] {
+    query used_crates(domain: ty::CoherenceDomain) -> &'tcx [CrateNum] {
         eval_always
         desc { "fetching `CrateNum`s for all crates loaded non-speculatively" }
     }
