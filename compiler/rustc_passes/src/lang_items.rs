@@ -13,7 +13,7 @@ use rustc_attr_ir::target::Target;
 use rustc_crate_store::ExternCrate;
 use rustc_hir::def_id::{DefId, LocalDefId};
 use rustc_middle::query::Providers;
-use rustc_middle::ty::TyCtxt;
+use rustc_middle::ty::{CoherenceDomain, TyCtxt};
 use rustc_span::{Span, Symbol, sym};
 
 use crate::diagnostics::{DuplicateLangItem, IncorrectCrateType, IncorrectTarget};
@@ -243,31 +243,39 @@ impl<'ast, 'tcx> LanguageItemCollector<'ast, 'tcx> {
 }
 
 /// Traverses and collects all the lang items in all crates.
-fn get_lang_items(tcx: TyCtxt<'_>, (): ()) -> LanguageItems {
-    let (resolver, krate) = tcx.resolver_for_lowering();
-    let resolver = &*resolver.borrow();
-    let krate = &*krate.borrow();
+fn get_lang_items(tcx: TyCtxt<'_>, domain: CoherenceDomain) -> LanguageItems {
+    let (node_id_to_def_id, krate): (&dyn Fn(_, _) -> _, _) = match domain {
+        CoherenceDomain::Upstream => (&|_, _| unreachable!(), None),
+        CoherenceDomain::Everything => {
+            super let (resolver, krate) = tcx.resolver_for_lowering();
+            super let resolver = &*resolver.borrow();
+            super let krate = &*krate.borrow();
 
-    let node_id_to_def_id = |owner, id| {
-        if owner == id {
-            resolver.owners[&owner].def_id
-        } else {
-            resolver.owners[&owner].node_id_to_def_id[&id]
+            super let node_id_to_def_id = |owner, id| {
+                if owner == id {
+                    resolver.owners[&owner].def_id
+                } else {
+                    resolver.owners[&owner].node_id_to_def_id[&id]
+                }
+            };
+            (&node_id_to_def_id, Some(krate))
         }
     };
 
     // Initialize the collector.
-    let mut collector = LanguageItemCollector::new(tcx, &node_id_to_def_id);
+    let mut collector = LanguageItemCollector::new(tcx, node_id_to_def_id);
 
     // Collect lang items in other crates.
-    for &cnum in tcx.used_crates(()).iter() {
+    for &cnum in tcx.used_crates(domain).iter() {
         for &(def_id, lang_item) in tcx.defined_lang_items(cnum).iter() {
             collector.collect_item(lang_item, def_id, None);
         }
     }
 
-    // Collect lang items local to this crate.
-    visit::Visitor::visit_crate(&mut collector, krate);
+    if let Some(krate) = krate {
+        // Collect lang items local to this crate.
+        visit::Visitor::visit_crate(&mut collector, krate);
+    }
 
     // Find all required but not-yet-defined lang items.
     weak_lang_items::check_crate(tcx, &mut collector.items);

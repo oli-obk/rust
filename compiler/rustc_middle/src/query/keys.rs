@@ -18,7 +18,7 @@ use crate::mono::CollectionMode;
 use crate::query::{DefIdCache, DefaultCache, SingleCache, VecCache};
 use crate::ty::fast_reject::SimplifiedType;
 use crate::ty::layout::ValidityRequirement;
-use crate::ty::{self, GenericArg, GenericArgsRef, Ty, TyCtxt};
+use crate::ty::{self, CoherenceDomain, GenericArg, GenericArgsRef, Ty, TyCtxt};
 use crate::{mir, traits};
 
 /// Placeholder for `CrateNum`'s "local" counterpart
@@ -59,6 +59,12 @@ pub trait QueryKey: Sized + QueryKeyBounds {
 impl QueryKey for () {
     type Cache<V> = SingleCache<V>;
 
+    fn default_span(&self, _: TyCtxt<'_>) -> Span {
+        DUMMY_SP
+    }
+}
+
+impl QueryKey for CoherenceDomain {
     fn default_span(&self, _: TyCtxt<'_>) -> Span {
         DUMMY_SP
     }

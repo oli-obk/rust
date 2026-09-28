@@ -7,6 +7,7 @@
 // tidy-alphabetical-start
 #![feature(deref_patterns)]
 #![feature(option_into_flat_iter)]
+#![feature(super_let)]
 // tidy-alphabetical-end
 
 use rustc_middle::query::Providers;

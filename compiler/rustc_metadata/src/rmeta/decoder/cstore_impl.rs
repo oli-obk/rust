@@ -602,10 +602,19 @@ pub(in crate::rmeta) fn provide(providers: &mut Providers) {
             tcx.untracked().freeze_cstore();
             tcx.arena.alloc_from_iter(CStore::from_tcx(tcx).iter_crate_data().map(|(cnum, _)| cnum))
         },
-        used_crates: |tcx, ()| {
-            // The loaded-crate list is now frozen in the query cache; stop
-            // mutating the cstore and stable crate id map from here on.
-            tcx.untracked().freeze_cstore();
+        used_crates: |tcx, domain| {
+            match domain {
+                ty::CoherenceDomain::Upstream => {
+                    // We lock in whatever state the crate map is in.
+                    // This means everything sees the same list, but the list may arbitrarily change
+                    // depending on resolver ordering changes or where the expansion time code is executed
+                }
+                ty::CoherenceDomain::Everything => {
+                    // The loaded-crate list is now frozen in the query cache; stop
+                    // mutating the cstore and stable crate id map from here on.
+                    tcx.untracked().freeze_cstore();
+                }
+            }
             tcx.arena.alloc_from_iter(
                 CStore::from_tcx(tcx)
                     .iter_crate_data()

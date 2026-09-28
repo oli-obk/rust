@@ -1,9 +1,8 @@
-error[E0391]: cycle detected when getting the resolver for lowering
+error: has eq impl
+  --> $DIR/expansion_time_type_info.rs:8:34
    |
-   = note: ...which requires calculating the lang items map...
-   = note: ...which again requires getting the resolver for lowering, completing the cycle
-   = note: for more information, see <https://rustc-dev-guide.rust-lang.org/overview.html#queries> and <https://rustc-dev-guide.rust-lang.org/query.html>
+LL | expansion_time_type_system_demo!(core::alloc::Layout);
+   |                                  ^^^^^^^^^^^^^^^^^^^
 
 error: aborting due to 1 previous error
 
-For more information about this error, try `rustc --explain E0391`.
