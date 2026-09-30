@@ -905,7 +905,7 @@ impl<'tcx> MiriMachine<'tcx> {
             .map(|crates| crates.split(',').map(|krate| krate.to_string()).collect::<Vec<_>>())
             .unwrap_or_default();
         let mut local_crates = Vec::new();
-        for &crate_num in tcx.crates(()) {
+        for &crate_num in tcx.crates(ty::CoherenceDomain::Everything) {
             let name = tcx.crate_name(crate_num);
             let name = name.as_str();
             if local_crate_names

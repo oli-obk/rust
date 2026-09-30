@@ -3,7 +3,7 @@
 
 use rustc_attr_ir::{DocAttribute, find_attr};
 use rustc_middle::query::{LocalCrate, Providers};
-use rustc_middle::ty::TyCtxt;
+use rustc_middle::ty::{self, TyCtxt};
 use rustc_span::def_id::{DefId, LOCAL_CRATE};
 use rustc_span::sym;
 
@@ -38,7 +38,7 @@ fn all_fake_doc_items(tcx: TyCtxt<'_>, (): ()) -> Vec<DefId> {
 
     // Collect fake doc items in visible crates.
     for cnum in tcx
-        .crates(())
+        .crates(ty::CoherenceDomain::Everything)
         .iter()
         .copied()
         .filter(|cnum| tcx.is_user_visible_dep(*cnum))

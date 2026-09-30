@@ -42,7 +42,7 @@ pub(super) fn collect_trait_impls(mut krate: Crate, cx: &mut DocContext<'_>) -> 
     // External trait impls.
     {
         let _prof_timer = tcx.sess.prof.generic_activity("build_extern_trait_impls");
-        for &cnum in tcx.crates(()) {
+        for &cnum in tcx.crates(ty::CoherenceDomain::Everything) {
             for &impl_def_id in tcx.trait_impls_in_crate(cnum) {
                 let trait_ref = tcx.impl_trait_ref(impl_def_id);
                 debug!("considering extern trait impl {trait_ref:?}");

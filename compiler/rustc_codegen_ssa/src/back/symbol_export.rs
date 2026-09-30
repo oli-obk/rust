@@ -506,7 +506,7 @@ fn upstream_monomorphizations_provider(
     tcx: TyCtxt<'_>,
     (): (),
 ) -> DefIdMap<UnordMap<GenericArgsRef<'_>, CrateNum>> {
-    let cnums = tcx.crates(());
+    let cnums = tcx.crates(ty::CoherenceDomain::Everything);
 
     let mut instances: DefIdMap<UnordMap<_, _>> = Default::default();
 

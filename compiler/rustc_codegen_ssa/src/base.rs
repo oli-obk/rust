@@ -645,7 +645,7 @@ pub fn collect_debugger_visualizers_transitive(
     tcx.debugger_visualizers(LOCAL_CRATE)
         .iter()
         .chain(
-            tcx.crates(())
+            tcx.crates(ty::CoherenceDomain::Everything)
                 .iter()
                 .filter(|&cnum| {
                     let used_crate_source = tcx.used_crate_source(*cnum);
@@ -965,7 +965,8 @@ fn collect_eii_linkage(tcx: TyCtxt<'_>) -> Vec<EiiLinkageInfo> {
 
     let mut eiis = FxIndexMap::<DefId, FoundEii>::default();
 
-    for &cnum in tcx.crates(()).iter().chain(iter::once(&LOCAL_CRATE)) {
+    for &cnum in tcx.crates(ty::CoherenceDomain::Everything).iter().chain(iter::once(&LOCAL_CRATE))
+    {
         for (&did, &(decl, ref impls)) in tcx.externally_implementable_items(cnum) {
             eiis.entry(did)
                 .or_insert_with(|| FoundEii { decl, impls: Default::default() })
@@ -1059,7 +1060,7 @@ impl CrateInfo {
         // `compiler_builtins` are always placed last to ensure that they're linked correctly.
         used_crates.extend(compiler_builtins);
 
-        let crates = tcx.crates(());
+        let crates = tcx.crates(ty::CoherenceDomain::Everything);
         let n_crates = crates.len();
         let mut info = CrateInfo {
             target_cpu,

@@ -489,7 +489,7 @@ pub(in crate::rmeta) fn provide(providers: &mut Providers) {
             // traversal, but not globally minimal across all crates.
             let bfs_queue = &mut VecDeque::new();
 
-            for &cnum in tcx.crates(()) {
+            for &cnum in tcx.crates(ty::CoherenceDomain::Everything) {
                 // Ignore crates without a corresponding local `extern crate` item.
                 if tcx.missing_extern_crate_item(cnum) {
                     continue;
@@ -596,10 +596,19 @@ pub(in crate::rmeta) fn provide(providers: &mut Providers) {
                 CStore::from_tcx(tcx).crate_dependencies_in_postorder(LOCAL_CRATE).into_iter(),
             )
         },
-        crates: |tcx, ()| {
-            // The loaded-crate list is now frozen in the query cache; stop
-            // mutating the cstore and stable crate id map from here on.
-            tcx.untracked().freeze_cstore();
+        crates: |tcx, domain| {
+            match domain {
+                ty::CoherenceDomain::Upstream => {
+                    // We lock in whatever state the crate map is in.
+                    // This means everything sees the same list, but the list may arbitrarily change
+                    // depending on resolver ordering changes or where the expansion time code is executed
+                }
+                ty::CoherenceDomain::Everything => {
+                    // The loaded-crate list is now frozen in the query cache; stop
+                    // mutating the cstore and stable crate id map from here on.
+                    tcx.untracked().freeze_cstore();
+                }
+            }
             tcx.arena.alloc_from_iter(CStore::from_tcx(tcx).iter_crate_data().map(|(cnum, _)| cnum))
         },
         used_crates: |tcx, domain| {
@@ -624,7 +633,7 @@ pub(in crate::rmeta) fn provide(providers: &mut Providers) {
         duplicate_crate_names: |tcx, c: CrateNum| {
             let name = tcx.crate_name(c);
             tcx.arena.alloc_from_iter(
-                tcx.crates(())
+                tcx.crates(ty::CoherenceDomain::Everything)
                     .into_iter()
                     .filter(|k| tcx.crate_name(**k) == name && **k != c)
                     .map(|c| *c),

@@ -288,7 +288,7 @@ pub(crate) fn run(
         // If two different versions of the crate in the dependency tree, then examples will be
         // collected from both.
         let all_crates = tcx
-            .crates(())
+            .crates(ty::CoherenceDomain::Everything)
             .iter()
             .chain([&LOCAL_CRATE])
             .map(|crate_num| (crate_num, tcx.crate_name(*crate_num)))

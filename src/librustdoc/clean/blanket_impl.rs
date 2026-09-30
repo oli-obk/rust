@@ -30,7 +30,7 @@ pub(crate) fn synthesize_blanket_impls(
             continue;
         }
         // NOTE: doesn't use `for_each_relevant_impl` to avoid looking at anything besides blanket impls
-        let trait_impls = tcx.trait_impls_of(trait_def_id);
+        let trait_impls = tcx.trait_impls_of((trait_def_id, ty::CoherenceDomain::Everything));
         'blanket_impls: for &impl_def_id in trait_impls.blanket_impls() {
             trace!("considering impl `{impl_def_id:?}` for trait `{trait_def_id:?}`");
 

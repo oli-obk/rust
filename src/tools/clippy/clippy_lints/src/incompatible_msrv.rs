@@ -6,7 +6,7 @@ use rustc_attr_ir::{RustcVersion, StabilityLevel, StableSince, find_attr};
 use rustc_data_structures::fx::FxHashMap;
 use rustc_hir::{self as hir, AmbigArg, Expr, ExprKind, HirId};
 use rustc_lint::{LateContext, LateLintPass, impl_lint_pass};
-use rustc_middle::ty::{self, TyCtxt};
+use rustc_middle::ty::{self, CoherenceDomain, TyCtxt};
 use rustc_span::def_id::{CrateNum, DefId};
 use rustc_span::{ExpnKind, Span};
 
@@ -84,7 +84,7 @@ struct StdCrates([Option<CrateNum>; 6]);
 impl StdCrates {
     fn new(tcx: TyCtxt<'_>) -> Self {
         let mut res = Self([None; _]);
-        for &krate in tcx.crates(()) {
+        for &krate in tcx.crates(CoherenceDomain::Everything) {
             // FIXME(@Jarcho): We should have an internal lint to detect when this list is out of date.
             match tcx.crate_name(krate) {
                 sym::alloc => res.0[0] = Some(krate),

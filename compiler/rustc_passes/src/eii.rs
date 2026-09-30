@@ -7,7 +7,7 @@ use rustc_attr_ir::{EiiDecl, EiiImpl};
 use rustc_data_structures::fx::FxIndexMap;
 use rustc_hir::def_id::{CrateNum, DefId, LOCAL_CRATE};
 use rustc_middle::diagnostics::DuplicateEiiImpls;
-use rustc_middle::ty::TyCtxt;
+use rustc_middle::ty::{self, TyCtxt};
 use rustc_structures::CrateType;
 
 use crate::diagnostics::EiiWithoutImpl;
@@ -60,7 +60,8 @@ pub(crate) fn check_externally_implementable_items<'tcx>(tcx: TyCtxt<'tcx>, (): 
     let mut eiis = FxIndexMap::<DefId, FoundEii>::default();
 
     // collect all the EII declarations, and possibly implementations from all descendent crates
-    for &cnum in tcx.crates(()).iter().chain(iter::once(&LOCAL_CRATE)) {
+    for &cnum in tcx.crates(ty::CoherenceDomain::Everything).iter().chain(iter::once(&LOCAL_CRATE))
+    {
         // get the eiis for the crate we're currently looking at
         let crate_eiis = tcx.externally_implementable_items(cnum);
 

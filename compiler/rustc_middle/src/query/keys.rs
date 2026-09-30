@@ -70,6 +70,15 @@ impl QueryKey for CoherenceDomain {
     }
 }
 
+impl QueryKey for (DefId, CoherenceDomain) {
+    fn default_span(&self, tcx: TyCtxt<'_>) -> Span {
+        tcx.def_span(self.0)
+    }
+    fn key_as_def_id(&self) -> Option<DefId> {
+        Some(self.0)
+    }
+}
+
 impl<'tcx> QueryKey for ty::ShimKind<'tcx> {
     fn default_span(&self, tcx: TyCtxt<'_>) -> Span {
         tcx.def_span(self.def_id())
