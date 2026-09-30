@@ -402,13 +402,18 @@ impl<T> Trait<T> for X {
                     }
                     (ty::Dynamic(t, _), _) if let Some(def_id) = t.principal_def_id() => {
                         let mut has_matching_impl = false;
-                        tcx.for_each_relevant_impl(def_id, values.found, |did| {
-                            if DeepRejectCtxt::relate_rigid_infer(tcx)
-                                .types_may_unify(values.found, tcx.type_of(did).skip_binder())
-                            {
-                                has_matching_impl = true;
-                            }
-                        });
+                        tcx.for_each_relevant_impl(
+                            def_id,
+                            values.found,
+                            ty::CoherenceDomain::Everything,
+                            |did| {
+                                if DeepRejectCtxt::relate_rigid_infer(tcx)
+                                    .types_may_unify(values.found, tcx.type_of(did).skip_binder())
+                                {
+                                    has_matching_impl = true;
+                                }
+                            },
+                        );
                         if has_matching_impl {
                             let trait_name = tcx.item_name(def_id);
                             diag.help(format!(
@@ -421,13 +426,19 @@ impl<T> Trait<T> for X {
                     }
                     (_, ty::Dynamic(t, _)) if let Some(def_id) = t.principal_def_id() => {
                         let mut has_matching_impl = false;
-                        tcx.for_each_relevant_impl(def_id, values.expected, |did| {
-                            if DeepRejectCtxt::relate_rigid_infer(tcx)
-                                .types_may_unify(values.expected, tcx.type_of(did).skip_binder())
-                            {
-                                has_matching_impl = true;
-                            }
-                        });
+                        tcx.for_each_relevant_impl(
+                            def_id,
+                            values.expected,
+                            ty::CoherenceDomain::Everything,
+                            |did| {
+                                if DeepRejectCtxt::relate_rigid_infer(tcx).types_may_unify(
+                                    values.expected,
+                                    tcx.type_of(did).skip_binder(),
+                                ) {
+                                    has_matching_impl = true;
+                                }
+                            },
+                        );
                         if has_matching_impl {
                             let trait_name = tcx.item_name(def_id);
                             diag.help(format!(
@@ -529,9 +540,12 @@ impl<T> Trait<T> for X {
                             }
                             let def_id = trait_predicate.def_id();
                             let mut impl_def_ids = vec![];
-                            tcx.for_each_relevant_impl(def_id, expected, |did| {
-                                impl_def_ids.push(did)
-                            });
+                            tcx.for_each_relevant_impl(
+                                def_id,
+                                expected,
+                                ty::CoherenceDomain::Everything,
+                                |did| impl_def_ids.push(did),
+                            );
                             if let [_] = &impl_def_ids[..] {
                                 let trait_name = tcx.item_name(def_id);
                                 diag.multipart_suggestion(
@@ -575,10 +589,12 @@ impl<T> Trait<T> for X {
                             && let ty::Dynamic(t, _) = boxed_ty.kind()
                             && let Some(def_id) = t.principal_def_id()
                             && let mut impl_def_ids = vec![]
-                            && let _ =
-                                tcx.for_each_relevant_impl(def_id, values.expected, |did| {
-                                    impl_def_ids.push(did)
-                                })
+                            && let _ = tcx.for_each_relevant_impl(
+                                def_id,
+                                values.expected,
+                                ty::CoherenceDomain::Everything,
+                                |did| impl_def_ids.push(did),
+                            )
                             && let [_] = &impl_def_ids[..] =>
                     {
                         // We have divergent if/else arms where the expected value is a type that

@@ -468,11 +468,13 @@ pub trait Interner:
     fn for_each_relevant_impl<R: VisitorResult>(
         self,
         trait_ref: TraitRef<Self>,
+        coherence_domain: ty::CoherenceDomain,
         f: impl FnMut(Self::ImplId) -> R,
     ) -> R;
     fn for_each_blanket_impl<R: VisitorResult>(
         self,
         trait_def_id: Self::TraitId,
+        coherence_domain: ty::CoherenceDomain,
         f: impl FnMut(Self::ImplId) -> R,
     ) -> R;
 

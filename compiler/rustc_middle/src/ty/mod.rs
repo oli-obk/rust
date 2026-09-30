@@ -22,7 +22,6 @@ use std::{assert_matches, fmt, iter, str};
 
 pub use adt::*;
 pub use assoc::*;
-pub use coherence_domains::CoherenceDomain;
 pub use generic_args::{GenericArgKind, TermKind, *};
 pub use generics::*;
 pub use intrinsic::IntrinsicDef;
@@ -126,7 +125,6 @@ pub mod adjustment;
 pub mod cast;
 pub mod codec;
 // FIXME(#159654): This should get deleted soon
-pub mod coherence_domains;
 pub mod consts;
 pub mod error;
 pub mod fast_reject;

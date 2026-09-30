@@ -140,10 +140,11 @@ impl<'tcx> TyCtxt<'tcx> {
         self,
         trait_def_id: DefId,
         self_ty: Ty<'tcx>,
+        coherence_domain: ty::CoherenceDomain,
         mut f: impl FnMut(DefId) -> R,
     ) -> R {
         let tcx = self;
-        let trait_impls = tcx.trait_impls_of((trait_def_id, ty::CoherenceDomain::Everything));
+        let trait_impls = tcx.trait_impls_of((trait_def_id, coherence_domain));
         let mut consider_impls_for_simplified_type = |simp| {
             if let Some(impls_for_type) = trait_impls.non_blanket_impls().get(&simp) {
                 for &impl_def_id in impls_for_type {
@@ -271,7 +272,7 @@ impl<'tcx> TyCtxt<'tcx> {
         }
 
         #[allow(rustc::usage_of_type_ir_traits)]
-        self.for_each_blanket_impl(trait_def_id, f)
+        self.for_each_blanket_impl(trait_def_id, coherence_domain, f)
     }
 
     /// `trait_def_id` MUST BE the `DefId` of a trait.
