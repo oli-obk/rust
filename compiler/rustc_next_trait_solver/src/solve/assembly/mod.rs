@@ -591,18 +591,22 @@ where
     ) -> Result<(), RerunNonErased> {
         let cx = self.cx();
         let goal_trait_ref = goal.predicate.trait_ref(cx);
-        cx.for_each_relevant_impl(goal_trait_ref, |impl_def_id| -> Result<_, _> {
-            match G::consider_impl_candidate(self, goal, goal_trait_ref, impl_def_id, |ecx| {
-                ecx.evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
-            })
-            .map_err_to_rerun()?
-            {
-                Ok(candidate) => candidates.push(candidate),
-                Err(NoSolution) => {}
-            }
+        cx.for_each_relevant_impl(
+            goal_trait_ref,
+            ty::CoherenceDomain::Everything,
+            |impl_def_id| -> Result<_, _> {
+                match G::consider_impl_candidate(self, goal, goal_trait_ref, impl_def_id, |ecx| {
+                    ecx.evaluate_added_goals_and_make_canonical_response(Certainty::Yes)
+                })
+                .map_err_to_rerun()?
+                {
+                    Ok(candidate) => candidates.push(candidate),
+                    Err(NoSolution) => {}
+                }
 
-            Ok(())
-        })
+                Ok(())
+            },
+        )
     }
 
     #[instrument(level = "trace", skip_all)]
@@ -1211,28 +1215,40 @@ where
             let cx = self.cx();
             let goal_trait_ref = goal.predicate.trait_ref(cx);
 
-            cx.for_each_blanket_impl(goal.predicate.trait_def_id(cx), |impl_def_id| {
-                match G::consider_impl_candidate(self, goal, goal_trait_ref, impl_def_id, |ecx| {
-                    if ecx.shallow_resolve(self_ty).is_ty_var() {
-                        // We force the certainty of impl candidates to be `Maybe`.
-                        ecx.evaluate_added_goals_and_make_canonical_response(Certainty::AMBIGUOUS)
-                    } else {
-                        // We don't want to use impls if they constrain the opaque.
-                        //
-                        // FIXME(trait-system-refactor-initiative#229): This isn't
-                        // perfect yet as it still allows us to incorrectly constrain
-                        // other inference variables.
-                        Err(NoSolution.into())
+            cx.for_each_blanket_impl(
+                goal.predicate.trait_def_id(cx),
+                ty::CoherenceDomain::Everything,
+                |impl_def_id| {
+                    match G::consider_impl_candidate(
+                        self,
+                        goal,
+                        goal_trait_ref,
+                        impl_def_id,
+                        |ecx| {
+                            if ecx.shallow_resolve(self_ty).is_ty_var() {
+                                // We force the certainty of impl candidates to be `Maybe`.
+                                ecx.evaluate_added_goals_and_make_canonical_response(
+                                    Certainty::AMBIGUOUS,
+                                )
+                            } else {
+                                // We don't want to use impls if they constrain the opaque.
+                                //
+                                // FIXME(trait-system-refactor-initiative#229): This isn't
+                                // perfect yet as it still allows us to incorrectly constrain
+                                // other inference variables.
+                                Err(NoSolution.into())
+                            }
+                        },
+                    )
+                    .map_err_to_rerun()?
+                    {
+                        Ok(candidate) => candidates.push(candidate),
+                        Err(NoSolution) => {}
                     }
-                })
-                .map_err_to_rerun()?
-                {
-                    Ok(candidate) => candidates.push(candidate),
-                    Err(NoSolution) => {}
-                }
 
-                Ok(())
-            })?;
+                    Ok(())
+                },
+            )?;
         }
 
         if candidates.is_empty() {

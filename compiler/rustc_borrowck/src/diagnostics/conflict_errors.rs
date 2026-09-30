@@ -1381,6 +1381,7 @@ impl<'diag, 'tcx> MirBorrowckCtxt<'_, 'diag, 'tcx> {
             self.infcx.tcx.for_each_relevant_impl(
                 self.infcx.tcx.lang_items().clone_trait().unwrap(),
                 ty,
+                ty::CoherenceDomain::Everything,
                 |def_id| {
                     if self.infcx.tcx.is_automatically_derived(def_id) {
                         derive_clone = true;

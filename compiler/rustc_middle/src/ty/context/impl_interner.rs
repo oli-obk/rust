@@ -530,6 +530,7 @@ impl<'tcx> Interner for TyCtxt<'tcx> {
     fn for_each_relevant_impl<R: VisitorResult>(
         self,
         trait_ref: ty::TraitRef<'tcx>,
+        coherence_domain: ty::CoherenceDomain,
         f: impl FnMut(DefId) -> R,
     ) -> R {
         let self_ty = trait_ref.args.type_at(0);
@@ -537,14 +538,15 @@ impl<'tcx> Interner for TyCtxt<'tcx> {
             !matches!(self_ty.kind(), ty::Infer(ty::TyVar(_)) | ty::Param(_) | ty::Bound(_, _)),
             "we should not have them as self ty in the next solver"
         );
-        TyCtxt::for_each_relevant_impl(self, trait_ref.def_id, self_ty, f)
+        TyCtxt::for_each_relevant_impl(self, trait_ref.def_id, self_ty, coherence_domain, f)
     }
     fn for_each_blanket_impl<R: VisitorResult>(
         self,
         trait_def_id: DefId,
+        coherence_domain: ty::CoherenceDomain,
         mut f: impl FnMut(DefId) -> R,
     ) -> R {
-        let trait_impls = self.trait_impls_of((trait_def_id, ty::CoherenceDomain::Everything));
+        let trait_impls = self.trait_impls_of((trait_def_id, coherence_domain));
         for &impl_def_id in trait_impls.blanket_impls() {
             try_visit!(f(impl_def_id));
         }

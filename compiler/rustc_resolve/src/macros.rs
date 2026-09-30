@@ -620,13 +620,13 @@ impl<'ra, 'tcx> ResolverExpand for Resolver<'ra, 'tcx> {
     }
 
     fn has_eq_impl(&mut self, id: DefId, _span: Span) -> bool {
+        let self_ty = self.tcx.type_of(id).instantiate_identity().skip_norm_wip();
         let eq_id = self.tcx.get_lang_items(CoherenceDomain::Upstream).eq_trait().unwrap();
-        self.tcx.trait_impls_of((eq_id, CoherenceDomain::Upstream)).non_blanket_impls().iter().any(
-            |(st, _impls)| {
-                let Some(ty_id) = st.def() else { return false };
-                ty_id == id
-            },
-        )
+        self.tcx
+            .for_each_relevant_impl(eq_id, self_ty, CoherenceDomain::Upstream, |_| {
+                Result::<_, ()>::Ok(())
+            })
+            .is_ok()
     }
 }
 

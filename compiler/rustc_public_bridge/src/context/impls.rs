@@ -263,7 +263,11 @@ impl<'tcx, B: Bridge> CompilerCtxt<'tcx, B> {
 
     /// Retrieve a list of all external crates.
     pub fn external_crates(&self) -> Vec<CrateNum> {
-        self.tcx.crates(ty::CoherenceDomain::Everything).iter().map(|crate_num| *crate_num).collect()
+        self.tcx
+            .crates(ty::CoherenceDomain::Everything)
+            .iter()
+            .map(|crate_num| *crate_num)
+            .collect()
     }
 
     /// Find a crate with the given name.

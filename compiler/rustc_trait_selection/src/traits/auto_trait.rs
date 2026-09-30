@@ -212,7 +212,7 @@ impl<'tcx> AutoTraitFinder<'tcx> {
         };
 
         let mut disqualifying_impl = None;
-        tcx.for_each_relevant_impl(trait_did, ty, |impl_def_id| {
+        tcx.for_each_relevant_impl(trait_did, ty, ty::CoherenceDomain::Everything, |impl_def_id| {
             disqualifying_impl = Some(impl_def_id);
         });
         if let Some(impl_def_id) = disqualifying_impl {

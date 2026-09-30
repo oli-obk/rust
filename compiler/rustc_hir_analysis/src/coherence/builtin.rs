@@ -302,6 +302,7 @@ fn visit_implementation_of_dispatch_from_dyn(checker: &Checker<'_>) -> Result<()
     tcx.for_each_relevant_impl(
         tcx.require_lang_item(LangItem::CoerceUnsized, span),
         source,
+        ty::CoherenceDomain::Everything,
         |impl_def_id| {
             res = res.and(tcx.ensure_result().coerce_unsized_info(impl_def_id));
         },

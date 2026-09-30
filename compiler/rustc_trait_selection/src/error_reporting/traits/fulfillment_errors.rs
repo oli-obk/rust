@@ -2820,6 +2820,7 @@ impl<'a, 'tcx> TypeErrCtxt<'a, 'tcx> {
             self.tcx.for_each_relevant_impl(
                 trait_def_id,
                 trait_pred.skip_binder().self_ty(),
+                ty::CoherenceDomain::Everything,
                 |impl_def_id| {
                     let impl_trait_header = self.tcx.impl_trait_header(impl_def_id);
                     trait_impls
