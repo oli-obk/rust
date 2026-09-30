@@ -143,7 +143,7 @@ impl<'tcx> TyCtxt<'tcx> {
         mut f: impl FnMut(DefId) -> R,
     ) -> R {
         let tcx = self;
-        let trait_impls = tcx.trait_impls_of(trait_def_id);
+        let trait_impls = tcx.trait_impls_of((trait_def_id, ty::CoherenceDomain::Everything));
         let mut consider_impls_for_simplified_type = |simp| {
             if let Some(impls_for_type) = trait_impls.non_blanket_impls().get(&simp) {
                 for &impl_def_id in impls_for_type {
@@ -280,7 +280,7 @@ impl<'tcx> TyCtxt<'tcx> {
         trait_def_id: DefId,
         self_ty: Ty<'tcx>,
     ) -> impl Iterator<Item = DefId> {
-        let impls = self.trait_impls_of(trait_def_id);
+        let impls = self.trait_impls_of((trait_def_id, ty::CoherenceDomain::Everything));
         if let Some(simp) =
             fast_reject::simplify_type(self, self_ty, TreatParams::InstantiateWithInfer)
         {
@@ -296,20 +296,24 @@ impl<'tcx> TyCtxt<'tcx> {
     ///
     /// `trait_def_id` MUST BE the `DefId` of a trait.
     pub fn all_impls(self, trait_def_id: DefId) -> impl Iterator<Item = DefId> {
-        let TraitImpls { blanket_impls, non_blanket_impls } = self.trait_impls_of(trait_def_id);
+        let TraitImpls { blanket_impls, non_blanket_impls } =
+            self.trait_impls_of((trait_def_id, ty::CoherenceDomain::Everything));
 
         blanket_impls.iter().chain(non_blanket_impls.iter().flat_map(|(_, v)| v)).cloned()
     }
 }
 
 /// Query provider for `trait_impls_of`.
-pub(super) fn trait_impls_of_provider(tcx: TyCtxt<'_>, trait_id: DefId) -> TraitImpls {
+pub(super) fn trait_impls_of_provider(
+    tcx: TyCtxt<'_>,
+    (trait_id, coherence_domain): (DefId, ty::CoherenceDomain),
+) -> TraitImpls {
     let mut impls = TraitImpls::default();
 
     // Traits defined in the current crate can't have impls in upstream
     // crates, so we don't bother querying the cstore.
     if !trait_id.is_local() {
-        for &cnum in tcx.crates(()).iter() {
+        for &cnum in tcx.crates(coherence_domain).iter() {
             for &(impl_def_id, simplified_self_ty) in
                 tcx.implementations_of_trait((cnum, trait_id)).iter()
             {
@@ -324,6 +328,12 @@ pub(super) fn trait_impls_of_provider(tcx: TyCtxt<'_>, trait_id: DefId) -> Trait
                 }
             }
         }
+    }
+
+    match coherence_domain {
+        // Avoid looking at the current crate
+        ty::CoherenceDomain::Upstream => return impls,
+        ty::CoherenceDomain::Everything => {}
     }
 
     for &impl_def_id in tcx.local_trait_impls(trait_id) {
@@ -352,7 +362,9 @@ pub(super) fn incoherent_impls_provider(tcx: TyCtxt<'_>, simp: SimplifiedType) -
     }
 
     let mut impls = Vec::new();
-    for cnum in iter::once(LOCAL_CRATE).chain(tcx.crates(()).iter().copied()) {
+    for cnum in
+        iter::once(LOCAL_CRATE).chain(tcx.crates(ty::CoherenceDomain::Everything).iter().copied())
+    {
         for &impl_def_id in tcx.crate_incoherent_impls((cnum, simp)) {
             impls.push(impl_def_id)
         }

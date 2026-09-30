@@ -53,7 +53,7 @@ fn try_resolve_did(tcx: TyCtxt<'_>, path: &[&str], namespace: Option<Namespace>)
     // the one in the sysroot and the one locally built by `cargo test`.)
     // FIXME: can we prefer the one from the sysroot?
     'crates: for krate in
-        tcx.crates(()).iter().filter(|&&krate| tcx.crate_name(krate).as_str() == crate_name)
+        tcx.crates(ty::CoherenceDomain::Everything).iter().filter(|&&krate| tcx.crate_name(krate).as_str() == crate_name)
     {
         let mut cur_item = DefId { krate: *krate, index: CRATE_DEF_INDEX };
         // Go over the modules.

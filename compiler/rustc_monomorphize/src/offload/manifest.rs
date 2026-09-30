@@ -209,7 +209,7 @@ impl<'a, 'tcx> OffloadManifestDecoder<'a, 'tcx> {
             map.insert((local_crate_name, def_path.to_string_no_crate_verbose()), def_id);
         }
 
-        for &cnum in tcx.crates(()) {
+        for &cnum in tcx.crates(ty::CoherenceDomain::Everything) {
             if cnum == LOCAL_CRATE {
                 continue;
             }

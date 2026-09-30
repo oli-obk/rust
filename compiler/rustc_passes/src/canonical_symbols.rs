@@ -1,7 +1,7 @@
 use rustc_attr_ir::{CanonicalSymbols, find_attr};
 use rustc_hir::ForeignItemId;
 use rustc_middle::query::{LocalCrate, Providers};
-use rustc_middle::ty::{Instance, List, TyCtxt};
+use rustc_middle::ty::{self, Instance, List, TyCtxt};
 use rustc_span::def_id::{DefId, LOCAL_CRATE};
 use rustc_span::{Symbol, sym};
 
@@ -76,7 +76,12 @@ fn all_canonical_symbols(tcx: TyCtxt<'_>, (): ()) -> CanonicalSymbols {
     let mut items = CanonicalSymbols::new();
 
     // Collect all canonical symbols
-    for cnum in tcx.crates(()).iter().copied().chain(std::iter::once(LOCAL_CRATE)) {
+    for cnum in tcx
+        .crates(ty::CoherenceDomain::Everything)
+        .iter()
+        .copied()
+        .chain(std::iter::once(LOCAL_CRATE))
+    {
         for cs in tcx.canonical_symbols(cnum).iter() {
             collect_item(tcx, &mut items, cs.symbol, cs.def_id);
         }

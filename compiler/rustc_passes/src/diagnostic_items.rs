@@ -13,7 +13,7 @@ use rustc_attr_ir::diagnostic_items::DiagnosticItems;
 use rustc_attr_ir::find_attr;
 use rustc_hir::{CRATE_OWNER_ID, OwnerId};
 use rustc_middle::query::{LocalCrate, Providers};
-use rustc_middle::ty::TyCtxt;
+use rustc_middle::ty::{self, TyCtxt};
 use rustc_span::def_id::{DefId, LOCAL_CRATE};
 use rustc_span::{Symbol, sym};
 
@@ -79,7 +79,7 @@ fn all_diagnostic_items(tcx: TyCtxt<'_>, (): ()) -> DiagnosticItems {
 
     // Collect diagnostic items in visible crates.
     for cnum in tcx
-        .crates(())
+        .crates(ty::CoherenceDomain::Everything)
         .iter()
         .copied()
         .filter(|cnum| tcx.is_user_visible_dep(*cnum))

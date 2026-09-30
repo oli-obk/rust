@@ -397,7 +397,7 @@ pub(super) fn specialization_graph_provider(
     //   `None`, is compared against every child, so then all buckets are kept;
     //   pruning them would change error recovery (see impl-unpin.rs, `tait`
     //   revision).
-    let all_impls = tcx.trait_impls_of(trait_id);
+    let all_impls = tcx.trait_impls_of((trait_id, ty::CoherenceDomain::Everything));
     let mut trait_impls: Vec<DefId> = all_impls.blanket_impls().to_vec();
     let has_local_blanket_impl =
         all_impls.blanket_impls().iter().any(|impl_def_id| impl_def_id.is_local());

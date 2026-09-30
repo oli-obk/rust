@@ -778,7 +778,7 @@ fn attempt_dyn_to_enum_suggestion(
     trait_str: &str,
     err: &mut Diag<'_>,
 ) {
-    let impls_of = tcx.trait_impls_of(trait_def_id);
+    let impls_of = tcx.trait_impls_of((trait_def_id, ty::CoherenceDomain::Everything));
 
     if !impls_of.blanket_impls().is_empty() {
         return;

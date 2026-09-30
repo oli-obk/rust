@@ -203,7 +203,7 @@ impl<'tcx, B: Bridge> CompilerCtxt<'tcx, B> {
 
     pub fn all_trait_impls(&self) -> Vec<DefId> {
         iter::once(LOCAL_CRATE)
-            .chain(self.tcx.crates(()).iter().copied())
+            .chain(self.tcx.crates(ty::CoherenceDomain::Everything).iter().copied())
             .flat_map(|cnum| self.tcx.trait_impls_in_crate(cnum).iter())
             .map(|impl_def_id| *impl_def_id)
             .collect()
@@ -263,14 +263,14 @@ impl<'tcx, B: Bridge> CompilerCtxt<'tcx, B> {
 
     /// Retrieve a list of all external crates.
     pub fn external_crates(&self) -> Vec<CrateNum> {
-        self.tcx.crates(()).iter().map(|crate_num| *crate_num).collect()
+        self.tcx.crates(ty::CoherenceDomain::Everything).iter().map(|crate_num| *crate_num).collect()
     }
 
     /// Find a crate with the given name.
     pub fn find_crates(&self, name: &str) -> Vec<CrateNum> {
         let crates: Vec<CrateNum> = [LOCAL_CRATE]
             .iter()
-            .chain(self.tcx.crates(()).iter())
+            .chain(self.tcx.crates(ty::CoherenceDomain::Everything).iter())
             .filter_map(|crate_num| {
                 let crate_name = self.tcx.crate_name(*crate_num).to_string();
                 (name == crate_name).then(|| *crate_num)

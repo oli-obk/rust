@@ -1591,14 +1591,17 @@ impl<'tcx> TyCtxt<'tcx> {
     /// All traits in the crate graph, including those not visible to the user.
     pub fn all_traits_including_private(self) -> impl Iterator<Item = DefId> {
         iter::once(LOCAL_CRATE)
-            .chain(self.crates(()).iter().copied())
+            .chain(self.crates(ty::CoherenceDomain::Everything).iter().copied())
             .flat_map(move |cnum| self.traits(cnum).iter().copied())
     }
 
     /// All traits that are visible within the crate graph (i.e. excluding private dependencies).
     pub fn visible_traits(self) -> impl Iterator<Item = DefId> {
-        let visible_crates =
-            self.crates(()).iter().copied().filter(move |cnum| self.is_user_visible_dep(*cnum));
+        let visible_crates = self
+            .crates(ty::CoherenceDomain::Everything)
+            .iter()
+            .copied()
+            .filter(move |cnum| self.is_user_visible_dep(*cnum));
 
         iter::once(LOCAL_CRATE)
             .chain(visible_crates)

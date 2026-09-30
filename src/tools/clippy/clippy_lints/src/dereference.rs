@@ -421,7 +421,7 @@ impl<'tcx> LateLintPass<'tcx> for Dereferencing<'tcx> {
                                                         .is_some()
                                                         || !cx
                                                             .tcx
-                                                            .trait_impls_of(trait_.def_id)
+                                                            .trait_impls_of((trait_.def_id, ty::CoherenceDomain::Everything))
                                                             .blanket_impls()
                                                             .is_empty()
                                                 })

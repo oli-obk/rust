@@ -817,7 +817,7 @@ impl<'a, 'tcx> EncodeContext<'a, 'tcx> {
             // Slot 0 (`LOCAL_CRATE`) is filler; this crate's own value is `extra_filename`.
             let mut dep_extra_filenames = IndexVec::from_elem_n(String::new(), 1);
             if !self.is_proc_macro {
-                for &cnum in self.tcx.crates(()).iter() {
+                for &cnum in self.tcx.crates(ty::CoherenceDomain::Everything).iter() {
                     let idx = dep_extra_filenames.push(self.tcx.extra_filename(cnum).to_owned());
                     assert_eq!(idx, cnum, "dep_extra_filenames must be indexed by CrateNum");
                 }
@@ -2141,7 +2141,7 @@ impl<'a, 'tcx> EncodeContext<'a, 'tcx> {
 
         let deps = self
             .tcx
-            .crates(())
+            .crates(ty::CoherenceDomain::Everything)
             .iter()
             .map(|&cnum| {
                 let dep = CrateDep {

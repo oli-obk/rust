@@ -24,7 +24,7 @@ use rustc_lint_defs::builtin::{
     LEGACY_DERIVE_HELPERS, OUT_OF_SCOPE_MACRO_CALLS, UNUSED_MACRO_RULES, UNUSED_MACROS,
 };
 use rustc_middle::middle::stability;
-use rustc_middle::ty::{RegisteredTools, TyCtxt};
+use rustc_middle::ty::{CoherenceDomain, RegisteredTools, TyCtxt};
 use rustc_session::Session;
 use rustc_session::diagnostics::feature_err;
 use rustc_span::def_id::ModId;
@@ -620,19 +620,13 @@ impl<'ra, 'tcx> ResolverExpand for Resolver<'ra, 'tcx> {
     }
 
     fn has_eq_impl(&mut self, id: DefId, _span: Span) -> bool {
-        let ty = self.tcx.type_of(id).instantiate_identity().skip_norm_wip();
-        let eq_id = self
-            .tcx
-            .get_lang_items(rustc_middle::ty::CoherenceDomain::Upstream)
-            .eq_trait()
-            .unwrap();
-        self.tcx.trait_impls_in_crate(id.krate).iter().any(|&impl_id| {
-            let header = self.tcx.impl_trait_header(impl_id);
-            header.trait_ref.instantiate_identity().skip_norm_wip().self_ty() == ty && {
-                let trait_id = header.trait_ref.def_id();
-                trait_id == eq_id
-            }
-        })
+        let eq_id = self.tcx.get_lang_items(CoherenceDomain::Upstream).eq_trait().unwrap();
+        self.tcx.trait_impls_of((eq_id, CoherenceDomain::Upstream)).non_blanket_impls().iter().any(
+            |(st, _impls)| {
+                let Some(ty_id) = st.def() else { return false };
+                ty_id == id
+            },
+        )
     }
 }
 

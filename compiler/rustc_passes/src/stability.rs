@@ -27,7 +27,7 @@ use rustc_middle::middle::lib_features::{FeatureStability, LibFeatures};
 use rustc_middle::middle::privacy::EffectiveVisibilities;
 use rustc_middle::middle::stability::{AllowUnstable, DeprecationEntry, EvalResult};
 use rustc_middle::query::{LocalCrate, Providers};
-use rustc_middle::ty::{AssocContainer, TyCtxt};
+use rustc_middle::ty::{self, AssocContainer, TyCtxt};
 use rustc_span::{Span, Symbol, span_bug, sym};
 use tracing::instrument;
 
@@ -1261,7 +1261,7 @@ pub fn check_unused_or_stable_features(tcx: TyCtxt<'_>) {
     // no unknown features, because the collection also does feature attribute validation.
     let local_defined_features = tcx.lib_features(LOCAL_CRATE);
     if !remaining_lib_features.is_empty() || !remaining_implications.is_empty() {
-        let crates = tcx.crates(());
+        let crates = tcx.crates(ty::CoherenceDomain::Everything);
 
         // Loading the implications of all crates is unavoidable to be able to emit the partial
         // stabilization diagnostic, but it can be avoided when there are no

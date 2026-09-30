@@ -221,7 +221,7 @@ impl Cache {
 
         // Cache where all our extern crates are located
         // This is also used in the JSON output.
-        for &crate_num in tcx.crates(()) {
+        for &crate_num in tcx.crates(ty::CoherenceDomain::Everything) {
             let e = ExternalCrate { crate_num };
 
             let name = e.name(tcx);

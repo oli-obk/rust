@@ -1295,7 +1295,7 @@ pub fn compute_hir_hash(tcx: TyCtxt<'_>) -> Fingerprint {
 
 fn upstream_crates(tcx: TyCtxt<'_>) -> Vec<(StableCrateId, Svh)> {
     let mut upstream_crates: Vec<_> = tcx
-        .crates(())
+        .crates(ty::CoherenceDomain::Everything)
         .iter()
         .map(|&cnum| {
             let stable_crate_id = tcx.stable_crate_id(cnum);

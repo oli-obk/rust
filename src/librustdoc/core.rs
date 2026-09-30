@@ -395,7 +395,7 @@ pub(crate) fn run_global_ctxt(
         output_format,
     };
 
-    for cnum in tcx.crates(()) {
+    for cnum in tcx.crates(ty::CoherenceDomain::Everything) {
         crate::visit_lib::lib_embargo_visit_item(&mut ctxt, cnum.as_def_id());
     }
 

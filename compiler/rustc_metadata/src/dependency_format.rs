@@ -57,7 +57,7 @@ use rustc_data_structures::fx::{FxHashMap, FxHashSet};
 use rustc_hir::def_id::{CrateNum, LOCAL_CRATE};
 use rustc_index::IndexVec;
 use rustc_middle::middle::dependency_format::{Dependencies, DependencyList, Linkage};
-use rustc_middle::ty::TyCtxt;
+use rustc_middle::ty::{self, TyCtxt};
 use rustc_span::{bug, sym};
 use rustc_structures::CrateType;
 use rustc_target::spec::PanicStrategy;
@@ -144,7 +144,7 @@ fn calculate_type(tcx: TyCtxt<'_>, ty: CrateType) -> DependencyList {
                     && sess.crt_static(Some(ty))
                     && !sess.target.crt_static_allows_dylibs)
             {
-                for &cnum in tcx.crates(()).iter() {
+                for &cnum in tcx.crates(ty::CoherenceDomain::Everything).iter() {
                     if tcx.crate_dep_kind(cnum).macros_only() {
                         continue;
                     }
@@ -161,7 +161,7 @@ fn calculate_type(tcx: TyCtxt<'_>, ty: CrateType) -> DependencyList {
     }
 
     let all_dylibs = || {
-        tcx.crates(()).iter().filter(|&&cnum| {
+        tcx.crates(ty::CoherenceDomain::Everything).iter().filter(|&&cnum| {
             !tcx.crate_dep_kind(cnum).macros_only()
                 && (tcx.used_crate_source(cnum).dylib.is_some()
                     || tcx.used_crate_source(cnum).sdylib_interface.is_some())
@@ -209,7 +209,7 @@ fn calculate_type(tcx: TyCtxt<'_>, ty: CrateType) -> DependencyList {
     }
 
     // Collect what we've got so far in the return vector.
-    let last_crate = tcx.crates(()).len();
+    let last_crate = tcx.crates(ty::CoherenceDomain::Everything).len();
     let mut ret = IndexVec::new();
 
     // We need to fill in something for LOCAL_CRATE as IndexVec is a dense map.
@@ -236,7 +236,7 @@ fn calculate_type(tcx: TyCtxt<'_>, ty: CrateType) -> DependencyList {
     //
     // If the crate hasn't been included yet and it's not actually required
     // (e.g., it's a panic runtime) then we skip it here as well.
-    for &cnum in tcx.crates(()).iter() {
+    for &cnum in tcx.crates(ty::CoherenceDomain::Everything).iter() {
         let src = tcx.used_crate_source(cnum);
         if src.dylib.is_none()
             && !formats.contains_key(&cnum)
@@ -309,7 +309,10 @@ fn add_library(
             // can be refined over time.
             if link2 != link || link == RequireStatic {
                 let linking_to_rustc_driver = tcx.sess.unstable_features.is_nightly_build()
-                    && tcx.crates(()).iter().any(|&cnum| tcx.crate_name(cnum) == sym::rustc_driver);
+                    && tcx
+                        .crates(ty::CoherenceDomain::Everything)
+                        .iter()
+                        .any(|&cnum| tcx.crate_name(cnum) == sym::rustc_driver);
                 tcx.dcx().emit_err(CrateDepMultiple {
                     crate_name: tcx.crate_name(cnum),
                     non_static_deps: unavailable_as_static
@@ -328,7 +331,7 @@ fn add_library(
 
 fn attempt_static(tcx: TyCtxt<'_>, unavailable: &mut Vec<CrateNum>) -> Option<DependencyList> {
     let all_crates_available_as_rlib = tcx
-        .crates(())
+        .crates(ty::CoherenceDomain::Everything)
         .iter()
         .copied()
         .filter_map(|cnum| {
@@ -350,7 +353,7 @@ fn attempt_static(tcx: TyCtxt<'_>, unavailable: &mut Vec<CrateNum>) -> Option<De
     // everything in explicitly so long as it's actually required.
     let mut ret = IndexVec::new();
     assert_eq!(ret.push(Linkage::Static), LOCAL_CRATE);
-    for &cnum in tcx.crates(()) {
+    for &cnum in tcx.crates(ty::CoherenceDomain::Everything) {
         assert_eq!(
             ret.push(match tcx.crate_dep_kind(cnum) {
                 CrateDepKind::Unconditional => Linkage::Static,

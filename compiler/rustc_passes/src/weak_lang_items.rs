@@ -4,7 +4,7 @@ use rustc_attr_ir::lang_items::{self, LangItem};
 use rustc_attr_ir::weak_lang_items::WEAK_LANG_ITEMS;
 use rustc_data_structures::fx::FxHashSet;
 use rustc_middle::middle::lang_items::required;
-use rustc_middle::ty::TyCtxt;
+use rustc_middle::ty::{self, TyCtxt};
 use rustc_structures::CrateType;
 
 use crate::diagnostics::{MissingLangItem, MissingPanicHandler, PanicUnwindWithoutStd};
@@ -41,7 +41,7 @@ fn verify(tcx: TyCtxt<'_>, items: &lang_items::LanguageItems) {
     }
 
     let mut missing = FxHashSet::default();
-    for &cnum in tcx.crates(()).iter() {
+    for &cnum in tcx.crates(ty::CoherenceDomain::Everything).iter() {
         for &item in tcx.missing_lang_items(cnum).iter() {
             missing.insert(item);
         }

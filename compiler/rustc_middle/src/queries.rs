@@ -1644,7 +1644,7 @@ rustc_queries! {
     }
 
     /// Given a trait `trait_id`, return all known `impl` blocks.
-    query trait_impls_of(trait_id: DefId) -> &'tcx ty::trait_def::TraitImpls {
+    query trait_impls_of((trait_id, coherence_domain): (DefId, ty::CoherenceDomain)) -> &'tcx ty::trait_def::TraitImpls {
         arena_cache
         desc { "finding trait impls of `{}`", tcx.def_path_str(trait_id) }
     }
@@ -2404,7 +2404,7 @@ rustc_queries! {
 
     /// All available crates in the graph, including those that should not be user-facing
     /// (such as private crates).
-    query crates(_: ()) -> &'tcx [CrateNum] {
+    query crates(domain: ty::CoherenceDomain) -> &'tcx [CrateNum] {
         eval_always
         desc { "fetching all foreign CrateNum instances" }
     }

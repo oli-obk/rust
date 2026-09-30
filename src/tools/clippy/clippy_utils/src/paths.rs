@@ -15,7 +15,7 @@ use rustc_hir::{ItemKind, Node, UseKind, UseTree};
 use rustc_lint::LateContext;
 use rustc_middle::ty::fast_reject::SimplifiedType;
 use rustc_middle::ty::layout::HasTyCtxt;
-use rustc_middle::ty::{FloatTy, IntTy, Ty, TyCtxt, UintTy};
+use rustc_middle::ty::{CoherenceDomain, FloatTy, IntTy, Ty, TyCtxt, UintTy};
 use rustc_span::{Ident, STDLIB_STABLE_CRATES, Symbol};
 use std::sync::OnceLock;
 
@@ -200,7 +200,7 @@ pub fn find_crates(tcx: TyCtxt<'_>, name: Symbol) -> &'static [DefId] {
     let map = BY_NAME.get_or_init(|| {
         let mut map = FxHashMap::default();
         map.insert(tcx.crate_name(LOCAL_CRATE), vec![LOCAL_CRATE.as_def_id()]);
-        for &num in tcx.crates(()) {
+        for &num in tcx.crates(CoherenceDomain::Everything) {
             map.entry(tcx.crate_name(num)).or_default().push(num.as_def_id());
         }
         map

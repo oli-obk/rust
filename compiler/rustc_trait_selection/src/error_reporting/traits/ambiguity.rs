@@ -447,7 +447,10 @@ impl<'a, 'tcx> TypeErrCtxt<'a, 'tcx> {
 
                         err.span_label(span, format!("cannot {verb} associated {noun} of trait"));
 
-                        let trait_impls = self.tcx.trait_impls_of(data.trait_ref.def_id);
+                        let trait_impls = self.tcx.trait_impls_of((
+                            data.trait_ref.def_id,
+                            ty::CoherenceDomain::Everything,
+                        ));
 
                         if let Some(&impl_def_id) =
                             trait_impls.non_blanket_impls().values().flatten().next()

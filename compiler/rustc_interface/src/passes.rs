@@ -684,7 +684,7 @@ fn write_out_deps(tcx: TyCtxt<'_>, outputs: &OutputFilenames, out_filenames: &[P
                 }
             }
 
-            for &cnum in tcx.crates(()) {
+            for &cnum in tcx.crates(ty::CoherenceDomain::Everything) {
                 let source = tcx.used_crate_source(cnum);
                 if let Some(path) = &source.dylib {
                     files.extend(hash_iter_files(

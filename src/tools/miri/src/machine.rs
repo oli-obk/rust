@@ -14,11 +14,11 @@ use rustc_abi::{Align, ExternAbi, Size};
 use rustc_apfloat::{Float, FloatConvert};
 use rustc_ast::Mutability;
 use rustc_ast::expand::allocator::{self, SpecialAllocatorMethod};
+use rustc_attr_ir::{InlineAttr, Linkage};
 use rustc_data_structures::either::Either;
 use rustc_data_structures::fx::{FxHashMap, FxHashSet};
 #[allow(unused)]
 use rustc_data_structures::static_assert_size;
-use rustc_attr_ir::{InlineAttr, Linkage};
 use rustc_hir::def::DefKind;
 use rustc_log::tracing;
 use rustc_middle::middle::codegen_fn_attrs::TargetFeatureKind;
@@ -902,7 +902,7 @@ impl<'tcx> MiriMachine<'tcx> {
             .map(|crates| crates.split(',').map(|krate| krate.to_string()).collect::<Vec<_>>())
             .unwrap_or_default();
         let mut local_crates = Vec::new();
-        for &crate_num in tcx.crates(()) {
+        for &crate_num in tcx.crates(ty::CoherenceDomain::Everything) {
             let name = tcx.crate_name(crate_num);
             let name = name.as_str();
             if local_crate_names

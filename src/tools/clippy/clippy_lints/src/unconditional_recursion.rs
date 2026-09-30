@@ -335,7 +335,9 @@ impl UnconditionalRecursion {
         if self.default_impl_for_type.is_empty()
             && let Some(default_trait_id) = cx.tcx.get_diagnostic_item(sym::Default)
         {
-            let impls = cx.tcx.trait_impls_of(default_trait_id);
+            let impls = cx
+                .tcx
+                .trait_impls_of((default_trait_id, ty::CoherenceDomain::Everything));
             for (ty, impl_def_ids) in impls.non_blanket_impls() {
                 let Some(self_def_id) = ty.def() else { continue };
                 for &impl_def_id in impl_def_ids {
