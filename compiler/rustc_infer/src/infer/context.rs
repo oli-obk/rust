@@ -40,6 +40,10 @@ impl<'tcx> rustc_type_ir::InferCtxtLike for InferCtxt<'tcx> {
         self.typing_mode_raw()
     }
 
+    fn coherence_domain(&self) -> ty::CoherenceDomain {
+        self.coherence_domain()
+    }
+
     fn universe(&self) -> ty::UniverseIndex {
         self.universe()
     }

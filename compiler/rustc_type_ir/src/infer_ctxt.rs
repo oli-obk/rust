@@ -401,6 +401,7 @@ pub trait InferCtxtLike: Sized {
     fn disable_trait_solver_fast_paths(&self) -> bool;
 
     fn typing_mode_raw(&self) -> TypingMode<Self::Interner>;
+    fn coherence_domain(&self) -> ty::CoherenceDomain;
 
     fn universe(&self) -> ty::UniverseIndex;
     fn create_next_universe(&self) -> ty::UniverseIndex;

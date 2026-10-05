@@ -431,6 +431,10 @@ where
         self.delegate.typing_mode_raw()
     }
 
+    pub(super) fn coherence_domain(&self) -> ty::CoherenceDomain {
+        self.delegate.coherence_domain()
+    }
+
     /// Computes the `PathKind` for the step from the current goal to the
     /// nested goal. See #136824 for a more detailed reasoning for this why we care about
     /// the step from a goal to its nested goals.

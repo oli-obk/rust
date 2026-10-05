@@ -89,6 +89,7 @@ impl<'tcx> InferCtxt<'tcx> {
             enable_next_solver_overflow_fcw: self.enable_next_solver_overflow_fcw.clone(),
             obligation_inspector: self.obligation_inspector.clone(),
             canonicalizer_state: Default::default(),
+            coherence_domain: self.coherence_domain,
         }
     }
 
@@ -120,6 +121,7 @@ impl<'tcx> InferCtxt<'tcx> {
             enable_next_solver_overflow_fcw: self.enable_next_solver_overflow_fcw.clone(),
             obligation_inspector: self.obligation_inspector.clone(),
             canonicalizer_state: Default::default(),
+            coherence_domain: self.coherence_domain,
         };
         forked.inner.borrow_mut().projection_cache().clear();
         forked

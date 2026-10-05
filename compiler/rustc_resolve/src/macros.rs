@@ -20,17 +20,20 @@ use rustc_expand::expand::{
 };
 use rustc_hir::def::{DefKind, MacroKinds, Namespace, NonMacroAttrKind};
 use rustc_hir::def_id::{CRATE_DEF_ID, CrateNum, DefId, LocalDefId};
+use rustc_infer::infer::TyCtxtInferExt as _;
+use rustc_infer::traits::{Obligation, ObligationCause};
 use rustc_lint_defs::builtin::{
     LEGACY_DERIVE_HELPERS, OUT_OF_SCOPE_MACRO_CALLS, UNUSED_MACRO_RULES, UNUSED_MACROS,
 };
 use rustc_middle::middle::stability;
-use rustc_middle::ty::{CoherenceDomain, RegisteredTools, TyCtxt};
+use rustc_middle::ty::{self, CoherenceDomain, RegisteredTools, TyCtxt, TypingMode, Upcast as _};
 use rustc_session::Session;
 use rustc_session::diagnostics::feature_err;
 use rustc_span::def_id::ModId;
 use rustc_span::edition::Edition;
 use rustc_span::hygiene::{self, AstPass, ExpnData, ExpnKind, LocalExpnId, MacroKind};
 use rustc_span::{DUMMY_SP, Ident, Span, Symbol, kw, sym};
+use rustc_trait_selection::traits::ObligationCtxt;
 
 use crate::Namespace::*;
 use crate::def_collector::collect_definitions;
@@ -640,11 +643,22 @@ impl<'ra, 'tcx> ResolverExpand for Resolver<'ra, 'tcx> {
     fn has_eq_impl(&mut self, id: DefId, _span: Span) -> bool {
         let self_ty = self.tcx.type_of(id).instantiate_identity().skip_norm_wip();
         let eq_id = self.tcx.get_lang_items(CoherenceDomain::Upstream).eq_trait().unwrap();
-        self.tcx
-            .for_each_relevant_impl(eq_id, self_ty, CoherenceDomain::Upstream, |_| {
-                Result::<_, ()>::Ok(())
-            })
-            .is_ok()
+        let infcx = self
+            .tcx
+            .infer_ctxt()
+            .with_coherence_domain(CoherenceDomain::Upstream)
+            .build(TypingMode::Codegen);
+        assert!(infcx.next_trait_solver());
+
+        let ocx = ObligationCtxt::new(&infcx);
+        let trait_ref = ty::TraitRef::new(self.tcx, eq_id, [self_ty, self_ty]);
+        ocx.register_obligation(Obligation {
+            cause: ObligationCause::dummy(),
+            recursion_depth: 0,
+            param_env: ty::ParamEnv::empty(),
+            predicate: trait_ref.upcast(self.tcx),
+        });
+        ocx.try_evaluate_obligations().no_errors()
     }
 }
 

@@ -248,6 +248,8 @@ pub struct InferCtxt<'tcx> {
     /// for more details.
     typing_mode: TypingMode<'tcx>,
 
+    coherence_domain: ty::CoherenceDomain,
+
     /// Whether this inference context should care about region obligations in
     /// the root universe. Most notably, this is used during HIR typeck as region
     /// solving is left to borrowck instead.
@@ -596,6 +598,7 @@ pub struct InferCtxtBuilder<'tcx> {
     /// which affects things like which solver is used in `predicate_may_hold`.
     next_trait_solver: bool,
     enable_next_solver_overflow_fcw: bool,
+    coherence_domain: ty::CoherenceDomain,
 }
 
 #[extension(pub trait TyCtxtInferExt<'tcx>)]
@@ -608,6 +611,7 @@ impl<'tcx> TyCtxt<'tcx> {
             skip_leak_check: false,
             next_trait_solver: self.next_trait_solver_globally(),
             enable_next_solver_overflow_fcw: true,
+            coherence_domain: ty::CoherenceDomain::Everything,
         }
     }
 }
@@ -638,6 +642,11 @@ impl<'tcx> InferCtxtBuilder<'tcx> {
 
     pub fn skip_leak_check(mut self, skip_leak_check: bool) -> Self {
         self.skip_leak_check = skip_leak_check;
+        self
+    }
+
+    pub fn with_coherence_domain(mut self, coherence_domain: ty::CoherenceDomain) -> Self {
+        self.coherence_domain = coherence_domain;
         self
     }
 
@@ -675,6 +684,7 @@ impl<'tcx> InferCtxtBuilder<'tcx> {
             in_hir_typeck,
             skip_leak_check,
             next_trait_solver,
+            coherence_domain,
             enable_next_solver_overflow_fcw,
         } = *self;
         InferCtxt {
@@ -697,6 +707,7 @@ impl<'tcx> InferCtxtBuilder<'tcx> {
             enable_next_solver_overflow_fcw: Cell::new(enable_next_solver_overflow_fcw),
             obligation_inspector: Cell::new(None),
             canonicalizer_state: Default::default(),
+            coherence_domain,
         }
     }
 }
@@ -752,6 +763,11 @@ impl<'tcx> InferCtxt<'tcx> {
     #[inline(always)]
     pub fn typing_mode_raw(&self) -> TypingMode<'tcx> {
         self.typing_mode
+    }
+
+    #[inline(always)]
+    pub fn coherence_domain(&self) -> ty::CoherenceDomain {
+        self.coherence_domain
     }
 
     #[inline(always)]

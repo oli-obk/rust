@@ -1,4 +1,4 @@
-//@ compile-flags: --crate-type=lib
+//@ compile-flags: --crate-type=lib -Znext-solver
 
 #![feature(ettsd)]
 #![no_std]
