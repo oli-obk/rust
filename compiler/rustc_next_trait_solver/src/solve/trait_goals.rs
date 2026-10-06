@@ -144,6 +144,7 @@ where
             clause_def_id: I::TraitId,
             goal_def_id: I::TraitId,
             polarity: ClausePolarity,
+            cd: ty::CoherenceDomain,
             goal_lang_item: Option<SolverTraitLangItem>,
         ) -> bool {
             clause_def_id == goal_def_id
@@ -153,7 +154,7 @@ where
             // `PointeeSized` bounds are syntactic sugar for a lack of bounds so don't need this.
                 || (polarity == ClausePolarity::Positive
                     && goal_lang_item == Some(SolverTraitLangItem::MetaSized)
-                    && cx.is_trait_lang_item(clause_def_id, SolverTraitLangItem::Sized))
+                    && cx.is_trait_lang_item(clause_def_id, SolverTraitLangItem::Sized, cd))
         }
 
         if let Some(trait_clause) = assumption.as_trait_clause()
@@ -163,6 +164,7 @@ where
                 trait_clause.def_id(),
                 goal.predicate.def_id(),
                 goal.predicate.polarity,
+                ecx.coherence_domain(),
                 goal_lang_item,
             )
             && DeepRejectCtxt::relate_rigid_rigid(ecx.cx()).args_may_unify(
@@ -189,8 +191,8 @@ where
         // are syntactic sugar for a lack of bounds so don't need this.
         // We don't need to check polarity, `fast_reject_assumption` already rejected non-`Positive`
         // polarity `Sized` assumptions as matching non-`Positive` `MetaSized` goals.
-        if ecx.cx().is_trait_lang_item(goal.predicate.def_id(), SolverTraitLangItem::MetaSized)
-            && ecx.cx().is_trait_lang_item(trait_clause.def_id(), SolverTraitLangItem::Sized)
+        if ecx.is_trait_lang_item(goal.predicate.def_id(), SolverTraitLangItem::MetaSized)
+            && ecx.is_trait_lang_item(trait_clause.def_id(), SolverTraitLangItem::Sized)
         {
             let meta_sized_clause =
                 trait_predicate_with_def_id(ecx.cx(), trait_clause, goal.predicate.def_id());
@@ -1437,9 +1439,7 @@ where
             // takes precedence over the structural auto trait candidate being
             // assembled.
             ty::Coroutine(def_id, _)
-                if self
-                    .cx()
-                    .is_trait_lang_item(goal.predicate.def_id(), SolverTraitLangItem::Unpin) =>
+                if self.is_trait_lang_item(goal.predicate.def_id(), SolverTraitLangItem::Unpin) =>
             {
                 match self.cx().coroutine_movability(def_id) {
                     Movability::Static => Some(Err(NoSolution.into())),

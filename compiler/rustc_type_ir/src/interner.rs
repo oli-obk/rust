@@ -445,7 +445,12 @@ pub trait Interner:
         lang_item: SolverProjectionLangItem,
     ) -> bool;
 
-    fn is_trait_lang_item(self, def_id: Self::TraitId, lang_item: SolverTraitLangItem) -> bool;
+    fn is_trait_lang_item(
+        self,
+        def_id: Self::TraitId,
+        lang_item: SolverTraitLangItem,
+        coherence_domain: ty::CoherenceDomain,
+    ) -> bool;
 
     fn is_default_trait(self, def_id: Self::TraitId) -> bool;
 

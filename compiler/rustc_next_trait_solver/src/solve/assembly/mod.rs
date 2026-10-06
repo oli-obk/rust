@@ -92,7 +92,7 @@ where
         // and `assumption`'s trait refs directly inside this function in
         // order to prevent unsoundness (see below).
 
-        let goal_lang_item = ecx.cx().as_trait_lang_item(goal.predicate.trait_def_id(ecx.cx()));
+        let goal_lang_item = ecx.as_trait_lang_item(goal.predicate.trait_def_id(ecx.cx()));
         Self::fast_reject_assumption(ecx, goal, goal_lang_item, assumption)?;
 
         ecx.probe_trait_candidate(source).enter(|ecx| {
@@ -223,7 +223,7 @@ where
         assumption: I::Clause,
         then: impl FnOnce(&mut EvalCtxt<'_, D>) -> QueryResultOrRerunNonErased<I>,
     ) -> Result<Candidate<I>, NoSolutionOrRerunNonErased> {
-        let goal_lang_item = ecx.cx().as_trait_lang_item(goal.predicate.trait_def_id(ecx.cx()));
+        let goal_lang_item = ecx.as_trait_lang_item(goal.predicate.trait_def_id(ecx.cx()));
         Self::fast_reject_assumption(ecx, goal, goal_lang_item, assumption)?;
 
         ecx.probe_trait_candidate(source)
@@ -727,7 +727,7 @@ where
 
         // There may be multiple unsize candidates for a trait with several supertraits:
         // `trait Foo: Bar<A> + Bar<B>` and `dyn Foo: Unsize<dyn Bar<_>>`
-        if cx.is_trait_lang_item(trait_def_id, SolverTraitLangItem::Unsize) {
+        if self.is_trait_lang_item(trait_def_id, SolverTraitLangItem::Unsize) {
             candidates.extend(G::consider_structural_builtin_unsize_candidates(self, goal)?);
         }
 
@@ -741,7 +741,7 @@ where
         candidates: &mut Vec<Candidate<I>>,
         failed_candidate_info: &mut FailedCandidateInfo,
     ) -> Result<(), RerunNonErased> {
-        let goal_lang_item = self.cx().as_trait_lang_item(goal.predicate.trait_def_id(self.cx()));
+        let goal_lang_item = self.as_trait_lang_item(goal.predicate.trait_def_id(self.cx()));
 
         for assumption in goal.param_env.caller_bounds() {
             match G::fast_reject_assumption(self, goal, goal_lang_item, assumption) {

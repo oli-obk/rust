@@ -142,7 +142,11 @@ impl<I: Interner, O: Elaboratable<I>> Elaborator<I, O> {
         // is present.
         if self.elaborate_sized == ElaborateSized::No
             && let Some(did) = clause.as_trait_clause().map(|c| c.def_id())
-            && self.cx.is_trait_lang_item(did, SolverTraitLangItem::Sized)
+            && self.cx.is_trait_lang_item(
+                did,
+                SolverTraitLangItem::Sized,
+                ty::CoherenceDomain::Everything,
+            )
         {
             return;
         }

@@ -440,6 +440,14 @@ where
         self.cx().as_trait_lang_item(def_id, self.delegate.coherence_domain())
     }
 
+    pub(super) fn is_trait_lang_item(
+        &self,
+        def_id: I::TraitId,
+        lang_item: SolverTraitLangItem,
+    ) -> bool {
+        self.cx().is_trait_lang_item(def_id, lang_item, self.delegate.coherence_domain())
+    }
+
     /// Computes the `PathKind` for the step from the current goal to the
     /// nested goal. See #136824 for a more detailed reasoning for this why we care about
     /// the step from a goal to its nested goals.
