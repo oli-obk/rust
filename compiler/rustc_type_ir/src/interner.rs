@@ -456,7 +456,11 @@ pub trait Interner:
         def_id: Self::TraitAssocTyId,
     ) -> Option<SolverProjectionLangItem>;
 
-    fn as_trait_lang_item(self, def_id: Self::TraitId) -> Option<SolverTraitLangItem>;
+    fn as_trait_lang_item(
+        self,
+        def_id: Self::TraitId,
+        coherence_domain: ty::CoherenceDomain,
+    ) -> Option<SolverTraitLangItem>;
 
     fn as_adt_lang_item(self, def_id: Self::AdtId) -> Option<SolverAdtLangItem>;
 

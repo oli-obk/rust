@@ -5,6 +5,7 @@ use std::ops::ControlFlow;
 use rustc_macros::StableHash;
 use rustc_type_ir::data_structures::HashSet;
 use rustc_type_ir::inherent::*;
+use rustc_type_ir::lang_items::SolverTraitLangItem;
 use rustc_type_ir::region_constraint::RegionConstraint;
 use rustc_type_ir::relate::Relate;
 use rustc_type_ir::relate::solver_relating::RelateExt;
@@ -433,6 +434,10 @@ where
 
     pub(super) fn coherence_domain(&self) -> ty::CoherenceDomain {
         self.delegate.coherence_domain()
+    }
+
+    pub(super) fn as_trait_lang_item(&self, def_id: I::TraitId) -> Option<SolverTraitLangItem> {
+        self.cx().as_trait_lang_item(def_id, self.delegate.coherence_domain())
     }
 
     /// Computes the `PathKind` for the step from the current goal to the

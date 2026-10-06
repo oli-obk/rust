@@ -637,7 +637,7 @@ where
         } else if cx.trait_is_alias(trait_def_id) {
             G::consider_trait_alias_candidate(self, goal)
         } else {
-            match cx.as_trait_lang_item(trait_def_id) {
+            match self.as_trait_lang_item(trait_def_id) {
                 Some(SolverTraitLangItem::Sized) => {
                     G::consider_builtin_sizedness_candidates(self, goal, SizedTraitKind::Sized)
                 }

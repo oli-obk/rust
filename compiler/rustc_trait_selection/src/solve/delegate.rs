@@ -61,6 +61,10 @@ impl<'tcx> SolverDelegate<'tcx> {
             // here, so let's try the slow path instead.
             && !self.typing_mode_raw().is_erased_not_coherence()
     }
+
+    pub fn as_lang_item(&self, def_id: DefId) -> Option<LangItem> {
+        self.tcx.get_lang_items(self.0.coherence_domain()).from_def_id(def_id)
+    }
 }
 
 /// Create a [`ComputeGoalFastPathOutcome`] signalling the goal is stalled
@@ -176,7 +180,7 @@ impl<'tcx> rustc_next_trait_solver::delegate::SolverDelegate for SolverDelegate<
                 {
                     goal_stalled_on_args_or_nonempty_opaques(thin_vec![TyOrConstInferVar::Ty(vid)])
                 } else if trait_pred.polarity() == ty::ClausePolarity::Positive {
-                    match self.0.tcx.as_lang_item(trait_pred.def_id()) {
+                    match self.as_lang_item(trait_pred.def_id()) {
                         Some(LangItem::Sized) | Some(LangItem::MetaSized) => {
                             let predicate = self.deeply_resolve_ignoring_regions(goal.predicate);
                             if sizedness_fast_path(self.tcx, predicate, goal.param_env) {

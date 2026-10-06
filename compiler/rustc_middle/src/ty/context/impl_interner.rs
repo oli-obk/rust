@@ -506,8 +506,8 @@ impl<'tcx> Interner for TyCtxt<'tcx> {
         lang_item_to_solver_lang_item(self.lang_items().from_def_id(def_id)?)
     }
 
-    fn as_trait_lang_item(self, def_id: DefId) -> Option<SolverTraitLangItem> {
-        lang_item_to_solver_trait_lang_item(self.lang_items().from_def_id(def_id)?)
+    fn as_trait_lang_item(self, def_id: DefId, coherence_domain: ty::CoherenceDomain) -> Option<SolverTraitLangItem> {
+        lang_item_to_solver_trait_lang_item(self.get_lang_items(coherence_domain).from_def_id(def_id)?)
     }
 
     fn as_adt_lang_item(self, def_id: DefId) -> Option<SolverAdtLangItem> {
