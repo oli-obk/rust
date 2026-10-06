@@ -398,7 +398,12 @@ impl<'a, 'tcx> ObligationProcessor for FulfillProcessor<'a, 'tcx> {
         let infcx = self.selcx.infcx;
 
         if !infcx.disable_trait_solver_fast_paths()
-            && sizedness_fast_path(infcx.tcx, obligation.predicate, obligation.param_env)
+            && sizedness_fast_path(
+                infcx.tcx,
+                infcx.coherence_domain(),
+                obligation.predicate,
+                obligation.param_env,
+            )
         {
             return ProcessResult::Changed(thin_vec![]);
         }

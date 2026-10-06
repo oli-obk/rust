@@ -190,6 +190,7 @@ fn evaluate_host_effect_from_conditionally_const_item_bounds<'tcx>(
         if tcx.is_conditionally_const(def_id) {
             for clause in elaborate(
                 tcx,
+                infcx.coherence_domain(),
                 tcx.explicit_implied_const_bounds(def_id)
                     .iter_instantiated_copied(tcx, alias_ty.args)
                     .map(Unnormalized::skip_norm_wip)

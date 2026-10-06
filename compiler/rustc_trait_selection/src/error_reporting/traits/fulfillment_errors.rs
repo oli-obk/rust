@@ -1652,19 +1652,19 @@ impl<'a, 'tcx> TypeErrCtxt<'a, 'tcx> {
 
         if let Some(error) = error.predicate.as_trait_clause() {
             self.enter_forall(error, |error| {
-                elaborate(self.tcx, std::iter::once(cond.predicate))
+                elaborate(self.tcx, self.coherence_domain(), std::iter::once(cond.predicate))
                     .filter_map(|implied| implied.as_trait_clause())
                     .any(|implied| self.can_match_trait(param_env, error, implied))
             })
         } else if let Some(error) = Self::as_host_effect_clause(error.predicate) {
             self.enter_forall(error, |error| {
-                elaborate(self.tcx, std::iter::once(cond.predicate))
+                elaborate(self.tcx, self.coherence_domain(), std::iter::once(cond.predicate))
                     .filter_map(Self::as_host_effect_clause)
                     .any(|implied| self.can_match_host_effect(param_env, error, implied))
             })
         } else if let Some(error) = error.predicate.as_projection_clause() {
             self.enter_forall(error, |error| {
-                elaborate(self.tcx, std::iter::once(cond.predicate))
+                elaborate(self.tcx, self.coherence_domain(), std::iter::once(cond.predicate))
                     .filter_map(|implied| implied.as_projection_clause())
                     .any(|implied| self.can_match_projection(param_env, error, implied))
             })
@@ -1700,7 +1700,7 @@ impl<'a, 'tcx> TypeErrCtxt<'a, 'tcx> {
             // `<C as FnOnce<..>>::Output` projection resting on it. A supertrait can hold
             // while `cond` fails though, so the projection is only covered if its own trait
             // goal is unproven too, otherwise it failed for its own reasons.
-            elaborate(self.tcx, std::iter::once(cond.predicate))
+            elaborate(self.tcx, self.coherence_domain(), std::iter::once(cond.predicate))
                 .filter_map(|implied| implied.as_trait_clause())
                 .any(|implied| self.can_match_trait(cond.param_env, trait_pred, implied))
                 && !self.predicate_must_hold_modulo_regions(&Obligation::new(

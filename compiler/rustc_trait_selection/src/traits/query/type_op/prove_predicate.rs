@@ -15,7 +15,12 @@ impl<'tcx> super::QueryTypeOp<'tcx> for ProvePredicate<'tcx> {
         infcx: &InferCtxt<'tcx>,
         key: &ParamEnvAnd<'tcx, Self>,
     ) -> Option<Self::QueryResponse> {
-        if sizedness_fast_path(infcx.tcx, key.value.predicate, key.param_env) {
+        if sizedness_fast_path(
+            infcx.tcx,
+            infcx.coherence_domain(),
+            key.value.predicate,
+            key.param_env,
+        ) {
             return Some(());
         }
 

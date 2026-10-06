@@ -542,7 +542,7 @@ rustc_queries! {
         desc { "elaborating item assumptions for `{}`", tcx.def_path_str(key) }
     }
 
-    query impl_super_outlives(key: DefId) -> ty::EarlyBinder<'tcx, ty::Clauses<'tcx>> {
+    query impl_super_outlives((key, _): (DefId, ty::CoherenceDomain)) -> ty::EarlyBinder<'tcx, ty::Clauses<'tcx>> {
         desc { "elaborating supertrait outlives for trait of `{}`", tcx.def_path_str(key) }
     }
 

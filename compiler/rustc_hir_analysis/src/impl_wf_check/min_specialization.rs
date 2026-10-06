@@ -326,6 +326,7 @@ fn check_predicates<'tcx>(
 ) -> Result<(), ErrorGuaranteed> {
     let impl1_clauses: Vec<(ty::Clause<'_>, _)> = traits::elaborate(
         tcx,
+        ty::CoherenceDomain::Everything,
         tcx.clauses_of(impl1_def_id)
             .instantiate(tcx, impl1_args)
             .into_iter()
@@ -340,6 +341,7 @@ fn check_predicates<'tcx>(
     } else {
         traits::elaborate(
             tcx,
+            ty::CoherenceDomain::Everything,
             tcx.clauses_of(impl2_node.def_id())
                 .instantiate(tcx, impl2_args)
                 .into_iter()
@@ -387,11 +389,15 @@ fn check_predicates<'tcx>(
 
         assert!(!obligations.has_infer());
         impl2_clauses.extend(
-            traits::elaborate(tcx, obligations)
+            traits::elaborate(tcx, ty::CoherenceDomain::Everything, obligations)
                 .filter_map(|obligation| obligation.predicate.as_clause()),
         )
     }
-    impl2_clauses.extend(traits::elaborate(tcx, always_applicable_traits));
+    impl2_clauses.extend(traits::elaborate(
+        tcx,
+        ty::CoherenceDomain::Everything,
+        always_applicable_traits,
+    ));
 
     let mut res = Ok(());
     for (clause1, span) in impl1_clauses {

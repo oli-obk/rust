@@ -13,7 +13,10 @@ where
 {
     type QueryResponse = T;
 
-    fn try_fast_path(infcx: &InferCtxt<'tcx>, key: &ParamEnvAnd<'tcx, Self>) -> Option<T> {
+    fn try_fast_path(
+        infcx: &InferCtxt<'tcx>,
+        key: &ParamEnvAnd<'tcx, Self>,
+    ) -> Option<T> {
         let value = key.value.value.skip_normalization();
         if !value.has_aliases() { Some(infcx.deeply_resolve_ignoring_regions(value)) } else { None }
     }

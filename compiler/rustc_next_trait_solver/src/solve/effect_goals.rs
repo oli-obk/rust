@@ -100,6 +100,7 @@ where
 
         for clause in elaborate::elaborate(
             cx,
+            ecx.coherence_domain(),
             cx.explicit_implied_const_bounds(def_id).iter_instantiated(cx, alias_ty.args).map(
                 |trait_ref| {
                     trait_ref.to_host_effect_clause(cx, goal.predicate.constness).skip_norm_wip()

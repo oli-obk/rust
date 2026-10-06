@@ -537,7 +537,12 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
         }
 
         if !self.infcx.disable_trait_solver_fast_paths()
-            && sizedness_fast_path(self.tcx(), obligation.predicate, obligation.param_env)
+            && sizedness_fast_path(
+                self.tcx(),
+                self.infcx.coherence_domain(),
+                obligation.predicate,
+                obligation.param_env,
+            )
         {
             return Ok(EvaluatedToOk);
         }
@@ -2758,7 +2763,10 @@ impl<'tcx> SelectionContext<'_, 'tcx> {
 
         // Register any outlives obligations from the trait here, cc #124336.
         if tcx.def_kind(def_id) == (DefKind::Impl { of_trait: true }) {
-            for clause in tcx.impl_super_outlives(def_id).iter_instantiated(tcx, args) {
+            for clause in tcx
+                .impl_super_outlives((def_id, self.infcx.coherence_domain()))
+                .iter_instantiated(tcx, args)
+            {
                 let clause = normalize_with_depth_to(
                     self,
                     param_env,

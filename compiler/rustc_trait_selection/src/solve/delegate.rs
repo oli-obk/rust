@@ -183,7 +183,12 @@ impl<'tcx> rustc_next_trait_solver::delegate::SolverDelegate for SolverDelegate<
                     match self.as_lang_item(trait_pred.def_id()) {
                         Some(LangItem::Sized) | Some(LangItem::MetaSized) => {
                             let predicate = self.deeply_resolve_ignoring_regions(goal.predicate);
-                            if sizedness_fast_path(self.tcx, predicate, goal.param_env) {
+                            if sizedness_fast_path(
+                                self.tcx,
+                                self.coherence_domain(),
+                                predicate,
+                                goal.param_env,
+                            ) {
                                 Outcome::TriviallyHolds
                             } else {
                                 Outcome::NoFastPath

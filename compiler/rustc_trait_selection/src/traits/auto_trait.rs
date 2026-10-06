@@ -401,6 +401,7 @@ impl<'tcx> AutoTraitFinder<'tcx> {
 
             let normalized_preds = elaborate(
                 tcx,
+                infcx.coherence_domain(),
                 computed_clauses.clone().chain(user_computed_clauses.iter().cloned()),
             );
             new_env = ty::ParamEnv::new(tcx, normalized_preds);

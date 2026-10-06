@@ -411,8 +411,9 @@ impl<'tcx> Interner for TyCtxt<'tcx> {
     fn impl_super_outlives(
         self,
         impl_def_id: DefId,
+        coherence_domain: ty::CoherenceDomain,
     ) -> ty::EarlyBinder<'tcx, impl IntoIterator<Item = ty::Clause<'tcx>>> {
-        self.impl_super_outlives(impl_def_id)
+        self.impl_super_outlives((impl_def_id, coherence_domain))
     }
 
     fn supertrait_def_ids(self, trait_def_id: DefId) -> impl Iterator<Item = DefId> {

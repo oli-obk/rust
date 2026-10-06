@@ -694,6 +694,7 @@ impl<'a, 'tcx> ConfirmContext<'a, 'tcx> {
 
         traits::elaborate(
             self.tcx,
+            self.coherence_domain(),
             inst_clauses.clauses.iter().copied().map(Unnormalized::skip_norm_wip),
         )
         // We don't care about regions here.

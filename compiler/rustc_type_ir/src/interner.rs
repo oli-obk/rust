@@ -408,6 +408,7 @@ pub trait Interner:
     fn impl_super_outlives(
         self,
         impl_def_id: Self::ImplId,
+        coherence_domain: ty::CoherenceDomain,
     ) -> ty::EarlyBinder<Self, impl IntoIterator<Item = Self::Clause>>;
 
     fn supertrait_def_ids(self, trait_def_id: Self::TraitId)

@@ -219,6 +219,7 @@ pub fn with_replaced_escaping_bound_vars<
 
 pub fn sizedness_fast_path<'tcx>(
     tcx: TyCtxt<'tcx>,
+    coherence_domain: ty::CoherenceDomain,
     predicate: ty::Predicate<'tcx>,
     param_env: ty::ParamEnv<'tcx>,
 ) -> bool {
@@ -229,7 +230,8 @@ pub fn sizedness_fast_path<'tcx>(
         predicate.kind().skip_binder()
         && trait_pred.polarity == ty::ClausePolarity::Positive
     {
-        let sizedness = match tcx.as_lang_item(trait_pred.def_id()) {
+        let sizedness = match tcx.get_lang_items(coherence_domain).from_def_id(trait_pred.def_id())
+        {
             Some(LangItem::Sized) => SizedTraitKind::Sized,
             Some(LangItem::MetaSized) => SizedTraitKind::MetaSized,
             _ => return false,

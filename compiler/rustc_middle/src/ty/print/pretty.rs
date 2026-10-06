@@ -1424,10 +1424,11 @@ pub trait PrettyPrinter<'tcx>: Printer<'tcx> + fmt::Write {
                         .with_self_ty(p.tcx(), p.tcx().types.trait_object_dummy_self);
 
                     let clause: ty::Clause<'tcx> = bound_principal_with_self.upcast(p.tcx());
-                    let super_projections: Vec<_> = elaborate::elaborate(p.tcx(), [clause])
-                        .filter_only_self()
-                        .filter_map(|clause| clause.as_projection_clause())
-                        .collect();
+                    let super_projections: Vec<_> =
+                        elaborate::elaborate(p.tcx(), ty::CoherenceDomain::Everything, [clause])
+                            .filter_only_self()
+                            .filter_map(|clause| clause.as_projection_clause())
+                            .collect();
 
                     let mut projections: Vec<_> = predicates
                         .projection_bounds()

@@ -134,6 +134,7 @@ pub(crate) fn check_refining_return_position_impl_trait_in_trait<'tcx>(
         );
         impl_bounds.extend(elaborate(
             tcx,
+            ty::CoherenceDomain::Everything,
             tcx.explicit_item_bounds(impl_opaque.kind)
                 .iter_instantiated_copied(tcx, impl_opaque.args)
                 .map(Unnormalized::skip_norm_wip),

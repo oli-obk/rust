@@ -492,7 +492,11 @@ pub(super) fn explicit_item_bounds_with_filter(
 
 pub(super) fn item_bounds(tcx: TyCtxt<'_>, def_id: DefId) -> ty::EarlyBinder<'_, ty::Clauses<'_>> {
     tcx.explicit_item_bounds(def_id).map_bound(|bounds| {
-        tcx.mk_clauses_from_iter(util::elaborate(tcx, bounds.iter().map(|&(bound, _span)| bound)))
+        tcx.mk_clauses_from_iter(util::elaborate(
+            tcx,
+            ty::CoherenceDomain::Everything,
+            bounds.iter().map(|&(bound, _span)| bound),
+        ))
     })
 }
 
@@ -502,7 +506,12 @@ pub(super) fn item_self_bounds(
 ) -> ty::EarlyBinder<'_, ty::Clauses<'_>> {
     tcx.explicit_item_self_bounds(def_id).map_bound(|bounds| {
         tcx.mk_clauses_from_iter(
-            util::elaborate(tcx, bounds.iter().map(|&(bound, _span)| bound)).filter_only_self(),
+            util::elaborate(
+                tcx,
+                ty::CoherenceDomain::Everything,
+                bounds.iter().map(|&(bound, _span)| bound),
+            )
+            .filter_only_self(),
         )
     })
 }
@@ -529,16 +538,18 @@ pub(super) fn item_non_self_bounds(
 /// trait that are outlives bounds.
 pub(super) fn impl_super_outlives(
     tcx: TyCtxt<'_>,
-    def_id: DefId,
+    (def_id, coherence_domain): (DefId, ty::CoherenceDomain),
 ) -> ty::EarlyBinder<'_, ty::Clauses<'_>> {
     tcx.impl_trait_header(def_id).trait_ref.map_bound(|trait_ref| {
         let clause: ty::Clause<'_> = trait_ref.upcast(tcx);
-        tcx.mk_clauses_from_iter(util::elaborate(tcx, [clause]).filter(|clause| {
-            matches!(
-                clause.kind().skip_binder(),
-                ty::ClauseKind::TypeOutlives(_) | ty::ClauseKind::RegionOutlives(_)
-            )
-        }))
+        tcx.mk_clauses_from_iter(util::elaborate(tcx, coherence_domain, [clause]).filter(
+            |clause| {
+                matches!(
+                    clause.kind().skip_binder(),
+                    ty::ClauseKind::TypeOutlives(_) | ty::ClauseKind::RegionOutlives(_)
+                )
+            },
+        ))
     })
 }
 

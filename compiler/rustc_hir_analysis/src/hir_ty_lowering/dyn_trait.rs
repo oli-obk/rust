@@ -211,6 +211,7 @@ impl<'tcx> dyn HirTyLowerer<'tcx> + '_ {
 
             for ClauseWithSupertraitSpan { clause, supertrait_span } in traits::elaborate(
                 tcx,
+                ty::CoherenceDomain::Everything,
                 [ClauseWithSupertraitSpan::new(
                     ty::TraitRef::identity(tcx, principal_trait.def_id()).upcast(tcx),
                     *spans.last().unwrap(),

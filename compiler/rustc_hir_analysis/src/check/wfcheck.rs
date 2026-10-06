@@ -2334,7 +2334,8 @@ impl<'tcx> WfCheckingCtxt<'_, 'tcx> {
 
         let clauses_with_span = tcx.clauses_of(self.body_def_id).clauses.iter().copied();
         // Check elaborated bounds.
-        let implied_obligations = traits::elaborate(tcx, clauses_with_span);
+        let implied_obligations =
+            traits::elaborate(tcx, self.ocx.infcx.coherence_domain(), clauses_with_span);
 
         for (clause, obligation_span) in implied_obligations {
             match clause.kind().skip_binder() {
@@ -2522,7 +2523,11 @@ impl<'tcx> WfCheckingCtxt<'_, 'tcx> {
             region_outlives.iter().map(|&c| ty::Binder::dummy(ty::ClauseKind::RegionOutlives(c)));
         let explicit_clauses: Vec<ty::Clause<'tcx>> =
             ty.chain(reg).map(|c| c.upcast(self.tcx())).collect();
-        for elaborated in ty::elaborate::elaborate(self.tcx(), explicit_clauses.iter().copied()) {
+        for elaborated in ty::elaborate::elaborate(
+            self.tcx(),
+            self.infcx.coherence_domain(),
+            explicit_clauses.iter().copied(),
+        ) {
             if !explicit_clauses.contains(&elaborated) {
                 let mut err = self.tcx().dcx().struct_span_err(
                     span,

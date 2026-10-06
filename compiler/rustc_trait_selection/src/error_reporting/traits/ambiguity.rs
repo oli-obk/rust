@@ -153,9 +153,11 @@ pub fn compute_applicable_impls_for_diagnostics<'tcx>(
     let body_def_id = obligation.cause.body_def_id;
     if body_def_id != CRATE_DEF_ID {
         let clauses = tcx.clauses_of(body_def_id.to_def_id()).instantiate_identity(tcx);
-        for (clause, span) in
-            elaborate(tcx, clauses.into_iter().map(|(c, s)| (c.skip_norm_wip(), s)))
-        {
+        for (clause, span) in elaborate(
+            tcx,
+            infcx.coherence_domain(),
+            clauses.into_iter().map(|(c, s)| (c.skip_norm_wip(), s)),
+        ) {
             let kind = clause.kind();
             if let ty::ClauseKind::Trait(trait_pred) = kind.skip_binder()
                 && param_env_candidate_may_apply(kind.rebind(trait_pred))

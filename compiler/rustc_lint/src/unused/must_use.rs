@@ -186,6 +186,7 @@ pub fn is_ty_must_use<'tcx>(
         ) => {
             elaborate(
                 cx.tcx,
+                ty::CoherenceDomain::Everything,
                 cx.tcx
                     .explicit_item_self_bounds(def)
                     .iter_identity_copied()

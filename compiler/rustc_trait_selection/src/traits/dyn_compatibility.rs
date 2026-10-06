@@ -327,18 +327,20 @@ fn generics_require_sized_self(tcx: TyCtxt<'_>, def_id: DefId) -> bool {
         .into_iter()
         .map(Unnormalized::skip_norm_wip)
         .collect();
-    elaborate(tcx, clauses).any(|clause| match clause.kind().skip_binder() {
-        ty::ClauseKind::Trait(ref trait_pred) => {
-            trait_pred.def_id() == sized_def_id && trait_pred.self_ty().is_param(0)
+    elaborate(tcx, ty::CoherenceDomain::Everything, clauses).any(|clause| {
+        match clause.kind().skip_binder() {
+            ty::ClauseKind::Trait(ref trait_pred) => {
+                trait_pred.def_id() == sized_def_id && trait_pred.self_ty().is_param(0)
+            }
+            ty::ClauseKind::RegionOutlives(_)
+            | ty::ClauseKind::TypeOutlives(_)
+            | ty::ClauseKind::Projection(_)
+            | ty::ClauseKind::ConstArgHasType(_, _)
+            | ty::ClauseKind::WellFormed(_)
+            | ty::ClauseKind::ConstEvaluatable(_)
+            | ty::ClauseKind::UnstableFeature(_)
+            | ty::ClauseKind::HostEffect(..) => false,
         }
-        ty::ClauseKind::RegionOutlives(_)
-        | ty::ClauseKind::TypeOutlives(_)
-        | ty::ClauseKind::Projection(_)
-        | ty::ClauseKind::ConstArgHasType(_, _)
-        | ty::ClauseKind::WellFormed(_)
-        | ty::ClauseKind::ConstEvaluatable(_)
-        | ty::ClauseKind::UnstableFeature(_)
-        | ty::ClauseKind::HostEffect(..) => false,
     })
 }
 

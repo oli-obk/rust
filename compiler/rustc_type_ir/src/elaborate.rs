@@ -16,6 +16,7 @@ use crate::{self as ty, Interner, Region, Unnormalized, Upcast as _};
 /// `T: Foo`, then we know that `T: 'static`.
 pub struct Elaborator<I: Interner, O> {
     cx: I,
+    coherence_domain: ty::CoherenceDomain,
     stack: Vec<O>,
     visited: HashSet<ty::Binder<I, ty::PredicateKind<I>>>,
     mode: Filter,
@@ -85,6 +86,7 @@ impl<I: Interner> Elaboratable<I> for ClauseWithSupertraitSpan<I> {
 
 pub fn elaborate<I: Interner, O: Elaboratable<I>>(
     cx: I,
+    coherence_domain: ty::CoherenceDomain,
     obligations: impl IntoIterator<Item = O>,
 ) -> Elaborator<I, O> {
     let mut elaborator = Elaborator {
@@ -93,6 +95,7 @@ pub fn elaborate<I: Interner, O: Elaboratable<I>>(
         visited: HashSet::default(),
         mode: Filter::All,
         elaborate_sized: ElaborateSized::No,
+        coherence_domain,
     };
     elaborator.extend_deduped(obligations);
     elaborator
@@ -142,11 +145,7 @@ impl<I: Interner, O: Elaboratable<I>> Elaborator<I, O> {
         // is present.
         if self.elaborate_sized == ElaborateSized::No
             && let Some(did) = clause.as_trait_clause().map(|c| c.def_id())
-            && self.cx.is_trait_lang_item(
-                did,
-                SolverTraitLangItem::Sized,
-                ty::CoherenceDomain::Everything,
-            )
+            && self.cx.is_trait_lang_item(did, SolverTraitLangItem::Sized, self.coherence_domain)
         {
             return;
         }
@@ -357,7 +356,9 @@ pub fn supertraits<I: Interner>(
     cx: I,
     trait_ref: ty::Binder<I, ty::TraitRef<I>>,
 ) -> FilterToTraits<I, Elaborator<I, I::Clause>> {
-    elaborate(cx, [trait_ref.upcast(cx)]).filter_only_self().filter_to_traits()
+    elaborate(cx, ty::CoherenceDomain::Everything, [trait_ref.upcast(cx)])
+        .filter_only_self()
+        .filter_to_traits()
 }
 
 impl<I: Interner> Elaborator<I, I::Clause> {

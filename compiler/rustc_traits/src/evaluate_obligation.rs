@@ -24,7 +24,9 @@ fn evaluate_obligation<'tcx>(
     debug!("evaluate_obligation: goal={:#?}", goal);
     let ParamEnvAnd { param_env, value: predicate } = goal;
 
-    if !tcx.disable_trait_solver_fast_paths() && sizedness_fast_path(tcx, predicate, param_env) {
+    if !tcx.disable_trait_solver_fast_paths()
+        && sizedness_fast_path(tcx, infcx.coherence_domain(), predicate, param_env)
+    {
         return Ok(EvaluationResult::EvaluatedToOk);
     }
 

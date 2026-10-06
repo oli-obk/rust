@@ -416,7 +416,8 @@ impl<'a, 'tcx> WfPredicates<'a, 'tcx> {
                 obligations.push(obligation)
             });
             debug!("compute_trait_pred obligations {:?}", obligations);
-            let implied_obligations = traits::util::elaborate(tcx, obligations);
+            let implied_obligations =
+                traits::util::elaborate(tcx, self.infcx.coherence_domain(), obligations);
             let implied_obligations = implied_obligations.map(extend);
             self.out.extend(implied_obligations);
         } else {
@@ -1274,7 +1275,7 @@ pub fn object_region_bounds<'tcx>(
     let clauses =
         existential_predicates.iter().map(|predicate| predicate.with_self_ty(tcx, erased_self_ty));
 
-    traits::elaborate(tcx, clauses)
+    traits::elaborate(tcx, ty::CoherenceDomain::Everything, clauses)
         .filter_map(|clause| {
             debug!(?clause);
             match clause.kind().skip_binder() {

@@ -1045,7 +1045,7 @@ where
                 let predicate: I::Predicate = trait_ref.upcast(cx);
                 ecx.add_goals(
                     GoalSource::Misc,
-                    elaborate::elaborate(cx, [predicate])
+                    elaborate::elaborate(cx, ecx.coherence_domain(),[predicate])
                         .skip(1)
                         .map(|predicate| goal.with(cx, predicate)),
                 )?;

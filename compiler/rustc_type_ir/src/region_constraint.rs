@@ -124,7 +124,7 @@ impl<I: Interner> Assumptions<I> {
             region_outlives_builder.add(r1, r2);
         }
 
-        let clauses = elaborate::elaborate(infcx.cx(), clauses)
+        let clauses = elaborate::elaborate(infcx.cx(), infcx.coherence_domain(), clauses)
             .filter(|clause| max_universe(infcx, *clause) == universe);
         for clause in clauses {
             match clause.kind().skip_binder() {

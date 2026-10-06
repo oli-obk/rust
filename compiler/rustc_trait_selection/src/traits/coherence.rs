@@ -442,6 +442,7 @@ fn impl_intersection_has_negative_obligation(
 
     util::elaborate(
         tcx,
+        infcx.coherence_domain(),
         tcx.clauses_of(impl2_def_id)
             .instantiate(tcx, impl2_header.impl_args)
             .into_iter()

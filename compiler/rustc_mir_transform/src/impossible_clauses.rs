@@ -91,7 +91,8 @@ pub(crate) fn has_impossible_clauses<'tcx>(tcx: TyCtxt<'tcx>, def_id: DefId) -> 
                 | TypeFlags::HAS_CONST_ALIAS,
         )
     });
-    let clauses: Vec<_> = traits::elaborate(tcx, clauses).collect();
+    let clauses: Vec<_> =
+        traits::elaborate(tcx, ty::CoherenceDomain::Everything, clauses).collect();
     tracing::trace!(?clauses);
     clauses.references_error() || traits::impossible_clauses(tcx, clauses)
 }

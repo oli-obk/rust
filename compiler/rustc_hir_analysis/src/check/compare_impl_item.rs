@@ -2606,6 +2606,7 @@ pub(super) fn check_type_bounds<'tcx>(
 
     let mut obligations: Vec<_> = util::elaborate(
         tcx,
+        infcx.coherence_domain(),
         tcx.explicit_item_bounds(trait_ty.def_id)
             .iter_instantiated_copied(tcx, rebased_args)
             .map(Unnormalized::skip_norm_wip)
@@ -2620,6 +2621,7 @@ pub(super) fn check_type_bounds<'tcx>(
     if tcx.is_conditionally_const(impl_ty_def_id) {
         obligations.extend(util::elaborate(
             tcx,
+            infcx.coherence_domain(),
             tcx.explicit_implied_const_bounds(trait_ty.def_id)
                 .iter_instantiated_copied(tcx, rebased_args)
                 .map(Unnormalized::skip_norm_wip)

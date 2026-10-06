@@ -114,7 +114,7 @@ where
             // all supertrait obligations unconditionally.
             ecx.add_goals(
                 GoalSource::Misc,
-                cx.impl_super_outlives(impl_def_id)
+                cx.impl_super_outlives(impl_def_id, ecx.coherence_domain())
                     .iter_instantiated(cx, impl_args)
                     .map(Unnormalized::skip_norm_wip)
                     .map(|pred| goal.with(cx, pred)),

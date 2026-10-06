@@ -453,6 +453,7 @@ pub fn normalize_param_env_or_error<'tcx>(
     // can be sure that no errors should occur.
     let mut clauses: Vec<_> = util::elaborate(
         tcx,
+        ty::CoherenceDomain::Everything,
         unnormalized_env.caller_bounds().into_iter().map(|clause| {
             if tcx.features().generic_const_exprs() || tcx.next_trait_solver_globally() {
                 return clause;

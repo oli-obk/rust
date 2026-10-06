@@ -343,6 +343,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
 
         for (clause, span) in traits::elaborate(
             self.tcx,
+            self.coherence_domain(),
             // Reverse the obligations here, since `elaborate_*` uses a stack,
             // and we want to keep inference generally in the same order of
             // the registered obligations.
