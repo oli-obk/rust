@@ -658,14 +658,14 @@ impl<'tcx> InferCtxtBuilder<'tcx> {
     /// the bound values in `C` to their instantiated values in `V`
     /// (in other words, `S(C) = V`).
     pub fn build_with_canonical<T>(
-        mut self,
+        self,
         span: Span,
         input: &CanonicalQueryInput<'tcx, T>,
     ) -> (InferCtxt<'tcx>, T, CanonicalVarValues<'tcx>)
     where
         T: TypeFoldable<TyCtxt<'tcx>>,
     {
-        let infcx = self.build(input.typing_mode.0);
+        let infcx = self.with_coherence_domain(input.coherence_domain).build(input.typing_mode.0);
         let (value, args) = infcx.instantiate_canonical(span, &input.canonical);
         (infcx, value, args)
     }

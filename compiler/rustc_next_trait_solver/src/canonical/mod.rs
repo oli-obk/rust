@@ -73,6 +73,7 @@ where
     let query_input = delegate.cx().mk_canonical_input(ty::CanonicalQueryInput {
         canonical,
         typing_mode: TypingModeEqWrapper(typing_mode),
+        coherence_domain: delegate.coherence_domain(),
     });
     (orig_values, query_input)
 }

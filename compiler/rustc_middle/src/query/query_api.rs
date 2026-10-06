@@ -96,7 +96,7 @@ macro_rules! define_query_api {
                 // Increase this limit if necessary, but do try to keep the size low if possible
                 #[cfg(target_pointer_width = "64")]
                 const _: () = {
-                    if size_of::<Key<'static>>() > 88 {
+                    if size_of::<Key<'static>>() > 96 {
                         panic!("{}", concat!(
                             "the query `",
                             stringify!($name),

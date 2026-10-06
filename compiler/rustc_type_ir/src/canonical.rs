@@ -22,6 +22,7 @@ use crate::{self as ty, Interner, TypingModeEqWrapper, UniverseIndex};
 pub struct CanonicalQueryInput<I: Interner, V> {
     pub canonical: Canonical<I, V>,
     pub typing_mode: TypingModeEqWrapper<I>,
+    pub coherence_domain: ty::CoherenceDomain,
 }
 
 impl<I: Interner, V: Eq> Eq for CanonicalQueryInput<I, V> {}
