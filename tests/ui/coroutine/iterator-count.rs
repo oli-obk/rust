@@ -20,7 +20,7 @@ impl<T: Coroutine<(), Return = ()> + Unpin> Iterator for W<T> {
     }
 }
 
-fn test() -> impl Coroutine<(), Return = (), Yield = u8> + Unpin {
+fn test() -> impl for<'y> Coroutine<(), Return = (), Yield<'y> = u8> + Unpin {
     #[coroutine]
     || {
         for i in 1..6 {
