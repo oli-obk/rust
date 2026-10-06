@@ -5,5 +5,5 @@
 
 use core::expansion_time_type_system_demo;
 
-expansion_time_type_system_demo!(core::alloc::Layout);
+expansion_time_type_system_demo!(core::primitive::u32);
 //~^ ERROR: has eq impl

@@ -4,7 +4,7 @@
 use std::mem;
 use std::sync::Arc;
 
-use rustc_ast::{self as ast, Crate, DelegationSuffixes, NodeId};
+use rustc_ast::{self as ast, Crate, DelegationSuffixes, FloatTy, IntTy, NodeId, UintTy};
 use rustc_ast_pretty::pprust;
 use rustc_attr_ir::{Attribute, AttributeKind, CfgEntry, StabilityLevel, StrippedCfgItem};
 use rustc_attr_parsing::AttributeParser;
@@ -614,7 +614,7 @@ impl<'ra, 'tcx> ResolverExpand for Resolver<'ra, 'tcx> {
         self.impl_trait_names.insert(id, name);
     }
 
-    fn resolve_path(&mut self, path: &ast::Path) -> Result<DefId, Indeterminate> {
+    fn resolve_path(&mut self, path: &ast::Path) -> Result<Res, Indeterminate> {
         let parent_scope = ParentScope::module(
             self.get_module(CRATE_DEF_ID.into()).unwrap().expect_local(),
             self.arenas,
@@ -629,9 +629,7 @@ impl<'ra, 'tcx> ResolverExpand for Resolver<'ra, 'tcx> {
         );
         match res {
             PathResult::Module(_) => todo!(),
-            PathResult::NonModule(partial_res) => {
-                partial_res.expect_full_res().opt_def_id().ok_or(Indeterminate)
-            }
+            PathResult::NonModule(partial_res) => Ok(partial_res.expect_full_res()),
             PathResult::Indeterminate => Err(Indeterminate),
             PathResult::Failed { span, message, .. } => {
                 self.dcx().span_err(span, message);
@@ -640,8 +638,39 @@ impl<'ra, 'tcx> ResolverExpand for Resolver<'ra, 'tcx> {
         }
     }
 
-    fn has_eq_impl(&mut self, id: DefId, _span: Span) -> bool {
-        let self_ty = self.tcx.type_of(id).instantiate_identity().skip_norm_wip();
+    fn has_eq_impl(&mut self, res: Res, _span: Span) -> bool {
+        let self_ty = match res {
+            Res::Def(_, def_id) => self.tcx.type_of(def_id).instantiate_identity().skip_norm_wip(),
+            Res::PrimTy(prim_ty) => match prim_ty {
+                rustc_hir::PrimTy::Int(IntTy::I128) => self.tcx.types.i128,
+                rustc_hir::PrimTy::Int(IntTy::I64) => self.tcx.types.i64,
+                rustc_hir::PrimTy::Int(IntTy::I32) => self.tcx.types.i32,
+                rustc_hir::PrimTy::Int(IntTy::I16) => self.tcx.types.i16,
+                rustc_hir::PrimTy::Int(IntTy::I8) => self.tcx.types.i8,
+                rustc_hir::PrimTy::Int(IntTy::Isize) => self.tcx.types.isize,
+                rustc_hir::PrimTy::Uint(UintTy::U128) => self.tcx.types.u128,
+                rustc_hir::PrimTy::Uint(UintTy::U64) => self.tcx.types.u64,
+                rustc_hir::PrimTy::Uint(UintTy::U32) => self.tcx.types.u32,
+                rustc_hir::PrimTy::Uint(UintTy::U16) => self.tcx.types.u16,
+                rustc_hir::PrimTy::Uint(UintTy::U8) => self.tcx.types.u8,
+                rustc_hir::PrimTy::Uint(UintTy::Usize) => self.tcx.types.usize,
+                rustc_hir::PrimTy::Float(FloatTy::F128) => self.tcx.types.f128,
+                rustc_hir::PrimTy::Float(FloatTy::F64) => self.tcx.types.f64,
+                rustc_hir::PrimTy::Float(FloatTy::F32) => self.tcx.types.f32,
+                rustc_hir::PrimTy::Float(FloatTy::F16) => self.tcx.types.f16,
+                rustc_hir::PrimTy::Str => self.tcx.types.str_,
+                rustc_hir::PrimTy::Bool => self.tcx.types.bool,
+                rustc_hir::PrimTy::Char => self.tcx.types.char,
+            },
+            Res::SelfTyParam { .. } => todo!(),
+            Res::SelfTyAlias { .. } => todo!(),
+            Res::SelfCtor(..) => todo!(),
+            Res::Local(_) => todo!(),
+            Res::ToolMod => todo!(),
+            Res::OpenMod(..) => todo!(),
+            Res::NonMacroAttr(..) => todo!(),
+            Res::Err => todo!(),
+        };
         let eq_id = self.tcx.get_lang_items(CoherenceDomain::Upstream).eq_trait().unwrap();
         let infcx = self
             .tcx

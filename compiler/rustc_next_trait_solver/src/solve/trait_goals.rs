@@ -1650,7 +1650,8 @@ where
             return Err(NoSolution);
         }
 
-        let candidate_preference_mode = CandidatePreferenceMode::compute(self.cx(), trait_def_id);
+        let candidate_preference_mode =
+            CandidatePreferenceMode::compute(self.cx(), trait_def_id, self.coherence_domain());
         if self.typing_mode().is_coherence() {
             return Ok(match self.try_merge_impl_candidates(trait_def_id, &candidates) {
                 Some(response) => (response, Some(TraitGoalProvenVia::Misc)),

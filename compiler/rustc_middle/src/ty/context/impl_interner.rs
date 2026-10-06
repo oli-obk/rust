@@ -505,8 +505,8 @@ impl<'tcx> Interner for TyCtxt<'tcx> {
         self.is_default_trait(def_id)
     }
 
-    fn is_sizedness_trait(self, def_id: DefId) -> bool {
-        self.is_sizedness_trait(def_id)
+    fn is_sizedness_trait(self, def_id: DefId, coherence_domain: ty::CoherenceDomain) -> bool {
+        self.is_sizedness_trait(def_id, coherence_domain)
     }
 
     fn as_projection_lang_item(self, def_id: DefId) -> Option<SolverProjectionLangItem> {

@@ -414,8 +414,11 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
             }
         } else {
             let has_non_region_infer = stack.obligation.predicate.has_non_region_infer();
-            let candidate_preference_mode =
-                CandidatePreferenceMode::compute(self.tcx(), stack.obligation.predicate.def_id());
+            let candidate_preference_mode = CandidatePreferenceMode::compute(
+                self.tcx(),
+                stack.obligation.predicate.def_id(),
+                self.infcx.coherence_domain(),
+            );
             Ok(self.winnow_candidates(has_non_region_infer, candidate_preference_mode, candidates))
         }
     }

@@ -13,7 +13,7 @@ use rustc_data_structures::fx::{FxHashMap, FxIndexMap};
 use rustc_data_structures::sync;
 use rustc_errors::{BufferedEarlyLint, DiagCtxtHandle, ErrorGuaranteed};
 use rustc_feature::Features;
-use rustc_hir::def::MacroKinds;
+use rustc_hir::def::{MacroKinds, Res};
 use rustc_lint_defs::RegisteredTools;
 use rustc_parse::MACRO_ARGUMENTS;
 use rustc_parse::parser::Parser;
@@ -1057,9 +1057,9 @@ pub trait ResolverExpand {
         force: bool,
     ) -> Result<Arc<SyntaxExtension>, Indeterminate>;
 
-    fn resolve_path(&mut self, path: &ast::Path) -> Result<DefId, Indeterminate>;
+    fn resolve_path(&mut self, path: &ast::Path) -> Result<Res<NodeId>, Indeterminate>;
 
-    fn has_eq_impl(&mut self, id: DefId, span: Span) -> bool;
+    fn has_eq_impl(&mut self, res: Res<NodeId>, span: Span) -> bool;
 
     fn record_macro_rule_usage(&mut self, mac_id: NodeId, rule_index: usize);
 

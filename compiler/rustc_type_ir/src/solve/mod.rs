@@ -460,8 +460,13 @@ pub enum CandidatePreferenceMode {
 
 impl CandidatePreferenceMode {
     /// Given `trait_def_id`, which candidate preference mode should be used?
-    pub fn compute<I: Interner>(cx: I, trait_id: I::TraitId) -> CandidatePreferenceMode {
-        let is_sizedness_or_auto_or_default_goal = cx.is_sizedness_trait(trait_id)
+    pub fn compute<I: Interner>(
+        cx: I,
+        trait_id: I::TraitId,
+        coherence_domain: ty::CoherenceDomain,
+    ) -> CandidatePreferenceMode {
+        let is_sizedness_or_auto_or_default_goal = cx
+            .is_sizedness_trait(trait_id, coherence_domain)
             || cx.trait_is_auto(trait_id)
             || cx.is_default_trait(trait_id);
         if is_sizedness_or_auto_or_default_goal {

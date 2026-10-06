@@ -931,7 +931,7 @@ where
         candidates: &mut Vec<Candidate<I>>,
     ) {
         let cx = self.cx();
-        if cx.is_sizedness_trait(goal.predicate.trait_def_id(cx)) {
+        if cx.is_sizedness_trait(goal.predicate.trait_def_id(cx), self.coherence_domain()) {
             // `dyn MetaSized` is valid, but should get its `MetaSized` impl from
             // being `dyn` (SizedCandidate), not from the object candidate.
             return;
@@ -1045,7 +1045,7 @@ where
                 let predicate: I::Predicate = trait_ref.upcast(cx);
                 ecx.add_goals(
                     GoalSource::Misc,
-                    elaborate::elaborate(cx, ecx.coherence_domain(),[predicate])
+                    elaborate::elaborate(cx, ecx.coherence_domain(), [predicate])
                         .skip(1)
                         .map(|predicate| goal.with(cx, predicate)),
                 )?;

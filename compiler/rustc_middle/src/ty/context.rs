@@ -948,8 +948,11 @@ impl<'tcx> TyCtxt<'tcx> {
         self.default_traits().iter().any(|&default_trait| self.is_lang_item(def_id, default_trait))
     }
 
-    pub fn is_sizedness_trait(self, def_id: DefId) -> bool {
-        matches!(self.as_lang_item(def_id), Some(LangItem::Sized | LangItem::MetaSized))
+    pub fn is_sizedness_trait(self, def_id: DefId, coherence_domain: ty::CoherenceDomain) -> bool {
+        matches!(
+            self.get_lang_items(coherence_domain).from_def_id(def_id),
+            Some(LangItem::Sized | LangItem::MetaSized)
+        )
     }
 
     pub fn lift<T: Lift<TyCtxt<'tcx>>>(self, value: T) -> T::Lifted {

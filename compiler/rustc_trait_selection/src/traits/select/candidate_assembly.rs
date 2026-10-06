@@ -913,6 +913,14 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
         }
     }
 
+    pub fn is_sizedness_trait(&self, def_id: DefId) -> bool {
+        matches!(self.as_lang_item(def_id), Some(LangItem::Sized | LangItem::MetaSized))
+    }
+
+    pub fn as_lang_item(&self, def_id: DefId) -> Option<LangItem> {
+        self.tcx().get_lang_items(self.infcx.coherence_domain()).from_def_id(def_id)
+    }
+
     /// Searches for impls that might apply to `obligation`.
     fn assemble_candidates_from_object_ty(
         &mut self,
@@ -924,7 +932,7 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
             "assemble_candidates_from_object_ty",
         );
 
-        if self.tcx().is_sizedness_trait(obligation.predicate.def_id()) {
+        if self.is_sizedness_trait(obligation.predicate.def_id()) {
             // `dyn MetaSized` is valid, but should get its `MetaSized` impl from
             // being `dyn` (SizedCandidate), not from the object candidate.
             return;

@@ -14,14 +14,14 @@ pub(crate) fn expand<'cx>(
             return ExpandResult::Ready(DummyResult::any(sp, err.emit_err()));
         }
     };
-    let Ok(id) = cx.resolver.resolve_path(&path) else {
+    let Ok(res) = cx.resolver.resolve_path(&path) else {
         return ExpandResult::Ready(DummyResult::any(
             sp,
             cx.dcx().span_err(path.span, "could not resolve"),
         ));
     };
 
-    if cx.resolver.has_eq_impl(id, sp) {
+    if cx.resolver.has_eq_impl(res, sp) {
         ExpandResult::Ready(DummyResult::any(sp, cx.dcx().span_err(path.span, "has eq impl")))
     } else {
         ExpandResult::Ready(DummyResult::any(
