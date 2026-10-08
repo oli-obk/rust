@@ -1059,7 +1059,12 @@ pub trait ResolverExpand {
 
     fn resolve_path(&mut self, path: &ast::Path) -> Result<Res<NodeId>, Indeterminate>;
 
-    fn has_eq_impl(&mut self, res: Res<NodeId>, span: Span) -> bool;
+    fn has_impl(
+        &mut self,
+        trait_: Res<NodeId>,
+        args: &[(Res<NodeId>, Span)],
+        trait_span: Span,
+    ) -> bool;
 
     fn record_macro_rule_usage(&mut self, mac_id: NodeId, rule_index: usize);
 

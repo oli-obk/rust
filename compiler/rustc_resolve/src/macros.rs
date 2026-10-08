@@ -628,6 +628,10 @@ impl<'ra, 'tcx> ResolverExpand for Resolver<'ra, 'tcx> {
             None,
         );
         match res {
+            PathResult::Module(ModuleOrUniformRoot::Module(module)) => match module.kind {
+                ModuleKind::Block => todo!(),
+                ModuleKind::Def(def_kind, def_id, ..) => Ok(Res::Def(def_kind, def_id)),
+            },
             PathResult::Module(_) => todo!(),
             PathResult::NonModule(partial_res) => Ok(partial_res.expect_full_res()),
             PathResult::Indeterminate => Err(Indeterminate),
@@ -638,8 +642,8 @@ impl<'ra, 'tcx> ResolverExpand for Resolver<'ra, 'tcx> {
         }
     }
 
-    fn has_eq_impl(&mut self, res: Res, _span: Span) -> bool {
-        let self_ty = match res {
+    fn has_impl(&mut self, trait_: Res, args: &[(Res, Span)], trait_span: Span) -> bool {
+        let args = args.iter().map(|(res, _)| match *res {
             Res::Def(_, def_id) => self.tcx.type_of(def_id).instantiate_identity().skip_norm_wip(),
             Res::PrimTy(prim_ty) => match prim_ty {
                 rustc_hir::PrimTy::Int(IntTy::I128) => self.tcx.types.i128,
@@ -670,8 +674,11 @@ impl<'ra, 'tcx> ResolverExpand for Resolver<'ra, 'tcx> {
             Res::OpenMod(..) => todo!(),
             Res::NonMacroAttr(..) => todo!(),
             Res::Err => todo!(),
+        });
+        let trait_def_id = match trait_ {
+            Res::Def(DefKind::Trait | DefKind::TraitAlias, id) => id,
+            _ => todo!("not a trait: {trait_:?}"),
         };
-        let eq_id = self.tcx.get_lang_items(CoherenceDomain::Upstream).eq_trait().unwrap();
         let infcx = self
             .tcx
             .infer_ctxt()
@@ -680,9 +687,9 @@ impl<'ra, 'tcx> ResolverExpand for Resolver<'ra, 'tcx> {
         assert!(infcx.next_trait_solver());
 
         let ocx = ObligationCtxt::new(&infcx);
-        let trait_ref = ty::TraitRef::new(self.tcx, eq_id, [self_ty, self_ty]);
+        let trait_ref = ty::TraitRef::new(self.tcx, trait_def_id, args);
         ocx.register_obligation(Obligation {
-            cause: ObligationCause::dummy(),
+            cause: ObligationCause::dummy_with_span(trait_span),
             recursion_depth: 0,
             param_env: ty::ParamEnv::empty(),
             predicate: trait_ref.upcast(self.tcx),
