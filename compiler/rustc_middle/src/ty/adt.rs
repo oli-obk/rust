@@ -371,6 +371,7 @@ impl AdtDefData {
         kind: AdtKind,
         variants: IndexVec<VariantIdx, VariantDef>,
         repr: ReprOptions,
+        coherence_domain: ty::CoherenceDomain,
     ) -> Self {
         debug!("AdtDef::new({:?}, {:?}, {:?}, {:?})", did, kind, variants, repr);
         let mut flags = AdtFlags::NO_ADT_FLAGS;
@@ -397,7 +398,7 @@ impl AdtDefData {
         if find_attr!(tcx, did, Fundamental) {
             flags |= AdtFlags::IS_FUNDAMENTAL;
         }
-        flags |= match tcx.as_lang_item(did) {
+        flags |= match tcx.get_lang_items(coherence_domain).from_def_id(did) {
             Some(LangItem::PhantomData) => AdtFlags::IS_PHANTOM_DATA,
             Some(LangItem::OwnedBox) => AdtFlags::IS_BOX,
             Some(LangItem::ManuallyDrop) => AdtFlags::IS_MANUALLY_DROP,

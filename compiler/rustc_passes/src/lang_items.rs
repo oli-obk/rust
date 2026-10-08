@@ -276,9 +276,11 @@ fn get_lang_items(tcx: TyCtxt<'_>, domain: CoherenceDomain) -> LanguageItems {
         // Collect lang items local to this crate.
         visit::Visitor::visit_crate(&mut collector, krate);
     }
-
-    // Find all required but not-yet-defined lang items.
-    weak_lang_items::check_crate(tcx, &mut collector.items);
+    match domain {
+        CoherenceDomain::Upstream => {}
+        // Find all required but not-yet-defined lang items.
+        CoherenceDomain::Everything => weak_lang_items::check_crate(tcx, &mut collector.items),
+    }
 
     // Return all the lang items that were found.
     collector.items

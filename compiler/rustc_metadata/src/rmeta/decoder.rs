@@ -1222,6 +1222,7 @@ impl CrateMetadata {
             adt_kind,
             variants.into_iter().map(|(_, variant)| variant).collect(),
             repr,
+            ty::CoherenceDomain::Upstream,
         )
     }
 
