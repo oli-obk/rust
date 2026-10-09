@@ -604,6 +604,8 @@ pub(in crate::rmeta) fn provide(providers: &mut Providers) {
                     // depending on resolver ordering changes or where the expansion time code is executed
                 }
                 ty::CoherenceDomain::Everything => {
+                    // trigger cycle errors for easier debugging
+                    let _ = tcx.resolver_for_lowering_raw(());
                     // The loaded-crate list is now frozen in the query cache; stop
                     // mutating the cstore and stable crate id map from here on.
                     tcx.untracked().freeze_cstore();
@@ -619,6 +621,10 @@ pub(in crate::rmeta) fn provide(providers: &mut Providers) {
                     // depending on resolver ordering changes or where the expansion time code is executed
                 }
                 ty::CoherenceDomain::Everything => {
+                    if cfg!(debug_assertions) {
+                        // trigger cycle errors for easier debugging
+                        let _ = tcx.resolver_for_lowering_raw(());
+                    }
                     // The loaded-crate list is now frozen in the query cache; stop
                     // mutating the cstore and stable crate id map from here on.
                     tcx.untracked().freeze_cstore();

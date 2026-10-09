@@ -1066,6 +1066,8 @@ pub trait ResolverExpand {
         trait_span: Span,
     ) -> bool;
 
+    fn instantiate_optional_info(&mut self, ty: &ast::Ty) -> Result<OptionalInfo, ErrorGuaranteed>;
+
     fn record_macro_rule_usage(&mut self, mac_id: NodeId, rule_index: usize);
 
     fn check_unused_macros(&mut self);
@@ -1141,6 +1143,11 @@ pub trait ResolverExpand {
     /// Mark the scope as having a compile error so that error for lookup in this scope
     /// should be suppressed
     fn mark_scope_with_compile_error(&mut self, parent_node: NodeId);
+}
+
+pub struct OptionalInfo {
+    pub needs_drop: bool,
+    pub is_copy: bool,
 }
 
 pub trait LintStoreExpand {

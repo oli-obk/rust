@@ -2091,7 +2091,7 @@ pub fn fn_has_unsatisfiable_clauses(cx: &LateContext<'_>, did: DefId) -> bool {
         .filter_map(|(p, _)| if p.is_global() { Some(*p) } else { None });
     traits::impossible_clauses(
         cx.tcx,
-        traits::elaborate(cx.tcx, CoherenceDomain::Everying, clauses).collect::<Vec<_>>(),
+        traits::elaborate(cx.tcx, CoherenceDomain::Everything, clauses).collect::<Vec<_>>(),
     )
 }
 

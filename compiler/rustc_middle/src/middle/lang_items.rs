@@ -18,7 +18,16 @@ impl<'tcx> TyCtxt<'tcx> {
     /// Returns the `DefId` for a given `LangItem`.
     /// If not found, fatally aborts compilation.
     pub fn require_lang_item(self, lang_item: LangItem, span: Span) -> DefId {
-        self.lang_items().get(lang_item).unwrap_or_else(|| {
+        self.require_lang_item_in(lang_item, span, ty::CoherenceDomain::Everything)
+    }
+
+    pub fn require_lang_item_in(
+        self,
+        lang_item: LangItem,
+        span: Span,
+        coherence_domain: ty::CoherenceDomain,
+    ) -> DefId {
+        self.get_lang_items(coherence_domain).get(lang_item).unwrap_or_else(|| {
             self.dcx()
                 .emit_fatal(crate::diagnostics::RequiresLangItem { span, name: lang_item.name() });
         })

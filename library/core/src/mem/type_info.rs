@@ -792,9 +792,9 @@ impl FieldId {
 
 /// Demo for accessing type information during macro expansion
 #[macro_export]
-#[rustc_builtin_macro(expansion_time_type_system_demo)]
+#[rustc_builtin_macro(instantiate_optional)]
 #[unstable(feature = "ettsd", issue = "123646")]
-macro_rules! expansion_time_type_system_demo {
+macro_rules! instantiate_optional {
     ($($arg:tt)*) => {
         /* compiler built-in */
     };

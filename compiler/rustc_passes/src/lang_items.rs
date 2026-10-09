@@ -246,6 +246,10 @@ impl<'ast, 'tcx> LanguageItemCollector<'ast, 'tcx> {
 fn get_lang_items(tcx: TyCtxt<'_>, domain: CoherenceDomain) -> LanguageItems {
     let (node_id_to_def_id, krate): (&dyn Fn(_, _) -> _, _) = match domain {
         CoherenceDomain::Upstream => (&|_, _| unreachable!(), None),
+        // only crates with `feature(lang_items)` can define lang items themselves
+        CoherenceDomain::Everything if !tcx.features().lang_items() => {
+            (&|_, _| unreachable!(), None)
+        }
         CoherenceDomain::Everything => {
             super let (resolver, krate) = tcx.resolver_for_lowering();
             super let resolver = &*resolver.borrow();

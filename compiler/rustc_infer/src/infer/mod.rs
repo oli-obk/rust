@@ -671,10 +671,14 @@ impl<'tcx> InferCtxtBuilder<'tcx> {
     }
 
     pub fn build_with_typing_env(
-        mut self,
+        self,
         typing_env: TypingEnv<'tcx>,
     ) -> (InferCtxt<'tcx>, ty::ParamEnv<'tcx>) {
-        (self.build(typing_env.typing_mode()), typing_env.param_env)
+        (
+            self.with_coherence_domain(typing_env.coherence_domain())
+                .build(typing_env.typing_mode()),
+            typing_env.param_env,
+        )
     }
 
     pub fn build(&mut self, typing_mode: TypingMode<'tcx>) -> InferCtxt<'tcx> {

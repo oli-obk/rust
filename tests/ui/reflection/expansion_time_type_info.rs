@@ -1,21 +1,21 @@
 //@ compile-flags: --crate-type=lib -Znext-solver
+//@ check-pass
 
 #![feature(ettsd)]
-#![no_std]
 
-use core::expansion_time_type_system_demo;
+extern crate core;
 
-expansion_time_type_system_demo!(core::cmp::PartialEq, core::primitive::u32, core::primitive::u32);
-//~^ ERROR: is implemented
+use core::instantiate_optional;
 
-expansion_time_type_system_demo!(core::cmp::PartialEq, core::alloc::Layout, core::alloc::Layout);
-//~^ ERROR: is implemented
+instantiate_optional!(OptU32, u32);
 
-expansion_time_type_system_demo!(core::cmp::Eq, core::primitive::f32);
-//~^ ERROR: is not implemented
+instantiate_optional!(OptLayout, std::alloc::Layout);
 
-expansion_time_type_system_demo!(core::cmp::Eq, core::primitive::u32);
-//~^ ERROR: is implemented
+instantiate_optional!(OptF32, f32);
 
-expansion_time_type_system_demo!(core::fmt::Display, core::alloc::Layout);
-//~^ ERROR: is not implemented
+instantiate_optional!(OptBool, bool);
+
+fn thing(x: &OptU32) {
+    let y = *x;
+    let y = x.clone();
+}

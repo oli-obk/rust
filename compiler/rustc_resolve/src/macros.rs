@@ -4,20 +4,21 @@
 use std::mem;
 use std::sync::Arc;
 
-use rustc_ast::{self as ast, Crate, DelegationSuffixes, FloatTy, IntTy, NodeId, UintTy};
+use rustc_ast::{self as ast, Crate, DelegationSuffixes, FloatTy, IntTy, NodeId, TyKind, UintTy};
 use rustc_ast_pretty::pprust;
 use rustc_attr_ir::{Attribute, AttributeKind, CfgEntry, StabilityLevel, StrippedCfgItem};
 use rustc_attr_parsing::AttributeParser;
 use rustc_data_structures::sync::RwLock;
 use rustc_errors::{Applicability, StashKey};
 use rustc_expand::base::{
-    Annotatable, DeriveResolution, Indeterminate, ResolverExpand, SyntaxExtension,
+    Annotatable, DeriveResolution, Indeterminate, OptionalInfo, ResolverExpand, SyntaxExtension,
     SyntaxExtensionKind,
 };
 use rustc_expand::compile_declarative_macro;
 use rustc_expand::expand::{
     AstFragment, AstFragmentKind, Invocation, InvocationKind, SupportsMacroExpansion,
 };
+use rustc_hir::PrimTy;
 use rustc_hir::def::{DefKind, MacroKinds, Namespace, NonMacroAttrKind};
 use rustc_hir::def_id::{CRATE_DEF_ID, CrateNum, DefId, LocalDefId};
 use rustc_infer::infer::TyCtxtInferExt as _;
@@ -26,13 +27,15 @@ use rustc_lint_defs::builtin::{
     LEGACY_DERIVE_HELPERS, OUT_OF_SCOPE_MACRO_CALLS, UNUSED_MACRO_RULES, UNUSED_MACROS,
 };
 use rustc_middle::middle::stability;
-use rustc_middle::ty::{self, CoherenceDomain, RegisteredTools, TyCtxt, TypingMode, Upcast as _};
+use rustc_middle::ty::{
+    self, CoherenceDomain, RegisteredTools, Ty, TyCtxt, TypingEnv, TypingMode, Upcast as _,
+};
 use rustc_session::Session;
 use rustc_session::diagnostics::feature_err;
 use rustc_span::def_id::ModId;
 use rustc_span::edition::Edition;
 use rustc_span::hygiene::{self, AstPass, ExpnData, ExpnKind, LocalExpnId, MacroKind};
-use rustc_span::{DUMMY_SP, Ident, Span, Symbol, kw, sym};
+use rustc_span::{DUMMY_SP, ErrorGuaranteed, Ident, Span, Symbol, kw, sym};
 use rustc_trait_selection::traits::ObligationCtxt;
 
 use crate::Namespace::*;
@@ -643,28 +646,31 @@ impl<'ra, 'tcx> ResolverExpand for Resolver<'ra, 'tcx> {
     }
 
     fn has_impl(&mut self, trait_: Res, args: &[(Res, Span)], trait_span: Span) -> bool {
+        // FIXME: we really should send this through `lower_to_hir` and then `hir_ty_lowering` instead
+        // of having a bad version going from ast directly to ty
+        let tcx = self.tcx;
         let args = args.iter().map(|(res, _)| match *res {
-            Res::Def(_, def_id) => self.tcx.type_of(def_id).instantiate_identity().skip_norm_wip(),
+            Res::Def(_, def_id) => tcx.type_of(def_id).instantiate_identity().skip_norm_wip(),
             Res::PrimTy(prim_ty) => match prim_ty {
-                rustc_hir::PrimTy::Int(IntTy::I128) => self.tcx.types.i128,
-                rustc_hir::PrimTy::Int(IntTy::I64) => self.tcx.types.i64,
-                rustc_hir::PrimTy::Int(IntTy::I32) => self.tcx.types.i32,
-                rustc_hir::PrimTy::Int(IntTy::I16) => self.tcx.types.i16,
-                rustc_hir::PrimTy::Int(IntTy::I8) => self.tcx.types.i8,
-                rustc_hir::PrimTy::Int(IntTy::Isize) => self.tcx.types.isize,
-                rustc_hir::PrimTy::Uint(UintTy::U128) => self.tcx.types.u128,
-                rustc_hir::PrimTy::Uint(UintTy::U64) => self.tcx.types.u64,
-                rustc_hir::PrimTy::Uint(UintTy::U32) => self.tcx.types.u32,
-                rustc_hir::PrimTy::Uint(UintTy::U16) => self.tcx.types.u16,
-                rustc_hir::PrimTy::Uint(UintTy::U8) => self.tcx.types.u8,
-                rustc_hir::PrimTy::Uint(UintTy::Usize) => self.tcx.types.usize,
-                rustc_hir::PrimTy::Float(FloatTy::F128) => self.tcx.types.f128,
-                rustc_hir::PrimTy::Float(FloatTy::F64) => self.tcx.types.f64,
-                rustc_hir::PrimTy::Float(FloatTy::F32) => self.tcx.types.f32,
-                rustc_hir::PrimTy::Float(FloatTy::F16) => self.tcx.types.f16,
-                rustc_hir::PrimTy::Str => self.tcx.types.str_,
-                rustc_hir::PrimTy::Bool => self.tcx.types.bool,
-                rustc_hir::PrimTy::Char => self.tcx.types.char,
+                rustc_hir::PrimTy::Int(IntTy::I128) => tcx.types.i128,
+                rustc_hir::PrimTy::Int(IntTy::I64) => tcx.types.i64,
+                rustc_hir::PrimTy::Int(IntTy::I32) => tcx.types.i32,
+                rustc_hir::PrimTy::Int(IntTy::I16) => tcx.types.i16,
+                rustc_hir::PrimTy::Int(IntTy::I8) => tcx.types.i8,
+                rustc_hir::PrimTy::Int(IntTy::Isize) => tcx.types.isize,
+                rustc_hir::PrimTy::Uint(UintTy::U128) => tcx.types.u128,
+                rustc_hir::PrimTy::Uint(UintTy::U64) => tcx.types.u64,
+                rustc_hir::PrimTy::Uint(UintTy::U32) => tcx.types.u32,
+                rustc_hir::PrimTy::Uint(UintTy::U16) => tcx.types.u16,
+                rustc_hir::PrimTy::Uint(UintTy::U8) => tcx.types.u8,
+                rustc_hir::PrimTy::Uint(UintTy::Usize) => tcx.types.usize,
+                rustc_hir::PrimTy::Float(FloatTy::F128) => tcx.types.f128,
+                rustc_hir::PrimTy::Float(FloatTy::F64) => tcx.types.f64,
+                rustc_hir::PrimTy::Float(FloatTy::F32) => tcx.types.f32,
+                rustc_hir::PrimTy::Float(FloatTy::F16) => tcx.types.f16,
+                rustc_hir::PrimTy::Str => tcx.types.str_,
+                rustc_hir::PrimTy::Bool => tcx.types.bool,
+                rustc_hir::PrimTy::Char => tcx.types.char,
             },
             Res::SelfTyParam { .. } => todo!(),
             Res::SelfTyAlias { .. } => todo!(),
@@ -679,22 +685,30 @@ impl<'ra, 'tcx> ResolverExpand for Resolver<'ra, 'tcx> {
             Res::Def(DefKind::Trait | DefKind::TraitAlias, id) => id,
             _ => todo!("not a trait: {trait_:?}"),
         };
-        let infcx = self
-            .tcx
-            .infer_ctxt()
-            .with_coherence_domain(CoherenceDomain::Upstream)
-            .build(TypingMode::Codegen);
-        assert!(infcx.next_trait_solver());
+        self.implements_trait(trait_span, args, trait_def_id)
+    }
 
-        let ocx = ObligationCtxt::new(&infcx);
-        let trait_ref = ty::TraitRef::new(self.tcx, trait_def_id, args);
-        ocx.register_obligation(Obligation {
-            cause: ObligationCause::dummy_with_span(trait_span),
-            recursion_depth: 0,
-            param_env: ty::ParamEnv::empty(),
-            predicate: trait_ref.upcast(self.tcx),
-        });
-        ocx.try_evaluate_obligations().no_errors()
+    fn instantiate_optional_info(
+        &mut self,
+        ast_ty: &ast::Ty,
+    ) -> Result<OptionalInfo, ErrorGuaranteed> {
+        let ty = self.lower_ty(ast_ty)?;
+        let mut info = OptionalInfo { needs_drop: false, is_copy: false };
+        let lang_items = self.tcx.get_lang_items(CoherenceDomain::Upstream);
+        let copy_trait = lang_items.copy_trait().unwrap();
+        info.needs_drop = ty.needs_drop(
+            self.tcx,
+            TypingEnv::new(
+                ty::ParamEnv::empty(),
+                TypingMode::Codegen,
+                ty::CoherenceDomain::Upstream,
+            ),
+        );
+        info.is_copy = self.implements_trait(ast_ty.span, [ty].into_iter(), copy_trait);
+        if info.needs_drop && info.is_copy {
+            self.dcx().span_bug(ast_ty.span, "both Destruct and Copy implemented");
+        }
+        Ok(info)
     }
 }
 
@@ -1384,5 +1398,107 @@ impl<'ra, 'tcx> Resolver<'ra, 'tcx> {
         }
 
         Ok(false)
+    }
+
+    fn lower_ty(&mut self, ty: &ast::Ty) -> Result<Ty<'tcx>, ErrorGuaranteed> {
+        macro_rules! todo {
+            () => {
+                return Err(self.dcx().span_err(ty.span, "unimplemented type variant"))
+            };
+        }
+        Ok(match &ty.kind {
+            TyKind::Path(None, path) => {
+                let res = self
+                    .resolve_path(&path)
+                    .map_err(|_| self.dcx().span_err(path.span, "could not resolve"))?;
+                match res {
+                    Res::Def(_def_kind, def_id) => self
+                        .tcx
+                        .type_of(def_id)
+                        .instantiate(self.tcx, ty::GenericArgs::empty())
+                        .skip_norm_wip(),
+                    Res::PrimTy(prim_ty) => match prim_ty {
+                        PrimTy::Int(IntTy::I128) => self.tcx.types.i128,
+                        PrimTy::Int(IntTy::I64) => self.tcx.types.i64,
+                        PrimTy::Int(IntTy::I32) => self.tcx.types.i32,
+                        PrimTy::Int(IntTy::I16) => self.tcx.types.i16,
+                        PrimTy::Int(IntTy::I8) => self.tcx.types.i8,
+                        PrimTy::Int(IntTy::Isize) => self.tcx.types.isize,
+                        PrimTy::Uint(UintTy::U128) => self.tcx.types.u128,
+                        PrimTy::Uint(UintTy::U64) => self.tcx.types.u64,
+                        PrimTy::Uint(UintTy::U32) => self.tcx.types.u32,
+                        PrimTy::Uint(UintTy::U16) => self.tcx.types.u16,
+                        PrimTy::Uint(UintTy::U8) => self.tcx.types.u8,
+                        PrimTy::Uint(UintTy::Usize) => self.tcx.types.usize,
+                        PrimTy::Float(FloatTy::F128) => self.tcx.types.f128,
+                        PrimTy::Float(FloatTy::F64) => self.tcx.types.f64,
+                        PrimTy::Float(FloatTy::F32) => self.tcx.types.f32,
+                        PrimTy::Float(FloatTy::F16) => self.tcx.types.f16,
+                        PrimTy::Str => self.tcx.types.str_,
+                        PrimTy::Bool => self.tcx.types.bool,
+                        PrimTy::Char => self.tcx.types.char,
+                    },
+                    Res::SelfTyParam { .. } => self.tcx.types.self_param,
+                    Res::SelfTyAlias { .. } => todo!(),
+                    Res::SelfCtor(_) => todo!(),
+                    Res::Local(_) => todo!(),
+                    Res::ToolMod => todo!(),
+                    Res::OpenMod(_) => todo!(),
+                    Res::NonMacroAttr(_) => todo!(),
+                    Res::Err => todo!(),
+                }
+            }
+            TyKind::Path(Some(_), _path) => todo!(),
+            TyKind::Slice(ty) => Ty::new_slice(self.tcx, self.lower_ty(ty)?),
+            TyKind::Array(_ty, _anon_const) => todo!(),
+            TyKind::Ptr(ty, mutbl) => Ty::new_ptr(self.tcx, self.lower_ty(ty)?, *mutbl),
+            TyKind::Ref(_lifetime, ty, mutability) => {
+                Ty::new_ref(self.tcx, self.tcx.lifetimes.re_static, self.lower_ty(ty)?, *mutability)
+            }
+            TyKind::PinnedRef(_lifetime, _ty, _mutability) => todo!(),
+            TyKind::FnPtr(_fn_ptr_ty) => todo!(),
+            TyKind::UnsafeBinder(_unsafe_binder_ty) => todo!(),
+            TyKind::Never => self.tcx.types.never,
+            TyKind::Tup(fields) => {
+                Ty::new_tup_from_iter(self.tcx, fields.iter().map(|t| self.lower_ty(t)))?
+            }
+            TyKind::TraitObject(_thin_vec, _trait_object_syntax) => todo!(),
+            TyKind::ImplTrait(_node_id, _thin_vec) => todo!(),
+            TyKind::Paren(ty) => self.lower_ty(ty)?,
+            TyKind::Infer => todo!(),
+            TyKind::ImplicitSelf => todo!(),
+            TyKind::MacCall(_mac_call) => todo!(),
+            TyKind::CVarArgs => todo!(),
+            TyKind::Pat(_ty, _ty_pat) => todo!(),
+            TyKind::FieldOf(_ty, _ident, _ident1) => todo!(),
+            TyKind::View(_ty, _thin_vec) => todo!(),
+            TyKind::GcaMacro(_expr) => todo!(),
+            TyKind::Dummy => todo!(),
+            TyKind::Err(guar) => return Err(*guar),
+        })
+    }
+
+    fn implements_trait(
+        &mut self,
+        trait_span: Span,
+        args: impl Iterator<Item = Ty<'tcx>>,
+        trait_def_id: DefId,
+    ) -> bool {
+        let infcx = self
+            .tcx
+            .infer_ctxt()
+            .with_coherence_domain(CoherenceDomain::Upstream)
+            .build(TypingMode::Codegen);
+        assert!(infcx.next_trait_solver());
+
+        let ocx = ObligationCtxt::new(&infcx);
+        let trait_ref = ty::TraitRef::new(self.tcx, trait_def_id, args);
+        ocx.register_obligation(Obligation {
+            cause: ObligationCause::dummy_with_span(trait_span),
+            recursion_depth: 0,
+            param_env: ty::ParamEnv::empty(),
+            predicate: trait_ref.upcast(self.tcx),
+        });
+        ocx.try_evaluate_obligations().no_errors()
     }
 }
