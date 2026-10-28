@@ -2120,6 +2120,7 @@ symbols! {
         sync,
         synthetic,
         t32,
+        take,
         target,
         target_abi,
         target_arch,

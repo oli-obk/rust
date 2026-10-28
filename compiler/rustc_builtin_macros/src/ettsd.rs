@@ -156,9 +156,17 @@ pub(crate) fn expand<'cx>(
                                     contract: None,
                                     define_opaque: None,
                                     body: Some(Box::new(ast::Block {
-                                        stmts: thin_vec![
-                                            /* actually drop sth here */
-                                        ],
+                                        stmts: thin_vec![ast::Stmt {
+                                            id: DUMMY_NODE_ID,
+                                            // TODO: optimize with drop_in_place
+                                            kind: ast::StmtKind::Semi(cx.expr_method_call(
+                                                span,
+                                                cx.expr_self(span),
+                                                Ident::new(sym::take, span),
+                                                thin_vec![]
+                                            )),
+                                            span
+                                        }],
                                         id: DUMMY_NODE_ID,
                                         rules: ast::BlockCheckMode::Default,
                                         span

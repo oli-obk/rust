@@ -1295,7 +1295,7 @@ impl<'tcx> TypingEnv<'tcx> {
         ); */
         PseudoCanonicalInput { typing_env: self, value }
     }
-    
+
     pub fn coherence_domain(&self) -> CoherenceDomain {
         self.coherence_domain
     }
