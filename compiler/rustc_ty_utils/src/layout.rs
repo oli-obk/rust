@@ -75,8 +75,11 @@ fn layout_of<'tcx>(
 
     match typing_env.typing_mode() {
         ty::TypingMode::Codegen => {
-            let with_postanalysis =
-                ty::TypingEnv::new(typing_env.param_env, ty::TypingMode::PostAnalysis);
+            let with_postanalysis = ty::TypingEnv::new(
+                typing_env.param_env,
+                ty::TypingMode::PostAnalysis,
+                typing_env.coherence_domain(),
+            );
             let res = tcx.layout_of(with_postanalysis.as_query_input(normalized_ty));
             match res {
                 Err(LayoutError::TooGeneric(_)) => {}
@@ -743,6 +746,7 @@ fn layout_of_uncached<'tcx>(
                     let typing_env = ty::TypingEnv::new(
                         tcx.param_env_normalized_for_post_analysis(def.did()),
                         cx.typing_env.typing_mode(),
+                        cx.typing_env.coherence_domain(),
                     );
                     !tcx.type_of(last_field.did)
                         .instantiate_identity()

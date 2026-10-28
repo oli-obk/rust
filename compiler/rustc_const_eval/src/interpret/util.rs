@@ -33,6 +33,7 @@ pub(crate) fn type_implements_dyn_trait<'tcx, M: Machine<'tcx>>(
     let (infcx, param_env) = ecx.tcx.infer_ctxt().build_with_typing_env(ty::TypingEnv::new(
         ecx.typing_env.param_env,
         ty::TypingMode::Reflection,
+        ecx.typing_env.coherence_domain(),
     ));
 
     let ocx = ObligationCtxt::new(&infcx);

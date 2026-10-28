@@ -194,7 +194,11 @@ fn maybe_normalize_erasing_regions<'tcx>(
     // `InferCtxt` would ICE (see #156352).
     let typing_env = if let Some(body_id) = cx.enclosing_body {
         let body_def_id = cx.tcx.hir_enclosing_body_owner(body_id.hir_id);
-        ty::TypingEnv::new(cx.param_env, ty::TypingMode::borrowck(cx.tcx, body_def_id))
+        ty::TypingEnv::new(
+            cx.param_env,
+            ty::TypingMode::borrowck(cx.tcx, body_def_id),
+            ty::CoherenceDomain::Everything,
+        )
     } else {
         cx.typing_env()
     };

@@ -637,7 +637,7 @@ impl<'tcx> LateContext<'tcx> {
     }
 
     pub fn typing_env(&self) -> TypingEnv<'tcx> {
-        TypingEnv::new(self.param_env, self.typing_mode())
+        TypingEnv::new(self.param_env, self.typing_mode(), ty::CoherenceDomain::Everything)
     }
 
     pub fn type_is_copy_modulo_regions(&self, ty: Ty<'tcx>) -> bool {

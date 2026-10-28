@@ -113,7 +113,11 @@ impl Qualif for HasMutInterior {
         let typing_env = if cx.tcx.use_typing_mode_post_typeck_through_borrowck() {
             cx.typing_env
         } else {
-            ty::TypingEnv::new(cx.typing_env.param_env, TypingMode::analysis_in_body(cx.tcx, did))
+            ty::TypingEnv::new(
+                cx.typing_env.param_env,
+                TypingMode::analysis_in_body(cx.tcx, did),
+                cx.typing_env.coherence_domain(),
+            )
         };
 
         let (infcx, param_env) = cx.tcx.infer_ctxt().build_with_typing_env(typing_env);

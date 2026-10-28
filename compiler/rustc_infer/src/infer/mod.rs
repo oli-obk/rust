@@ -1709,7 +1709,7 @@ impl<'tcx> InferCtxt<'tcx> {
             | ty::TypingMode::Codegen) => mode,
             ty::TypingMode::ErasedNotCoherence(MayBeErased) => unreachable!(),
         };
-        ty::TypingEnv::new(param_env, typing_mode)
+        ty::TypingEnv::new(param_env, typing_mode, self.coherence_domain)
     }
 
     /// Similar to [`Self::canonicalize_query`], except that it returns

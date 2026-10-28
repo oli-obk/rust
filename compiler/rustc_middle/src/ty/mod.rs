@@ -1106,6 +1106,9 @@ pub struct TypingEnv<'tcx> {
     #[type_foldable(identity)]
     #[type_visitable(ignore)]
     typing_mode: TypingModeEqWrapper<'tcx>,
+    #[type_foldable(identity)]
+    #[type_visitable(ignore)]
+    coherence_domain: ty::CoherenceDomain,
     pub param_env: ParamEnv<'tcx>,
 }
 
@@ -1122,8 +1125,12 @@ impl<'tcx> rustc_type_ir::inherent::TypingEnv<TyCtxt<'tcx>> for TypingEnv<'tcx> 
 }
 
 impl<'tcx> TypingEnv<'tcx> {
-    pub fn new(param_env: ParamEnv<'tcx>, typing_mode: TypingMode<'tcx>) -> Self {
-        Self { typing_mode: TypingModeEqWrapper(typing_mode), param_env }
+    pub fn new(
+        param_env: ParamEnv<'tcx>,
+        typing_mode: TypingMode<'tcx>,
+        coherence_domain: ty::CoherenceDomain,
+    ) -> Self {
+        Self { typing_mode: TypingModeEqWrapper(typing_mode), param_env, coherence_domain }
     }
 
     pub fn typing_mode(&self) -> TypingMode<'tcx> {
@@ -1138,7 +1145,7 @@ impl<'tcx> TypingEnv<'tcx> {
     /// use `TypingMode::PostAnalysis`, they may still have where-clauses
     /// in scope.
     pub fn fully_monomorphized() -> TypingEnv<'tcx> {
-        Self::new(ParamEnv::empty(), TypingMode::Codegen)
+        Self::new(ParamEnv::empty(), TypingMode::Codegen, ty::CoherenceDomain::Everything)
     }
 
     /// Create a typing environment for use during analysis outside of a body.
@@ -1151,14 +1158,22 @@ impl<'tcx> TypingEnv<'tcx> {
         def_id: impl IntoQueryKey<DefId>,
     ) -> TypingEnv<'tcx> {
         let def_id = def_id.into_query_key();
-        Self::new(tcx.param_env(def_id), TypingMode::non_body_analysis())
+        Self::new(
+            tcx.param_env(def_id),
+            TypingMode::non_body_analysis(),
+            ty::CoherenceDomain::Everything,
+        )
     }
 
     /// The `TypingEnv` which should be for everything happens after HIR typeck
     /// up-to and including borrowck itself.
     pub fn post_typeck_through_borrowck(tcx: TyCtxt<'tcx>, def_id: LocalDefId) -> TypingEnv<'tcx> {
         let param_env = tcx.param_env(def_id.to_def_id());
-        TypingEnv::new(param_env, ty::TypingMode::borrowck(tcx, def_id))
+        TypingEnv::new(
+            param_env,
+            ty::TypingMode::borrowck(tcx, def_id),
+            ty::CoherenceDomain::Everything,
+        )
     }
 
     /// Ideally we just use `TypingMode::post_typeck_through_borrowck`.
@@ -1170,7 +1185,11 @@ impl<'tcx> TypingEnv<'tcx> {
         def_id: LocalDefId,
     ) -> TypingEnv<'tcx> {
         if tcx.use_typing_mode_post_typeck_through_borrowck() {
-            TypingEnv::new(tcx.param_env(def_id.to_def_id()), ty::TypingMode::borrowck(tcx, def_id))
+            TypingEnv::new(
+                tcx.param_env(def_id.to_def_id()),
+                ty::TypingMode::borrowck(tcx, def_id),
+                ty::CoherenceDomain::Everything,
+            )
         } else {
             // FIXME(#132279): We're in a body, we should use a typing
             // mode which reveals the opaque types defined by that body.
@@ -1179,11 +1198,19 @@ impl<'tcx> TypingEnv<'tcx> {
     }
 
     pub fn post_analysis(tcx: TyCtxt<'tcx>, def_id: impl IntoQueryKey<DefId>) -> TypingEnv<'tcx> {
-        TypingEnv::new(tcx.param_env_normalized_for_post_analysis(def_id), TypingMode::PostAnalysis)
+        TypingEnv::new(
+            tcx.param_env_normalized_for_post_analysis(def_id),
+            TypingMode::PostAnalysis,
+            ty::CoherenceDomain::Everything,
+        )
     }
 
     pub fn codegen(tcx: TyCtxt<'tcx>, def_id: impl IntoQueryKey<DefId>) -> TypingEnv<'tcx> {
-        TypingEnv::new(tcx.param_env_normalized_for_post_analysis(def_id), TypingMode::Codegen)
+        TypingEnv::new(
+            tcx.param_env_normalized_for_post_analysis(def_id),
+            TypingMode::Codegen,
+            ty::CoherenceDomain::Everything,
+        )
     }
 
     /// Modify the `typing_mode` to `PostAnalysis` or `Codegen` and eagerly reveal all opaque types
@@ -1205,7 +1232,7 @@ impl<'tcx> TypingEnv<'tcx> {
     where
         T: TypeFoldable<TyCtxt<'tcx>>,
     {
-        let TypingEnv { typing_mode, param_env } = self;
+        let TypingEnv { typing_mode, param_env, coherence_domain } = self;
         match typing_mode.0.assert_not_erased() {
             TypingMode::Coherence
             | TypingMode::Reflection
@@ -1217,7 +1244,7 @@ impl<'tcx> TypingEnv<'tcx> {
 
         let param_env = param_env.with_normalized(tcx);
         let value = ty::set_aliases_to_non_rigid(tcx, value).skip_norm_wip();
-        TypingEnv::new(param_env, TypingMode::PostAnalysis).as_query_input(value)
+        TypingEnv::new(param_env, TypingMode::PostAnalysis, coherence_domain).as_query_input(value)
     }
 
     /// Same as `with_post_analysis_normalized_invalidating_rigid_aliases` except that we use
@@ -1230,7 +1257,7 @@ impl<'tcx> TypingEnv<'tcx> {
     where
         T: TypeFoldable<TyCtxt<'tcx>>,
     {
-        let TypingEnv { typing_mode, param_env } = self;
+        let TypingEnv { typing_mode, param_env, coherence_domain } = self;
         match typing_mode.0.assert_not_erased() {
             TypingMode::Coherence
             | TypingMode::Reflection
@@ -1243,7 +1270,7 @@ impl<'tcx> TypingEnv<'tcx> {
 
         let param_env = param_env.with_normalized(tcx);
         let value = ty::set_aliases_to_non_rigid(tcx, value).skip_norm_wip();
-        TypingEnv::new(param_env, TypingMode::Codegen).as_query_input(value)
+        TypingEnv::new(param_env, TypingMode::Codegen, coherence_domain).as_query_input(value)
     }
 
     /// Combine this typing environment with the given `value` to be used by
@@ -1267,6 +1294,10 @@ impl<'tcx> TypingEnv<'tcx> {
             "{value:?} which has placeholder shouldn't be pseudo-canonicalized"
         ); */
         PseudoCanonicalInput { typing_env: self, value }
+    }
+    
+    pub fn coherence_domain(&self) -> CoherenceDomain {
+        self.coherence_domain
     }
 }
 

@@ -421,6 +421,7 @@ impl<'tcx> Body<'tcx> {
                     TypingEnv::new(
                         tcx.param_env(self.source.def_id()),
                         ty::TypingMode::borrowck(tcx, def_id),
+                        ty::CoherenceDomain::Everything,
                     )
                 }
                 MirPhase::Analysis(AnalysisPhase::PostCleanup)
@@ -429,6 +430,7 @@ impl<'tcx> Body<'tcx> {
                     TypingEnv::new(
                         tcx.param_env(self.source.def_id()),
                         ty::TypingMode::post_borrowck_analysis(tcx, def_id),
+                        ty::CoherenceDomain::Everything,
                     )
                 }
                 MirPhase::Built | MirPhase::Analysis(_) => {
@@ -444,6 +446,7 @@ impl<'tcx> Body<'tcx> {
                 MirPhase::Built | MirPhase::Analysis(_) => TypingEnv::new(
                     tcx.param_env(self.source.def_id()),
                     ty::TypingMode::non_body_analysis(),
+                    ty::CoherenceDomain::Everything,
                 ),
                 MirPhase::Runtime(_) => TypingEnv::post_analysis(tcx, self.source.def_id()),
             }

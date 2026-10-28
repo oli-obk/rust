@@ -32,8 +32,11 @@ fn retry_codegen_mode_with_postanalysis<'tcx, K: TypeVisitable<TyCtxt<'tcx>>, V>
         // We are in codegen. It's very likely this constant has been evaluated in PostAnalysis
         // before. Try to reuse this evaluation, and only re-run if we hit a `TooGeneric` error.
         ty::TypingMode::Codegen => {
-            let with_postanalysis =
-                ty::TypingEnv::new(typing_env.param_env, ty::TypingMode::PostAnalysis);
+            let with_postanalysis = ty::TypingEnv::new(
+                typing_env.param_env,
+                ty::TypingMode::PostAnalysis,
+                typing_env.coherence_domain(),
+            );
             let with_postanalysis = f(with_postanalysis.as_query_input(value));
             match with_postanalysis {
                 Ok(_) | Err(ErrorHandled::Reported(..)) => return Some(with_postanalysis),

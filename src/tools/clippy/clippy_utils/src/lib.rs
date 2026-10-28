@@ -108,8 +108,8 @@ use rustc_middle::mir::{AggregateKind, Operand, RETURN_PLACE, Rvalue, StatementK
 use rustc_middle::ty::adjustment::{Adjust, Adjustment, AutoBorrow, DerefAdjustKind, PointerCoercion};
 use rustc_middle::ty::layout::IntegerExt as _;
 use rustc_middle::ty::{
-    self as rustc_ty, Binder, BorrowKind, ClosureKind, EarlyBinder, GenericArgKind, GenericArgsRef, IntTy, Ty, TyCtxt,
-    TypeFlags, TypeVisitableExt as _, TypeckResults, UintTy, UpvarCapture,
+    self as rustc_ty, Binder, BorrowKind, ClosureKind, CoherenceDomain, EarlyBinder, GenericArgKind, GenericArgsRef,
+    IntTy, Ty, TyCtxt, TypeFlags, TypeVisitableExt as _, TypeckResults, UintTy, UpvarCapture,
 };
 use rustc_session::config::Input;
 use rustc_span::hygiene::{ExpnKind, MacroKind};
@@ -2089,7 +2089,10 @@ pub fn fn_has_unsatisfiable_clauses(cx: &LateContext<'_>, did: DefId) -> bool {
         .clauses
         .iter()
         .filter_map(|(p, _)| if p.is_global() { Some(*p) } else { None });
-    traits::impossible_clauses(cx.tcx, traits::elaborate(cx.tcx, clauses).collect::<Vec<_>>())
+    traits::impossible_clauses(
+        cx.tcx,
+        traits::elaborate(cx.tcx, CoherenceDomain::Everying, clauses).collect::<Vec<_>>(),
+    )
 }
 
 /// Returns the `DefId` of the callee if the given expression is a function or method call.
